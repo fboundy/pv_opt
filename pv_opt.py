@@ -188,7 +188,9 @@ class PVOpt(hass.Hass):
         self.log(f"PV Opt Initialisation complete")
 
     def _load_inverter(self):
-        self.inverter = inv.InverterController(type=self.inverter_type)
+        self.inverter = inv.InverterController(
+            inverter_type=self.inverter_type, host=self
+        )
 
     def _setup_schedule(self):
         if self.config["forced_charge"]:
@@ -776,8 +778,7 @@ class PVOpt(hass.Hass):
         )
         self.base_cost = self.contract.net_cost(self.base)
 
-        if self.debug:
-            self.log(f'Optimising for {self.config["solar_forecast"]} forecast')
+        self.log(f'Optimising for {self.config["solar_forecast"]} forecast')
 
         self.opt = self.pv_system.optimised_force(
             self.initial_soc,
@@ -803,23 +804,22 @@ class PVOpt(hass.Hass):
             self.charge_end_datetime = self.static.index[0]
 
         self.log(
+            f"Start time: {self.static.index[0]} End time: {self.static.index[-1]} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum()} Opt Cost: {self.opt_cost.sum()}"
+        )
+        self.log(
             f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).total_seconds():0.2f} seconds"
         )
         self.log("")
 
-        if self.debug:
-            self.log(f"Start time: {self.static.index[0]}")
-            self.log(f"End time: {self.static.index[-1]}")
-            self.log("Optimising for default prices")
-            self.log(self.static.columns)
-            self.log(f"Initial SOC: {self.initial_soc}")
-            self.log(f"Base Cost: {self.base_cost.sum()}")
-            self.log(f"Opt Cost: {self.opt_cost.sum()}")
-            self.log(self.base.columns)
-            self.log(self.opt.columns)
-            self.log(self.base.iloc[-1])
-
         self.write_output()
+
+        if not self.config["read_only"]:
+            self.inverter.control_charge(
+                enable=True,
+                start=self.charge_start_datetime,
+                end=self.charge_end_datetime,
+                power=charge_power,
+            )
 
     def write_to_hass(self, entity, state, attributes):
         try:
