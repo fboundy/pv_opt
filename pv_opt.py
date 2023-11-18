@@ -40,6 +40,8 @@ BOTTLECAP_DAVE = {
     "rates": "current_day_rates",
 }
 
+INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS"]
+
 IMPEXP = ["import", "export"]
 
 DEFAULT_CONFIG = {
@@ -150,8 +152,11 @@ class PVOpt(hass.Hass):
         self.change_items = {}
         self.cum_delta = {}
         self.timer_handle = None
+        self.inverter_type = "SOLIS_SOLAX_MODBUS"
 
         self._load_args()
+
+        self._load_inverter()
 
         self._status("Initialising PV Model")
         self.inverter_model = pv.InverterModel(
@@ -181,6 +186,9 @@ class PVOpt(hass.Hass):
             self._setup_schedule()
 
         self.log(f"PV Opt Initialisation complete")
+
+    def _load_inverter(self):
+        self.inverter = inv.InverterController(type=self.inverter_type)
 
     def _setup_schedule(self):
         if self.config["forced_charge"]:

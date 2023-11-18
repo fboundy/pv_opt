@@ -68,7 +68,10 @@ pv_opt:
     - 52
 
   entity_id_battery_soc: sensor.solis_battery_soc
-
+  entity_id_timed_charge_start_hour:     number.solis_timed_charge_start_hour
+  entity_id_timed_charge_start_minutes:  number.solis_timed_charge_start_minutes
+  entity_id_timed_charge_end_hours:      number.solis_timed_charge_end_hours 
+  entity_id_timed_charge_end_minutes:    number.solis_timed_charge_end_minutes
   # ========================================
   # Solcast configuration
   # ========================================
