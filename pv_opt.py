@@ -153,7 +153,6 @@ class PVOpt(hass.Hass):
 
         self._load_args()
 
-        self._load_inverter()
         self._status("Initialising PV Model")
         self.inverter_model = pv.InverterModel(
             inverter_efficiency=self.config["inverter_efficiency_percent"] / 100,
@@ -796,7 +795,7 @@ class PVOpt(hass.Hass):
             self.charge_end_datetime = self.static.index[0]
 
         self.log(
-            f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).seconds:0.2f} seconds"
+            f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).total_seconds():0.2f} seconds"
         )
         self.log("")
 
