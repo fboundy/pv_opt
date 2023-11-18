@@ -8,6 +8,7 @@ import pandas as pd
 # import requests
 # import datetime
 import pvpy as pv
+import inverters as inv
 import numpy as np
 from numpy import nan
 
@@ -17,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 # %%
 #
 
-VERSION = "2.1.0"
+VERSION = "3.0.0"
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S%z"
 
@@ -34,16 +35,24 @@ OUTPUT_OPT_COST_ENTITY = "sensor.solaropt_optimised_cost"
 OUTPUT_ALT_OPT_ENTITY = "sensor.solaropt_alt"
 
 BOTTLECAP_DAVE = {
-    "domain": "sensor",
-    "tariff_code": "tariff",
-    "rates": "current_rate",
+    "domain": "event",
+    "tariff_code": "tariff_code",
+    "rates": "current_day_rates",
 }
 
 IMPEXP = ["import", "export"]
 
 DEFAULT_CONFIG = {
-    "force_charge": {"default": True, "domain": "switch"},
-    "force_discharge": {"default": True, "domain": "switch"},
+    "forced_charge": {"default": True, "domain": "switch"},
+    "forced_discharge": {"default": False, "domain": "switch"},
+    "read_only": {"default": True, "domain": "switch"},
+    "optimise_frequency_minutes": {
+        "default": 10,
+        "min": 5,
+        "max": 60,
+        "step": 5,
+        "domain": "input_number",
+    },
     "manual_tariff": {"default": False, "domain": "switch"},
     "octopus_auto": {"default": True, "domain": "switch"},
     "solcast_integration": {"default": True, "domain": "switch"},
@@ -89,7 +98,7 @@ DEFAULT_CONFIG = {
     },
     "solar_forecast": {
         "default": "Solcast",
-        "options": ["Solcast p10", "Solcast p90"],
+        "options": ["Solcast", "Solcast_p10", "Solcast_p90"],
         "domain": "select",
     },
     "consumption_from_entity": {"default": True, "domain": "switch"},
@@ -137,52 +146,73 @@ class PVOpt(hass.Hass):
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
         self.adapi = self.get_ad_api()
-        self.log(f"INFO:  Time Zone Offset: {self.get_tz_offset()} minutes")
+        self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
         self.change_items = {}
         self.cum_delta = {}
+        self.timer_handle = None
 
         self._load_args()
 
+        self._load_inverter()
         self._status("Initialising PV Model")
-        self.inverter = pv.HybridInverter(
+        self.inverter_model = pv.InverterModel(
             inverter_efficiency=self.config["inverter_efficiency_percent"] / 100,
             inverter_power=self.config["inverter_power_watts"],
             inverter_loss=self.config["inverter_loss_watts"],
             charger_efficiency=self.config["charger_efficiency_percent"] / 100,
             charger_power=self.config["charger_power_watts"],
         )
-        self.battery = pv.Battery(
+        self.battery_model = pv.BatteryModel(
             capacity=self.config["battery_capacity_Wh"],
             max_dod=self.config["maximum_dod_percent"] / 100,
         )
-        self.pv_system = pv.PVsystem(
-            "PV_Opt", self.inverter, self.battery, log=self.log
+        self.pv_system = pv.PVsystemModel(
+            "PV_Opt", self.inverter_model, self.battery_model, log=self.log
         )
         self.load_contract()
-        self._status("Idle")
-        # # Optimise on an EVENT trigger:
-        # self.listen_event(
-        #     self.optimise_event,
-        #     EVENT_TRIGGER,
-        # )
-        # self.listen_event(self.optimise_debug_event, DEBUG_TRIGGER)
-        # # Optimise when the Solcast forecast changes:
-        # self.log(self.config["entity_id_solcast_today"])
-        # self.listen_state(
-        #     self.optimise_state_change, self.config["entity_id_solcast_today"]
-        # )
+        # Optimise on an EVENT trigger:
+        self.listen_event(
+            self.optimise_event,
+            EVENT_TRIGGER,
+        )
+        if self.config["forced_charge"]:
+            self.log("")
+            self.log("Running initial Optimisation:")
+            self.optimise()
+            self._setup_schedule()
 
-        # self.log(f"************** PV Opt Initialised ************")
-        # self.log(f"******** Waiting for {EVENT_TRIGGER} Event *********")
+        self.log(f"PV Opt Initialisation complete")
+
+    def _setup_schedule(self):
+        if self.config["forced_charge"]:
+            start_opt = (
+                pd.Timestamp.now()
+                .round(f"{self.config['optimise_frequency_minutes']}T")
+                .to_pydatetime()
+            )
+            self.timer_handle = self.run_every(
+                self.optimise_time,
+                start=start_opt,
+                interval=self.config["optimise_frequency_minutes"] * 60,
+            )
+            self.log(
+                f"Optimiser will run every {self.config['optimise_frequency_minutes']} minutes from {start_opt.strftime('%H:%M')} or on {EVENT_TRIGGER} Event"
+            )
+
+        else:
+            if self.timer_handle and self.timer_running(self.timer_handle):
+                self.cancel_timer(self.timer_handle)
+                self.log("Optimer Schedule Disabled")
+                self._set_status("Disabled")
 
     def load_contract(self):
         self.contract = None
         self.log("")
-        self.log("INFO:  Loading Contract:")
+        self.log("Loading Contract:")
         self.log("------------------------")
         try:
             if self.config["octopus_auto"]:
-                self.log(f"INFO:  Trying to auto detect Octopus tariffs")
+                self.log(f"Trying to auto detect Octopus tariffs")
 
                 octopus_entities = [
                     name
@@ -198,8 +228,8 @@ class PVOpt(hass.Hass):
                 entities["export"] = [x for x in octopus_entities if "export" in x]
 
                 for imp_exp in IMPEXP:
-                    for entity in octopus_entities:
-                        self.log(f"INFO:  Found {imp_exp} entity {entity}")
+                    for entity in entities[imp_exp]:
+                        self.log(f"Found {imp_exp} entity {entity}")
 
                 tariffs = {x: None for x in IMPEXP}
                 for imp_exp in IMPEXP:
@@ -214,9 +244,11 @@ class PVOpt(hass.Hass):
                 self.contract = pv.Contract(
                     "current", imp=tariffs["import"], exp=tariffs["export"], base=self
                 )
-                self.log("INFO:  Contract tariffs loaded OK")
+                self.log("Contract tariffs loaded OK")
         except:
-            self.log("WARN:  Failed to find tariff from Octopus Energy Integration")
+            self.log(
+                "Failed to find tariff from Octopus Energy Integration", level="WARNING"
+            )
 
         if self.contract is None:
             if ("octopus_account" in self.config) and (
@@ -227,7 +259,7 @@ class PVOpt(hass.Hass):
                 ):
                     try:
                         self.log(
-                            f"INFO:  Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
+                            f"Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
                         )
                         self.octopus_account = pv.OctopusAccount(
                             self.config["octopus_account"],
@@ -237,11 +269,12 @@ class PVOpt(hass.Hass):
                         self.contract = pv.Contract(
                             "current", octopus_account=self.octopus_account, base=self
                         )
-                        self.log("INFO:  Contract tariffs loaded OK")
+                        self.log("Contract tariffs loaded OK")
 
                     except:
                         self.log(
-                            "WARN:  Unable to load Octopus Account details using API Key"
+                            "Unable to load Octopus Account details using API Key",
+                            level="WARN",
                         )
 
         if self.contract is None:
@@ -270,12 +303,12 @@ class PVOpt(hass.Hass):
                         exp=tariffs["export"],
                         base=self,
                     )
-                    self.log("INFO:  Contract tariffs loaded OK from Tariff Codes")
+                    self.log("Contract tariffs loaded OK from Tariff Codes")
                 except:
-                    self.log("WARN: Unable to load Tariff Codes")
+                    self.log("Unable to load Tariff Codes", level="WARNING")
 
         if self.contract is None:
-            e = "ERROR: Unable to load contract tariffs"
+            e = "Unable to load contract tariffs"
             self.log(e)
             self._status(e)
             raise ValueError(e)
@@ -333,7 +366,7 @@ class PVOpt(hass.Hass):
 
         change_entities = []
 
-        self.log("INFO:  Reading arguments from YAML:")
+        self.log("Reading arguments from YAML:")
         self.log("-----------------------------------")
 
         if items is None:
@@ -349,7 +382,8 @@ class PVOpt(hass.Hass):
             if values[0] is None:
                 self.config[item] = self.get_default_config(item)
                 self.log(
-                    f"WARN:      {item:30s} = {str(self.config[item]):57s} Source: system default. Null entry found in YAML."
+                    f"    {item:30s} = {str(self.config[item]):57s} Source: system default. Null entry found in YAML.",
+                    level="WARNING",
                 )
             # if the item starts with 'entitiy_id' then it must be an entity that exists:
             elif "entity_id" in item:
@@ -363,16 +397,17 @@ class PVOpt(hass.Hass):
                     #     self.change_items[v] = item
 
                     self.log(
-                        f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: value(s) in YAML"
+                        f"    {item:30s} = {str(self.config[item]):57s} Source: value(s) in YAML"
                     )
 
                 elif self.entity_exists(self.get_default_config(item)):
                     self.config = self.get_default_config(item)
                     self.log(
-                        f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: system default. Entities listed in YAML {value} do not all exist in HA."
+                        f"    {item:30s} = {str(self.config[item]):57s} Source: system default. Entities listed in YAML {value} do not all exist in HA.",
+                        level="ERROR",
                     )
                 else:
-                    e = f"ERROR:     {item:30s} : Neither the entities listed in the YAML {value} nor the system default of {self.get_default_config(item)} exist in HA."
+                    e = f"    {item:30s} : Neither the entities listed in the YAML {value} nor the system default of {self.get_default_config(item)} exist in HA."
                     self.log(e)
                     raise ValueError(e)
 
@@ -403,7 +438,7 @@ class PVOpt(hass.Hass):
                 ):
                     self.config[item] = values[0]
                     self.log(
-                        f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: value in YAML"
+                        f"    {item:30s} = {str(self.config[item]):57s} Source: value in YAML"
                     )
 
                 elif min(arg_types[str]):
@@ -426,7 +461,7 @@ class PVOpt(hass.Hass):
                     if np.min(val_types[int] | val_types[float]):
                         self.config[item] = sum(ha_values)
                         self.log(
-                            f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
+                            f"    {item:30s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
                         )
                     # if any of list but the last one are strings and the default for the item is a string
                     # try getting values from all the entities
@@ -434,33 +469,34 @@ class PVOpt(hass.Hass):
                         self.config[item] = valid_strings[0][0]
                         self.change_items[valid_strings[0][1]] = item
                         self.log(
-                            f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
+                            f"    {item:30s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
                         )
 
                     elif len(values) > 1:
                         if self.same_type(values[-1], self.get_default_config(item)):
                             self.config[item] = values[-1]
                             self.log(
-                                f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
+                                f"    {item:30s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
                             )
 
                         elif values[-1] in self.get_default_config(item):
                             self.log(values)
                             self.config[item] = values[-1]
                             self.log(
-                                f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
+                                f"    {item:30s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
                             )
                     else:
                         if item in DEFAULT_CONFIG:
                             self.config[item] = self.get_default_config(item)
 
                             self.log(
-                                f"ERROR:     {item:30s} = {str(self.config[item]):57s} Source: system default. Unable to read from HA entities listed in YAML. No default in YAML."
+                                f"    {item:30s} = {str(self.config[item]):57s} Source: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
+                                level="ERROR",
                             )
                         else:
                             self.config[item] = values[0]
                             self.log(
-                                f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: YAML default value. No default defined."
+                                f"    {item:30s} = {str(self.config[item]):57s} Source: YAML default value. No default defined."
                             )
 
                 elif len(values) == 1 and (
@@ -471,7 +507,7 @@ class PVOpt(hass.Hass):
 
                     self.config[item] = values[0]
                     self.log(
-                        f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: value in YAML"
+                        f"    {item:30s} = {str(self.config[item]):57s} Source: value in YAML"
                     )
 
                 elif (
@@ -496,7 +532,7 @@ class PVOpt(hass.Hass):
                     if np.min(val_types[int] | val_types[float]):
                         self.config[item] = sum(ha_values)
                         self.log(
-                            f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
+                            f"    {item:30s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
                         )
                         # If these change then we need to trigger automatically
                         for v in values[:-1]:
@@ -505,17 +541,18 @@ class PVOpt(hass.Hass):
                     else:
                         self.config[item] = values[-1]
                         self.log(
-                            f"INFO:      {item:30s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
+                            f"    {item:30s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
                         )
 
                 else:
                     self.config[item] = self.get_default_config(item)
                     self.log(
-                        f"ERROR:     {item:30s} = {str(self.config[item]):57s} Source: system default. Invalid arguments in YAML."
+                        f"    {item:30s} = {str(self.config[item]):57s} Source: system default. Invalid arguments in YAML.",
+                        level="ERROR",
                     )
 
         self.log("")
-        self.log("INFO:  Checking config:")
+        self.log("Checking config:")
         self.log("-----------------------")
         items_not_defined = [i for i in DEFAULT_CONFIG if i not in self.config]
         if len(items_not_defined) > 0:
@@ -523,19 +560,20 @@ class PVOpt(hass.Hass):
                 if item not in self.config:
                     self.config[item] = self.get_default_config(item)
                     self.log(
-                        f"WARN:      {item:30s} = {str(self.config[item]):57s} Source: system default. Not in YAML."
+                        f"    {item:30s} = {str(self.config[item]):57s} Source: system default. Not in YAML.",
+                        level="WARNING",
                     )
         else:
-            self.log("INFO:  All config items defined OK")
+            self.log("All config items defined OK")
 
         self.log("")
-        self.log("INFO:  Exposing config to Home Assistant:")
+        self.log("Exposing config to Home Assistant:")
         self.log("-----------------------")
         self._expose_configs()
 
         if self.change_items:
             self.log("")
-            self.log("INFO:  State change entities:")
+            self.log("State change entities:")
             self.log("-----------------------------")
             for entity_id in self.change_items:
                 self.log(
@@ -543,6 +581,13 @@ class PVOpt(hass.Hass):
                 )
                 self.listen_state(self.optimise_state_change, entity_id)
                 self.cum_delta[entity_id] = 0
+
+        if "manual_tz" in self.config:
+            self.tz = self.params["manual_tz"]
+        else:
+            self.tz = "GB"
+
+        self.log(f"Local timezone set to {self.tz}")
 
     def _name_from_item(self, item):
         name = item.replace("_", " ")
@@ -573,7 +618,7 @@ class PVOpt(hass.Hass):
                 attributes = attributes | DEFAULT_CONFIG[item]["attributes"]
 
             if not self.entity_exists(entity_id=entity_id):
-                self.log(f"INFO:  Creating HA Entity {entity_id} for {item}")
+                self.log(f"Creating HA Entity {entity_id} for {item}")
                 self.set_state(
                     state=self._state_from_value(self.config[item]),
                     entity_id=entity_id,
@@ -592,21 +637,30 @@ class PVOpt(hass.Hass):
         item = self.change_items[entity_id]
         delta = None
         value = None
-        if "step" in DEFAULT_CONFIG[item]["attributes"]:
+        if (
+            "attributes" in DEFAULT_CONFIG[item]
+            and "step" in DEFAULT_CONFIG[item]["attributes"]
+        ):
             delta = DEFAULT_CONFIG[item]["attributes"]["step"]
         try:
             self.cum_delta[entity_id] += float(new) - float(old)
             if self.cum_delta[entity_id] >= delta:
                 self.log(
-                    f"INFO:  Entity {entity_id} changed from {old} to {new}. Cumulative{self.cum_delta[entity_id]} vs {delta}"
+                    f"Entity {entity_id} changed from {old} to {new}. Cumulative{self.cum_delta[entity_id]} vs {delta}"
                 )
                 value = self._value_from_state(new)
+                self.cum_delta[entity_id] = 0
         except:
-            self.log(f"INFO:  Entity {entity_id} changed from {old} to {new}. ")
+            self.log(f"Entity {entity_id} changed from {old} to {new}. ")
             value = self._value_from_state(new)
 
         if value is not None:
-            self.log(f"INFO:  State resolved to {value} [with type{type(value)}")
+            self.log(f"State resolved to {value} [with type{type(value)}")
+
+        if "forced" in item:
+            self._setup_schedule()
+        else:
+            pass
             # self.optimise()
 
     def _value_from_state(self, state):
@@ -631,24 +685,32 @@ class PVOpt(hass.Hass):
             if time_value != state:
                 value = state
 
-        value = state
+        if value is None:
+            value = state
 
         return value
 
+    @ad.app_lock
     def optimise_event(self, event_name, data, kwargs):
-        self.log(f"********* {event_name} Event triggered **********")
-        self.log(kwargs)
+        self.log(f"Optimiser triggered by {event_name}")
         self.optimise()
 
-    def optimise_debug_event(self, event_name, data, kwargs):
-        self.log(f"********* {event_name} Event triggered **********")
-        debug_old = self.debug
-        self.debug = True
+    @ad.app_lock
+    def optimise_time(self, cb_args):
+        self.log(f"Optimser triggered by Scheduler ")
         self.optimise()
-        self.debug = debug_old
 
     def optimise(self):
         # initialse a DataFrame to cover today and tomorrow at 30 minute frequency
+        self.log("")
+        if self.config["forced_discharge"]:
+            discharge_enable = "enabled"
+        else:
+            discharge_enable = "disabled"
+        self.log(f"Starting Opimisation with discharge {discharge_enable}")
+        self.log(
+            f"-------------------------------------------{len(discharge_enable)*'-'}"
+        )
         self.t0 = pd.Timestamp.now()
         self.static = pd.DataFrame(
             index=pd.date_range(
@@ -663,18 +725,18 @@ class PVOpt(hass.Hass):
         try:
             if not self.load_solcast():
                 raise Exception
+            self.log("Solar forecast loaded OK")
 
         except Exception as e:
-            self.log(f"Unable to load solar forecast: {e}")
+            self.log(f"Unable to load solar forecast: {e}", level="ERROR")
             return False
 
-        # Load the expected consumption
         try:
             if not self.load_consumption():
                 raise Exception
 
         except Exception as e:
-            self.log(f"Unable to load estimated consumption: {e}")
+            self.log(f"Unable to load estimated consumption: {e}", level="ERROR")
             return False
 
         self.time_now = pd.Timestamp.utcnow()
@@ -715,25 +777,28 @@ class PVOpt(hass.Hass):
             self.static,
             self.contract,
             solar=self.config["solar_forecast"],
-            discharge=True,
+            discharge=self.config["forced_discharge"],
         )
         self.opt_cost = self.contract.net_cost(self.opt)
 
         if (self.opt["forced"] > 0).sum() > 0:
             charge_power = self.opt[self.opt["forced"] > 0].iloc[0]["forced"]
             self.charge_current = charge_power / self.config["battery_voltage"]
-            self.log(f"First slot power:{charge_power}")
+            # self.log(f"First slot power:{charge_power}")
             charge_window = self.opt[self.opt["forced"] == charge_power]
             self.charge_start_datetime = charge_window.index[0]
             self.charge_end_datetime = charge_window.index[0] + pd.Timedelta("30T")
 
         else:
-            self.log(f"No charging slots")
+            # self.log(f"No charging slots")
             self.charge_current = 0
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
 
-        self.log(f"Elapsed time {pd.Timestamp.now()- self.t0}")
+        self.log(
+            f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).seconds:0.2f} seconds"
+        )
+        self.log("")
 
         if self.debug:
             self.log(f"Start time: {self.static.index[0]}")
@@ -783,25 +848,29 @@ class PVOpt(hass.Hass):
 
     def write_output(self):
         self.write_cost(
-            "Base",
-            entity=OUTPUT_BASE_COST_ENTITY,
+            "PVopt Base Cost",
+            entity=f"sensor.{self.prefix}_base_cost",
             cost=self.base_cost.sum(),
             df=self.base,
         )
+
         self.write_cost(
-            "Opt", entity=OUTPUT_OPT_COST_ENTITY, cost=self.opt_cost.sum(), df=self.opt
+            "PVopt Optimised Cost",
+            entity=f"sensor.{self.prefix}_opt_cost",
+            cost=self.opt_cost.sum(),
+            df=self.opt,
         )
 
         self.write_to_hass(
-            entity=OUTPUT_START_ENTITY,
+            entity=f"sensor.{self.prefix}_charge_start",
             state=self.charge_start_datetime,
             attributes={
-                "friendly_name": "PV_Opt Next Charge Period End",
+                "friendly_name": "PVopt Next Charge Period Start",
             },
         )
 
         self.write_to_hass(
-            entity=OUTPUT_END_ENTITY,
+            entity=f"sensor.{self.prefix}_charge_end",
             state=self.charge_end_datetime,
             attributes={
                 "friendly_name": "PV_Opt Next Charge Period End",
@@ -809,7 +878,7 @@ class PVOpt(hass.Hass):
         )
 
         self.write_to_hass(
-            entity=OUTPUT_CURRENT_ENTITY,
+            entity=f"sensor.{self.prefix}_charge_current",
             state=round(self.charge_current, 2),
             attributes={
                 "unique_id": OUTPUT_CURRENT_ENTITY,
@@ -849,8 +918,7 @@ class PVOpt(hass.Hass):
             df *= 1000
 
             self.static = pd.concat([self.static, df.fillna(0)], axis=1)
-            if self.debug:
-                self.log("** Solcast forecast loaded OK **")
+            self.log("Solcast forecast loaded OK")
             return True
 
         except Exception as e:
@@ -858,54 +926,56 @@ class PVOpt(hass.Hass):
             return False
 
     def load_consumption(self):
-        self.log("INFO:  Getting expected consumption data")
+        self.log("Getting expected consumption data")
 
         if self.config["consumption_from_entity"]:
-            try:
-                # load history fot the last N days from the specified sensor
-                # self.log(self.config["consumption_history_days"])
-                df = self.hass2df(
-                    self.config["entity_id_consumption"],
-                    days=int(self.config["consumption_history_days"]),
-                )
+            consumption = pd.Series(index=self.static.index, data=0)
+            for entity_id in self.config["entity_id_consumption"]:
+                try:
+                    # load history fot the last N days from the specified sensors
+                    # self.log(self.config["consumption_history_days"])
+                    df = self.hass2df(
+                        entity_id,
+                        days=int(self.config["consumption_history_days"]),
+                    )
 
-            except Exception as e:
-                self.log(
-                    f"Unable to get historical consumption from {self.config['entity_id_consumption']}"
-                )
-                self.log(f"Error: {e}")
-                return False
+                except Exception as e:
+                    self.log(f"Unable to get historical consumption from {entity_id}")
+                    self.log(f"Error: {e}")
+                    return False
 
-            try:
-                # df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
-                df.index = pd.to_datetime(df.index)
-                df = (
-                    pd.to_numeric(df, errors="coerce")
-                    .dropna()
-                    .resample("30T")
-                    .mean()
-                    .fillna(0)
-                )
-                df *= 1 + self.config["consumption_margin"] / 100
+                try:
+                    df.index = pd.to_datetime(df.index)
+                    df = (
+                        pd.to_numeric(df, errors="coerce")
+                        .dropna()
+                        .resample("30T")
+                        .mean()
+                        .fillna(0)
+                    )
+                    df *= 1 + self.config["consumption_margin"] / 100
 
-                # Group by time and take the mean
-                df = df.groupby(df.index.time).aggregate(
-                    self.config["consumption_grouping"]
-                )
-                df.name = "consumption"
+                    # Group by time and take the mean
+                    df = df.groupby(df.index.time).aggregate(
+                        self.config["consumption_grouping"]
+                    )
+                    df.name = "consumption"
 
-                self.static["time"] = self.static.index.time
-                self.static = self.static.merge(
-                    df, "left", left_on="time", right_index=True
-                )
+                    temp = self.static.copy()
+                    temp["time"] = temp.index.time
+                    temp = temp.merge(df, "left", left_on="time", right_index=True)
+                    # self.log(temp["consumption"].sum())
+                    consumption += temp["consumption"]
+                    self.log(f"Estimated consumption from {entity_id} loaded OK ")
 
-                if self.debug:
-                    self.log("** Estimated consumption loaded OK **")
-                return True
+                # self.log(temp)
 
-            except Exception as e:
-                self.log(f"Error loading consumption data: {e}")
-                return False
+                except Exception as e:
+                    self.log(f"Error loading consumption data: {e}")
+                    return False
+
+            self.static["consumption"] = consumption
+            return True
 
         else:
             try:

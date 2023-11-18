@@ -3,9 +3,14 @@ pvpy:
   module: pvpy
   global: true
 
+inverters:
+  module: inverters
+  global: true
+
 pv_opt:
   module: pv_opt
   class: PVOpt
+  log: pv_opt_log
 
 # User configuration ---  EDIT AWAY! ---
   prefix: PVopt

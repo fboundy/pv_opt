@@ -166,7 +166,7 @@ class Tariff:
         return pd.DataFrame(df)
 
 
-class HybridInverter:
+class InverterModel:
     def __init__(
         self,
         inverter_efficiency=0.97,
@@ -202,7 +202,7 @@ class HybridInverter:
     #     return mask
 
 
-class Battery:
+class BatteryModel:
     def __init__(self, capacity: int, max_dod: float = 0.15) -> None:
         self.capacity = capacity
         self.max_dod = max_dod
@@ -232,6 +232,10 @@ class Contract:
     ) -> None:
         self.name = name
         self.base = base
+        if self.base:
+            self.log = base.log
+        else:
+            self.log = print
 
         if imp is None and octopus_account is None:
             raise ValueError(
@@ -244,22 +248,25 @@ class Contract:
 
         else:
             url = f"https://api.octopus.energy/v1/accounts/{octopus_account.account_number}/"
+            self.log(f"INFO:  Connecting to {url}")
             try:
                 r = requests.get(url, auth=(octopus_account.api_key, ""))
                 r.raise_for_status()  # Raise an exception for unsuccessful HTTP status codes
 
             except requests.exceptions.RequestException as e:
-                print("An HTTP error occurred:", e)
+                self.log("ERROR: An HTTP error occurred:", e)
                 self.imp = e
 
             mpans = r.json()["properties"][0]["electricity_meter_points"]
             for mpan in mpans:
+                self.log(f"INFO:  Getting details for MPAN {mpan}")
                 df = pd.DataFrame(mpan["agreements"])
                 df = df.set_index("valid_from")
                 df.index = pd.to_datetime(df.index)
                 df = df.sort_index()
                 tariff_code = df["tariff_code"].iloc[-1]
 
+                self.log(f"INFO:  Retrieved most recent tariff code {tariff_code}")
                 if mpan["is_export"]:
                     self.exp = Tariff(tariff_code, export=True)
                 else:
@@ -295,9 +302,9 @@ class Contract:
         return nc
 
 
-class PVsystem:
+class PVsystemModel:
     def __init__(
-        self, name: str, inverter: HybridInverter, battery: Battery, log=None
+        self, name: str, inverter: InverterModel, battery: BatteryModel, log=None
     ) -> None:
         self.name = name
         self.inverter = inverter
@@ -436,7 +443,7 @@ class PVsystem:
         #                                    Charging
         # --------------------------------------------------------------------------------------------
         if self.log is not None:
-            self.log("Started charge loop")
+            self.log("INFO:  Optimising charge")
         done = False
         i = 0
         df = pd.concat(
@@ -514,6 +521,14 @@ class PVsystem:
             ],
             axis=1,
         )
+        if self.log is not None:
+            self.log("INFO:  Optimal forced charge slots:")
+            x = df[df["forced"] > 0]
+            for t_start in x.index:
+                t_end = t_start + pd.Timedelta("30T")
+                self.log(
+                    f"INFO:    {t_start.strftime('%d-%b %H:%M'):>13s} - {t_end.strftime('%d-%b %H:%M'):<13s} {x.loc[t_start]['forced']:8.0f} W   SOC: {x.loc[t_start]['soc']:0.0f}% -> {df.loc[t_end]['soc']:0.0f}%"
+                )
 
         if discharge:
             # --------------------------------------------------------------------------------------------
