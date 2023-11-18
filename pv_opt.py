@@ -47,7 +47,7 @@ IMPEXP = ["import", "export"]
 DEFAULT_CONFIG = {
     "forced_charge": {"default": True, "domain": "switch"},
     "forced_discharge": {"default": False, "domain": "switch"},
-    "read_only": {"default": True, "domain": "switch"},
+    "read_only": {"default": False, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
         "min": 5,
@@ -416,7 +416,7 @@ class PVOpt(hass.Hass):
                         level="ERROR",
                     )
                 else:
-                    e = f"    {item:30s} : Neither the entities listed in the YAML {value} nor the system default of {self.get_default_config(item)} exist in HA."
+                    e = f"    {item:30s} : Neither the entities listed in the YAML {values[0]} nor the system default of {self.get_default_config(item)} exist in HA."
                     self.log(e)
                     raise ValueError(e)
 
