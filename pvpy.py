@@ -493,6 +493,15 @@ class PVsystemModel:
                         cost_at_min_price = round_trip_energy_required * min_price
                         str_log += f"Min price at {start_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh costing {cost_at_min_price:5.2f} "
                         str_log += f"SOC: {x.loc[start_window]['soc']:5.1f}% ->  {x.loc[start_window]['soc_end']:5.1f}%"
+                        if pd.Timestamp.now() > start_window:
+                            str_log += "* "
+                            factor = (
+                                (start_window + pd.Timedelta("30T"))
+                                - pd.Timestamp.now()
+                            ).total_seconds / 1800
+                        else:
+                            str_log += "  "
+                            factor = 1
 
                         if cost_at_min_price < max_import_cost:
                             slots.append(
@@ -500,14 +509,15 @@ class PVsystemModel:
                                     start_window,
                                     round(
                                         min(
-                                            round_trip_energy_required * 2000,
+                                            round_trip_energy_required * 2000 * factor,
                                             self.inverter.charger_power
                                             - x["forced"].loc[start_window],
                                             (
                                                 (100 - x["soc_end"].loc[start_window])
                                                 * self.battery.capacity
                                             )
-                                            * 2,
+                                            * 2
+                                            * factor,
                                         ),
                                         0,
                                     ),
