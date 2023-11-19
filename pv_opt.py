@@ -810,9 +810,18 @@ class PVOpt(hass.Hass):
         self.opt_cost = self.contract.net_cost(self.opt)
 
         if (self.opt["forced"] > 0).sum() > 0:
+            self.log("Optimal forced charge slots:")
+            x = self.opt[self.opt["forced"] > 0]
+            self.log(x["forced"])
+            for t_start in x.index:
+                t_end = t_start + pd.Timedelta("30T")
+                self.log(
+                    f"  {t_start.strftime('%d-%b %H:%M'):>13s} - {t_end.strftime('%d-%b %H:%M'):<13s} {x.loc[t_start]['forced']:8.0f} W   SOC: {x.loc[t_start]['soc']:0.0f}% -> {df.loc[t_end]['soc']:0.0f}%"
+                )
+
             charge_power = self.opt[self.opt["forced"] > 0].iloc[0]["forced"]
             self.charge_current = charge_power / self.config["battery_voltage"]
-            # self.log(f"First slot power:{charge_power}")
+            # Merge slots with same power
             charge_window = self.opt[self.opt["forced"] == charge_power]
             self.charge_start_datetime = charge_window.index[0]
             self.charge_end_datetime = charge_window.index[0] + pd.Timedelta("30T")
@@ -825,6 +834,7 @@ class PVOpt(hass.Hass):
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
 
+        self.log("")
         self.log(
             f"Start time: {self.static.index[0]} End time: {self.static.index[-1]} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.opt_cost.sum():5.2f}"
         )

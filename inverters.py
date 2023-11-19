@@ -22,8 +22,14 @@ class InverterController:
             f"Updating inverter {direction} times to {times['start'].strftime(TIMEFORMAT)}-{times['end'].strftime(TIMEFORMAT)} at {power:0.0f}W"
         )
         if self.type == "SOLIS_SOLAX_MODBUS":
+            # Disable by steting the times the same
             if not enable:
                 times["end"] = times["start"]
+
+            # Don't span midnight
+            elif times["end"].day != times["start".day]:
+                times["end"] = times["end"].normalize() - pd.Timedelta("1T")
+                self.log(f"End time clipped to {times['end'].strftime(TIMEFORMAT)}")
 
             write_flag = True
             value_changed = False

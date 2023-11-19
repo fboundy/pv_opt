@@ -594,14 +594,6 @@ class PVsystemModel:
             ],
             axis=1,
         )
-        if self.log is not None:
-            self.log("Optimal forced charge slots:")
-            x = df[df["forced"] > 0]
-            for t_start in x.index:
-                t_end = t_start + pd.Timedelta("30T")
-                self.log(
-                    f"  {t_start.strftime('%d-%b %H:%M'):>13s} - {t_end.strftime('%d-%b %H:%M'):<13s} {x.loc[t_start]['forced']:8.0f} W   SOC: {x.loc[t_start]['soc']:0.0f}% -> {df.loc[t_end]['soc']:0.0f}%"
-                )
 
         if discharge:
             # --------------------------------------------------------------------------------------------
