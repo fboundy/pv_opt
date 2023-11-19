@@ -174,6 +174,7 @@ class PVOpt(hass.Hass):
             "PV_Opt", self.inverter_model, self.battery_model, log=self.log
         )
         self.load_contract()
+
         # Optimise on an EVENT trigger:
         self.listen_event(
             self.optimise_event,
@@ -219,6 +220,8 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("Loading Contract:")
         self.log("------------------------")
+        self.tariff_codes = {}
+        self.agile = False
         try:
             if self.config["octopus_auto"]:
                 self.log(f"Trying to auto detect Octopus tariffs")
@@ -246,15 +249,20 @@ class PVOpt(hass.Hass):
                         tariff_code = self.get_state(
                             entities[imp_exp][0], attribute="all"
                         )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
+
                         tariffs[imp_exp] = pv.Tariff(
                             tariff_code, export=(imp_exp == "export")
                         )
+                        if "AGILE" in tariff_code:
+                            self.agile = True
 
                 self.contract = pv.Contract(
                     "current", imp=tariffs["import"], exp=tariffs["export"], base=self
                 )
                 self.log("Contract tariffs loaded OK")
-        except:
+
+        except Exception as e:
+            self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
             self.log(
                 "Failed to find tariff from Octopus Energy Integration", level="WARNING"
             )
@@ -278,12 +286,17 @@ class PVOpt(hass.Hass):
                         self.contract = pv.Contract(
                             "current", octopus_account=self.octopus_account, base=self
                         )
-                        self.log("Contract tariffs loaded OK")
 
-                    except:
                         self.log(
-                            "Unable to load Octopus Account details using API Key",
+                            "Tariffs loaded using Octopus Account details from API Key",
                             level="WARN",
+                        )
+
+                    except Exception as e:
+                        self.log(e, level="ERROR")
+                        self.log(
+                            "Unable to load Octopus Account details using API Key. Trying other methods.",
+                            level="WARNING",
                         )
 
         if self.contract is None:
@@ -318,11 +331,18 @@ class PVOpt(hass.Hass):
 
         if self.contract is None:
             e = "Unable to load contract tariffs"
-            self.log(e)
+            self.log(e, level="ERROR")
             self._status(e)
             raise ValueError(e)
 
-        # else:
+        else:
+            for n, t in zip(imp_exp, [self.contract.imp, self.contract.exp]):
+                self.log(f"  {n.title()}: {t.name}")
+                if "AGILE" in t.name:
+                    self.agile = True
+
+                if self.agile:
+                    self.log("AGILE tariff detected. Rates will update at 16:00 daily")
         #     self.log(self.contract.__str__())
 
     def get_ha_value(self, entity_id):
