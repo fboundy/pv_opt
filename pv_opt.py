@@ -824,7 +824,11 @@ class PVOpt(hass.Hass):
 
         self.write_output()
 
-        if not self.config["read_only"]:
+        if (
+            (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds()
+            / 60
+            < self.config["optimise_frequency_minutes"] * 1.5
+        ) and not self.config["read_only"]:
             self.inverter.control_charge(
                 enable=(charge_power > 0),
                 start=self.charge_start_datetime,
