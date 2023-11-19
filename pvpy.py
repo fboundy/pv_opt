@@ -6,6 +6,7 @@ import requests
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
+TIME_FORMAT = "%d-%b %H:%M"
 
 
 class Tariff:
@@ -463,7 +464,7 @@ class PVsystemModel:
                 max_slot = import_cost[import_cost == max_import_cost].index[0]
                 max_slot_energy = df["grid"].loc[max_slot] / 2000  # kWh
                 if round(max_slot_energy, 0) > 0:
-                    min_price_energy = (
+                    round_trip_energy_required = (
                         max_slot_energy
                         / self.inverter.charger_efficiency
                         / self.inverter.inverter_efficiency
@@ -473,12 +474,18 @@ class PVsystemModel:
                     x = x[x["soc"] < 100]
                     x = x[x["forced"] < self.inverter.charger_power]
 
-                    # print(max_slot)
-
+                    search_window = x.index
+                    str_log = f"{max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
+                    str_log += f"Round trip requirement: {round_trip_energy_required:5.2f} kWh."
+                    str_log += f"Window: {search_window[0].strftime(TIME_FORMAT)} -  {search_window[1].strftime(TIME_FORMAT)}"
+                    self.log(str_log)
                     if len(x) > 0:
                         min_price = x["import"].min()
                         min_price_window = x[x["import"] == min_price].index[0]
-                        cost_at_min_price = min_price_energy * min_price
+                        cost_at_min_price = round_trip_energy_required * min_price
+                        str_log = f"Min price at {min_price_window.strftime(TIME_FORMAT)} is {min_price:5.2f}p/kWh costing {cost_at_min_price:5.2f}"
+                        str_log += f"SOC: {x.loc[min_price_window]['soc']:5.1f}%"
+                        self.log(str_log)
 
                         if cost_at_min_price < max_import_cost:
                             slots.append(
@@ -486,7 +493,7 @@ class PVsystemModel:
                                     min_price_window,
                                     round(
                                         min(
-                                            min_price_energy * 2000,
+                                            round_trip_energy_required * 2000,
                                             self.inverter.charger_power
                                             - x["forced"].loc[min_price_window],
                                         ),
@@ -522,27 +529,25 @@ class PVsystemModel:
                                 axis=1,
                             )
 
-                            self.log(
-                                f"{max_slot.strftime('%d-%b %H:%M')} at {max_import_cost} swap with {min_price_window.strftime('%d-%b %H:%M')} at {cost_at_min_price} [{min_price}]  Net: {net_cost_opt}"
-                            )
-                            if contract.net_cost(df).sum() < net_cost_opt:
-                                net_cost_opt = contract.net_cost(df).sum()
-                            else:
-                                done = True
-                                slots = slots[:-1]
-                                df = pd.concat(
-                                    [
-                                        prices,
-                                        consumption,
-                                        self.flows(
-                                            initial_soc,
-                                            static_flows,
-                                            slots=slots,
-                                            **kwargs,
-                                        ),
-                                    ],
-                                    axis=1,
-                                )
+                            self.log(f"Net: {net_cost_opt:5.1f}")
+                            #                          if contract.net_cost(df).sum() < net_cost_opt:
+                            net_cost_opt = contract.net_cost(df).sum()
+            #                          else:
+            #                              done = True
+            #                               slots = slots[:-1]
+            #                               df = pd.concat(
+            #                                   [
+            #                                       prices,
+            #                                      consumption,
+            #                                      self.flows(
+            #                                           initial_soc,
+            #                                          static_flows,
+            #                                           slots=slots,
+            #                                           **kwargs,
+            #                                       ),
+            #                                  ],
+            #                                  axis=1,
+            #                               )
             else:
                 done = True
 

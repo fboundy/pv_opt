@@ -35,11 +35,11 @@ class InverterController:
                     else:
                         value = times[limit].minute
                     try:
-                        int(
-                            self.host.call_service(
-                                "number/set_value", entity_id=entity_id, value=value
-                            )
-                        ) != value
+                        
+                        self.host.call_service(
+                           "number/set_value", entity_id=entity_id, value=value
+                        )
+                        
                         time.sleep(0.1)
                         if int(self.host.get_state(entity_id=entity_id)) == value:
                             self.log(
