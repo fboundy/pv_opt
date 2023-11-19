@@ -809,6 +809,8 @@ class PVOpt(hass.Hass):
         else:
             # self.log(f"No charging slots")
             self.charge_current = 0
+            charge_power = 0
+
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
 
@@ -824,7 +826,7 @@ class PVOpt(hass.Hass):
 
         if not self.config["read_only"]:
             self.inverter.control_charge(
-                enable=True,
+                enable=(charge_power > 0),
                 start=self.charge_start_datetime,
                 end=self.charge_end_datetime,
                 power=charge_power,
