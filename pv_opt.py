@@ -246,11 +246,10 @@ class PVOpt(hass.Hass):
                 tariffs = {x: None for x in IMPEXP}
                 for imp_exp in IMPEXP:
                     if len(entities[imp_exp]) > 0:
-                        self.log(f"{imp_exp}.title() tarifff code is {tariff_code}")
-                        self.tariff_codes[imp_exp] = tariff_code
                         tariff_code = self.get_state(
                             entities[imp_exp][0], attribute="all"
                         )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
+
                         tariffs[imp_exp] = pv.Tariff(
                             tariff_code, export=(imp_exp == "export")
                         )
@@ -262,7 +261,8 @@ class PVOpt(hass.Hass):
                 )
                 self.log("Contract tariffs loaded OK")
 
-        except:
+        except Exception as e:
+            self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
             self.log(
                 "Failed to find tariff from Octopus Energy Integration", level="WARNING"
             )
@@ -286,12 +286,16 @@ class PVOpt(hass.Hass):
                         self.contract = pv.Contract(
                             "current", octopus_account=self.octopus_account, base=self
                         )
-                        self.log("Contract tariffs loaded OK")
-                        if self.contact.imp:
-                            self.log(f"Import: ")
-                    except:
+
                         self.log(
-                            "Unable to load Octopus Account details using API Key",
+                            "Tariffs loaded using Octopus Account details from API Key",
+                            level="WARN",
+                        )
+
+                    except Exception as e:
+                        self.log(e, level="ERROR")
+                        self.log(
+                            "Unable to load Octopus Account details using API Key. Trying other methods.",
                             level="WARNING",
                         )
 
@@ -327,11 +331,18 @@ class PVOpt(hass.Hass):
 
         if self.contract is None:
             e = "Unable to load contract tariffs"
-            self.log(e)
+            self.log(e, level="ERROR")
             self._status(e)
             raise ValueError(e)
 
-        # else:
+        else:
+            for n, t in zip(imp_exp, [self.contract.imp, self.contract.exp]):
+                self.log(f"  {n.title()}: {t.name}")
+                if "AGILE" in t.name:
+                    self.agile = True
+
+                if self.agile:
+                    self.log("AGILE tariff detected. Rates will update at 16:00 daily")
         #     self.log(self.contract.__str__())
 
     def get_ha_value(self, entity_id):
