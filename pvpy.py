@@ -465,10 +465,10 @@ class PVsystemModel:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 max_slot = import_cost[import_cost == max_import_cost].index[0]
                 max_slot_energy = df["grid"].loc[max_slot] / 2000  # kWh
-                self.log(
-                    f"{i}: {max_slot.strftime(TIME_FORMAT)} {max_import_cost:5.2f} {max_slot_energy:5.2f} "
-                )
-                if round(max_slot_energy, 0) > 0:
+                # self.log(
+                #     f"{i}: {max_slot.strftime(TIME_FORMAT)} {max_import_cost:5.2f} {max_slot_energy:5.2f} "
+                # )
+                if max_slot_energy > 0:
                     round_trip_energy_required = (
                         max_slot_energy
                         / self.inverter.charger_efficiency
@@ -479,27 +479,14 @@ class PVsystemModel:
                     x = df.loc[:max_slot].copy()
 
                     # count back to find the slots where soc_end < 100
-                    if len(x) > 0:
-                        self.log(
-                            f"   {x.index[0].strftime(TIME_FORMAT)} - {x.index[-1].strftime(TIME_FORMAT)}"
-                        )
-
                     x["countback"] = (x["soc_end"] >= 97).sum() - (
                         x["soc_end"] >= 97
                     ).cumsum()
 
-                    x = x[x["countback"] == 0]
-                    if len(x) > 0:
-                        self.log(
-                            f"   {x.index[0].strftime(TIME_FORMAT)} - {x.index[-1].strftime(TIME_FORMAT)}"
-                        )
+                    x = x[x["countback"] == 0].iloc[1:]
 
                     # ignore slots which are already fully charging
                     x = x[x["forced"] < self.inverter.charger_power]
-                    if len(x) > 0:
-                        self.log(
-                            f"   {x.index[0].strftime(TIME_FORMAT)} - {x.index[-1].strftime(TIME_FORMAT)}"
-                        )
 
                     search_window = x.index
                     str_log = f"{max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
@@ -572,11 +559,12 @@ class PVsystemModel:
                                 ],
                                 axis=1,
                             )
-                            str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}%"
+                            str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
+                            net_cost_opt = contract.net_cost(df).sum()
                             str_log += f"Net: {net_cost_opt:5.1f}"
 
                             #                          if contract.net_cost(df).sum() < net_cost_opt:
-                            net_cost_opt = contract.net_cost(df).sum()
+
                         #                          else:
                         #                              done = True
                         #                               slots = slots[:-1]
