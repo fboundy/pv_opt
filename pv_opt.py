@@ -246,11 +246,10 @@ class PVOpt(hass.Hass):
                 tariffs = {x: None for x in IMPEXP}
                 for imp_exp in IMPEXP:
                     if len(entities[imp_exp]) > 0:
-                        self.log(f"{imp_exp}.title() tarifff code is {tariff_code}")
-                        self.tariff_codes[imp_exp] = tariff_code
                         tariff_code = self.get_state(
                             entities[imp_exp][0], attribute="all"
                         )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
+
                         tariffs[imp_exp] = pv.Tariff(
                             tariff_code, export=(imp_exp == "export")
                         )
@@ -262,7 +261,8 @@ class PVOpt(hass.Hass):
                 )
                 self.log("Contract tariffs loaded OK")
 
-        except:
+        except Exception as e:
+            self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
             self.log(
                 "Failed to find tariff from Octopus Energy Integration", level="WARNING"
             )
@@ -292,10 +292,11 @@ class PVOpt(hass.Hass):
                             level="WARN",
                         )
 
-                    except:
+                    except Exception as e:
+                        self.log(e, level="ERROR")
                         self.log(
-                            "Unable to load Octopus Account details using API Key",
-                            level="WARN",
+                            "Unable to load Octopus Account details using API Key. Trying other methods.",
+                            level="WARNING",
                         )
 
         if self.contract is None:
@@ -336,8 +337,8 @@ class PVOpt(hass.Hass):
 
         else:
             for n, t in zip(imp_exp, [self.contract.imp, self.contract.exp]):
-                self.log(f"  {n.title}: {t.name}")
-                if "AGILE" in t:
+                self.log(f"  {n.title()}: {t.name}")
+                if "AGILE" in t.name:
                     self.agile = True
 
                 if self.agile:

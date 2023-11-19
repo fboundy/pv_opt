@@ -249,19 +249,19 @@ class Contract:
 
         else:
             url = f"https://api.octopus.energy/v1/accounts/{octopus_account.account_number}/"
-            self.log(f"INFO:  Connecting to {url}")
+            self.log(f"Connecting to {url}")
             try:
                 r = requests.get(url, auth=(octopus_account.api_key, ""))
                 r.raise_for_status()  # Raise an exception for unsuccessful HTTP status codes
 
             except requests.exceptions.RequestException as e:
-                self.log("ERROR: An HTTP error occurred:", e)
+                self.log(f"HTTP error occurred: {e}")
                 self.imp = None
                 return
 
             mpans = r.json()["properties"][0]["electricity_meter_points"]
             for mpan in mpans:
-                self.log(f"Getting details for MPAN {mpan}")
+                self.log(f"Getting details for MPAN {mpan['mpan']}")
                 df = pd.DataFrame(mpan["agreements"])
                 df = df.set_index("valid_from")
                 df.index = pd.to_datetime(df.index)
@@ -585,12 +585,12 @@ class PVsystemModel:
             axis=1,
         )
         if self.log is not None:
-            self.log("INFO:  Optimal forced charge slots:")
+            self.log("Optimal forced charge slots:")
             x = df[df["forced"] > 0]
             for t_start in x.index:
                 t_end = t_start + pd.Timedelta("30T")
                 self.log(
-                    f"INFO:    {t_start.strftime('%d-%b %H:%M'):>13s} - {t_end.strftime('%d-%b %H:%M'):<13s} {x.loc[t_start]['forced']:8.0f} W   SOC: {x.loc[t_start]['soc']:0.0f}% -> {df.loc[t_end]['soc']:0.0f}%"
+                    f"  {t_start.strftime('%d-%b %H:%M'):>13s} - {t_end.strftime('%d-%b %H:%M'):<13s} {x.loc[t_start]['forced']:8.0f} W   SOC: {x.loc[t_start]['soc']:0.0f}% -> {df.loc[t_end]['soc']:0.0f}%"
                 )
 
         if discharge:
