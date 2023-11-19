@@ -38,7 +38,7 @@ class InverterController:
                         value = times[limit].minute
 
                     changed, written = self._write_and_poll_value(
-                        entity_id=entity_id, value=value
+                        entity_id=entity_id, value=value, verbose=True
                     )
                     if changed:
                         if written:
@@ -91,10 +91,13 @@ class InverterController:
             else:
                 self.log("Inverter already at correct current")
 
-    def _write_and_poll_value(self, entity_id, value, tolerance=0):
+    def _write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
         changed = False
         written = False
-        if abs(float(self.host.get_state(entity_id=entity_id)) - value) <= tolerance:
+        state = float(self.host.get_state(entity_id=entity_id))
+        new_state = None
+        diff = abs(state - value)
+        if diff > tolerance:
             changed = True
             try:
                 self.host.call_service(
@@ -102,10 +105,17 @@ class InverterController:
                 )
 
                 time.sleep(0.1)
-                written = int(self.host.get_state(entity_id=entity_id)) == value
+                new_state = float(self.host.get_state(entity_id=entity_id))
+                written = new_state == value
 
             except:
                 written = False
+
+        if verbose:
+            self.log(
+                f"Entity: {entity_id} Value: {value}  Old State: {state} New state: {new_state} Diff: {diff} Tol: {tolerance}"
+            )
+
         return (changed, written)
 
     def _monitor_target_soc(self, target_soc, mode="charge"):
