@@ -40,12 +40,14 @@ BOTTLECAP_DAVE = {
     "rates": "current_day_rates",
 }
 
+INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS"]
+
 IMPEXP = ["import", "export"]
 
 DEFAULT_CONFIG = {
     "forced_charge": {"default": True, "domain": "switch"},
     "forced_discharge": {"default": False, "domain": "switch"},
-    "read_only": {"default": True, "domain": "switch"},
+    "read_only": {"default": False, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
         "min": 5,
@@ -150,8 +152,11 @@ class PVOpt(hass.Hass):
         self.change_items = {}
         self.cum_delta = {}
         self.timer_handle = None
+        self.inverter_type = "SOLIS_SOLAX_MODBUS"
 
         self._load_args()
+
+        self._load_inverter()
 
         self._status("Initialising PV Model")
         self.inverter_model = pv.InverterModel(
@@ -181,6 +186,11 @@ class PVOpt(hass.Hass):
             self._setup_schedule()
 
         self.log(f"PV Opt Initialisation complete")
+
+    def _load_inverter(self):
+        self.inverter = inv.InverterController(
+            inverter_type=self.inverter_type, host=self
+        )
 
     def _setup_schedule(self):
         if self.config["forced_charge"]:
@@ -406,7 +416,7 @@ class PVOpt(hass.Hass):
                         level="ERROR",
                     )
                 else:
-                    e = f"    {item:30s} : Neither the entities listed in the YAML {value} nor the system default of {self.get_default_config(item)} exist in HA."
+                    e = f"    {item:30s} : Neither the entities listed in the YAML {values[0]} nor the system default of {self.get_default_config(item)} exist in HA."
                     self.log(e)
                     raise ValueError(e)
 
@@ -768,8 +778,7 @@ class PVOpt(hass.Hass):
         )
         self.base_cost = self.contract.net_cost(self.base)
 
-        if self.debug:
-            self.log(f'Optimising for {self.config["solar_forecast"]} forecast')
+        self.log(f'Optimising for {self.config["solar_forecast"]} forecast')
 
         self.opt = self.pv_system.optimised_force(
             self.initial_soc,
@@ -795,23 +804,22 @@ class PVOpt(hass.Hass):
             self.charge_end_datetime = self.static.index[0]
 
         self.log(
+            f"Start time: {self.static.index[0]} End time: {self.static.index[-1]} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum()} Opt Cost: {self.opt_cost.sum()}"
+        )
+        self.log(
             f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).total_seconds():0.2f} seconds"
         )
         self.log("")
 
-        if self.debug:
-            self.log(f"Start time: {self.static.index[0]}")
-            self.log(f"End time: {self.static.index[-1]}")
-            self.log("Optimising for default prices")
-            self.log(self.static.columns)
-            self.log(f"Initial SOC: {self.initial_soc}")
-            self.log(f"Base Cost: {self.base_cost.sum()}")
-            self.log(f"Opt Cost: {self.opt_cost.sum()}")
-            self.log(self.base.columns)
-            self.log(self.opt.columns)
-            self.log(self.base.iloc[-1])
-
         self.write_output()
+
+        if not self.config["read_only"]:
+            self.inverter.control_charge(
+                enable=True,
+                start=self.charge_start_datetime,
+                end=self.charge_end_datetime,
+                power=charge_power,
+            )
 
     def write_to_hass(self, entity, state, attributes):
         try:
