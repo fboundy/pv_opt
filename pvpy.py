@@ -6,7 +6,7 @@ import requests
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
-TIME_FORMAT = "%d-%b %H:%M"
+TIME_FORMAT = "%d/%m %H:%M"
 
 
 class Tariff:
@@ -476,16 +476,14 @@ class PVsystemModel:
 
                     search_window = x.index
                     str_log = f"{max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
-                    str_log += f"Round trip requirement: {round_trip_energy_required:5.2f} kWh."
-                    str_log += f"Window: {search_window[0].strftime(TIME_FORMAT)} -  {search_window[1].strftime(TIME_FORMAT)}"
-                    self.log(str_log)
+                    str_log += f"Energy: {round_trip_energy_required:5.2f} kWh."
+                    str_log += f"Window: {search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}"
                     if len(x) > 0:
                         min_price = x["import"].min()
                         min_price_window = x[x["import"] == min_price].index[0]
                         cost_at_min_price = round_trip_energy_required * min_price
-                        str_log = f"Min price at {min_price_window.strftime(TIME_FORMAT)} is {min_price:5.2f}p/kWh costing {cost_at_min_price:5.2f}"
+                        str_log += f"Min price at {min_price_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh costing {cost_at_min_price:5.2f}"
                         str_log += f"SOC: {x.loc[min_price_window]['soc']:5.1f}%"
-                        self.log(str_log)
 
                         if cost_at_min_price < max_import_cost:
                             slots.append(
@@ -528,8 +526,8 @@ class PVsystemModel:
                                 ],
                                 axis=1,
                             )
-
-                            self.log(f"Net: {net_cost_opt:5.1f}")
+                            str_log += f"Net: {net_cost_opt:5.1f}"
+                            self.log(str_log)
                             #                          if contract.net_cost(df).sum() < net_cost_opt:
                             net_cost_opt = contract.net_cost(df).sum()
             #                          else:
