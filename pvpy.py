@@ -256,27 +256,28 @@ class Contract:
 
             except requests.exceptions.RequestException as e:
                 self.log("ERROR: An HTTP error occurred:", e)
-                self.imp = e
+                self.imp = None
+                return
 
             mpans = r.json()["properties"][0]["electricity_meter_points"]
             for mpan in mpans:
-                self.log(f"INFO:  Getting details for MPAN {mpan}")
+                self.log(f"Getting details for MPAN {mpan}")
                 df = pd.DataFrame(mpan["agreements"])
                 df = df.set_index("valid_from")
                 df.index = pd.to_datetime(df.index)
                 df = df.sort_index()
                 tariff_code = df["tariff_code"].iloc[-1]
 
-                self.log(f"INFO:  Retrieved most recent tariff code {tariff_code}")
+                self.log(f"Retrieved most recent tariff code {tariff_code}")
                 if mpan["is_export"]:
                     self.exp = Tariff(tariff_code, export=True)
                 else:
                     self.imp = Tariff(tariff_code)
 
             if self.imp is None:
-                raise ValueError(
-                    "Either a named import tariff or valid Octopus Account details much be provided"
-                )
+                e = "Either a named import tariff or valid Octopus Account details much be provided"
+                self.log(e, level="ERROR")
+                raise ValueError(e)
 
     def __str__(self):
         str = f"Contract: {self.name}\n"
