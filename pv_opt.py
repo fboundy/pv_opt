@@ -804,7 +804,7 @@ class PVOpt(hass.Hass):
             self.charge_end_datetime = self.static.index[0]
 
         self.log(
-            f"Start time: {self.static.index[0]} End time: {self.static.index[-1]} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum()} Opt Cost: {self.opt_cost.sum()}"
+            f"Start time: {self.static.index[0]} End time: {self.static.index[-1]} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.opt_cost.sum():5.2f}"
         )
         self.log(
             f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).total_seconds():0.2f} seconds"
