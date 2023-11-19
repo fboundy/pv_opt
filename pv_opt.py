@@ -174,6 +174,7 @@ class PVOpt(hass.Hass):
             "PV_Opt", self.inverter_model, self.battery_model, log=self.log
         )
         self.load_contract()
+
         # Optimise on an EVENT trigger:
         self.listen_event(
             self.optimise_event,
@@ -219,6 +220,8 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("Loading Contract:")
         self.log("------------------------")
+        self.tariff_codes = {}
+        self.agile = False
         try:
             if self.config["octopus_auto"]:
                 self.log(f"Trying to auto detect Octopus tariffs")
@@ -243,17 +246,22 @@ class PVOpt(hass.Hass):
                 tariffs = {x: None for x in IMPEXP}
                 for imp_exp in IMPEXP:
                     if len(entities[imp_exp]) > 0:
+                        self.log(f"{imp_exp}.title() tarifff code is {tariff_code}")
+                        self.tariff_codes[imp_exp] = tariff_code
                         tariff_code = self.get_state(
                             entities[imp_exp][0], attribute="all"
                         )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
                         tariffs[imp_exp] = pv.Tariff(
                             tariff_code, export=(imp_exp == "export")
                         )
+                        if "AGILE" in tariff_code:
+                            self.agile = True
 
                 self.contract = pv.Contract(
                     "current", imp=tariffs["import"], exp=tariffs["export"], base=self
                 )
                 self.log("Contract tariffs loaded OK")
+
         except:
             self.log(
                 "Failed to find tariff from Octopus Energy Integration", level="WARNING"
@@ -279,7 +287,8 @@ class PVOpt(hass.Hass):
                             "current", octopus_account=self.octopus_account, base=self
                         )
                         self.log("Contract tariffs loaded OK")
-
+                        if self.contact.imp:
+                            self.log(f"Import: ")
                     except:
                         self.log(
                             "Unable to load Octopus Account details using API Key",

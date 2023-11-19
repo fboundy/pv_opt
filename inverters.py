@@ -1,13 +1,6 @@
 import pandas as pd
 import time
 
-INVERTER_TYPES = {
-    "SOLIS_SOLAX_MODBUS": {
-        "timed": True,
-        "current_power": "Current",
-    }
-}
-
 
 class InverterController:
     def __init__(self, inverter_type, host) -> None:
@@ -35,11 +28,10 @@ class InverterController:
                     else:
                         value = times[limit].minute
                     try:
-                        
                         self.host.call_service(
-                           "number/set_value", entity_id=entity_id, value=value
+                            "number/set_value", entity_id=entity_id, value=value
                         )
-                        
+
                         time.sleep(0.1)
                         if int(self.host.get_state(entity_id=entity_id)) == value:
                             self.log(
