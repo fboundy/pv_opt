@@ -72,6 +72,7 @@ pv_opt:
   entity_id_timed_charge_start_minutes:  number.solis_timed_charge_start_minutes
   entity_id_timed_charge_end_hours:      number.solis_timed_charge_end_hours 
   entity_id_timed_charge_end_minutes:    number.solis_timed_charge_end_minutes
+  entity_id_timed_charge_current:    number.solis_timed_charge_current
   entity_id_timed_charge_discharge_button: button.solis_update_charge_discharge_times
 
   # ========================================
