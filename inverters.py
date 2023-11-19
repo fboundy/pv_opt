@@ -1,6 +1,8 @@
 import pandas as pd
 import time
 
+TIMEFORMAT = "%H:%M"
+
 
 class InverterController:
     def __init__(self, inverter_type, host) -> None:
@@ -16,43 +18,57 @@ class InverterController:
         }
         power = kwargs.get("power", self.host.config["charger_power_watts"])
 
-        if self.type == "SOLIS_SOLAX_MODBUS":
-            write_flag = True
-            for limit in times:
-                for unit in ["hours", "minutes"]:
-                    entity_id = self.host.config[
-                        f"entity_id_timed_{direction}_{limit}_{unit}"
-                    ]
-                    if unit == "hours":
-                        value = times[limit].hour
-                    else:
-                        value = times[limit].minute
-                    try:
-                        self.host.call_service(
-                            "number/set_value", entity_id=entity_id, value=value
-                        )
-
-                        time.sleep(0.1)
-                        if int(self.host.get_state(entity_id=entity_id)) == value:
-                            self.log(
-                                f"Wrote {direction} {limit} {unit} of {value} to inverter"
-                            )
+        if enable:
+            self.log(
+                f"Updating intverter {direction} times to {times['start'].strftime(TIMEFORMAT)} -{times['end'].strftime(TIMEFORMAT)} "
+            )
+            if self.type == "SOLIS_SOLAX_MODBUS":
+                write_flag = True
+                value_changed = False
+                for limit in times:
+                    for unit in ["hours", "minutes"]:
+                        entity_id = self.host.config[
+                            f"entity_id_timed_{direction}_{limit}_{unit}"
+                        ]
+                        if unit == "hours":
+                            value = times[limit].hour
                         else:
-                            raise ValueError
+                            value = times[limit].minute
 
-                    except:
-                        self.log(
-                            f"Failed to write {direction} {limit} {unit} to inverter",
-                            level="ERROR",
-                        )
-                        write_flag = False
-            if write_flag:
-                entity_id = self.host.config["entity_id_timed_charge_discharge_button"]
+                        if int(self.host.get_state(entity_id=entity_id)) != value:
+                            value_changed = True
+                            try:
+                                self.host.call_service(
+                                    "number/set_value", entity_id=entity_id, value=value
+                                )
 
-                self.log(f">>> Pressed button {entity_id}")
+                                time.sleep(0.1)
+                                if (
+                                    int(self.host.get_state(entity_id=entity_id))
+                                    == value
+                                ):
+                                    self.log(
+                                        f"Wrote {direction} {limit} {unit} of {value} to inverter"
+                                    )
+                                else:
+                                    raise ValueError
 
-                self.host.call_service("button/press", entity_id=entity_id)
-                self.log(f"Pressed button {entity_id}")
+                            except:
+                                self.log(
+                                    f"Failed to write {direction} {limit} {unit} to inverter",
+                                    level="ERROR",
+                                )
+                                write_flag = False
+
+                if value_changed and write_flag:
+                    entity_id = self.host.config[
+                        "entity_id_timed_charge_discharge_button"
+                    ]
+
+                    self.log(f">>> Pressed button {entity_id}")
+
+                    self.host.call_service("button/press", entity_id=entity_id)
+                    self.log(f"Pressed button {entity_id}")
                 #     sleep(1)
                 #     time_pressed = datetime.strptime(entity.get_state(), TIME_FORMAT_SECONDS)
 
