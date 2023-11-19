@@ -292,7 +292,7 @@ class PVOpt(hass.Hass):
                     except:
                         self.log(
                             "Unable to load Octopus Account details using API Key",
-                            level="WARN",
+                            level="WARNING",
                         )
 
         if self.contract is None:

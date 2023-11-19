@@ -20,7 +20,7 @@ class InverterController:
 
         if enable:
             self.log(
-                f"Updating intverter {direction} times to {times['start'].strftime(TIMEFORMAT)} -{times['end'].strftime(TIMEFORMAT)} "
+                f"Updating intverter {direction} times to {times['start'].strftime(TIMEFORMAT)}-{times['end'].strftime(TIMEFORMAT)} "
             )
             if self.type == "SOLIS_SOLAX_MODBUS":
                 write_flag = True
@@ -60,25 +60,25 @@ class InverterController:
                                 )
                                 write_flag = False
 
-                if value_changed and write_flag:
-                    entity_id = self.host.config[
-                        "entity_id_timed_charge_discharge_button"
-                    ]
+                if value_changed:
+                    if write_flag:
+                        entity_id = self.host.config[
+                            "entity_id_timed_charge_discharge_button"
+                        ]
+                        self.host.call_service("button/press", entity_id=entity_id)
+                        time.sleep(0.1)
+                        time_pressed = pd.Timestamp(self.host.get_state(entity_id))
 
-                    self.log(f">>> Pressed button {entity_id}")
+                        if (pd.Timestamp.now() - time_pressed).total_seconds < 10:
+                            self.log(
+                                f"Successfully pressed button {entity_id} on Inverter {self.id}"
+                            )
 
-                    self.host.call_service("button/press", entity_id=entity_id)
-                    self.log(f"Pressed button {entity_id}")
-                #     sleep(1)
-                #     time_pressed = datetime.strptime(entity.get_state(), TIME_FORMAT_SECONDS)
+                        else:
+                            self.log(f"Failed to press button {entity_id}")
 
-                # if (pytz.timezone("UTC").localize(datetime.now()) - time_pressed).seconds < 10:
-                # self.log(
-                #     f"Successfully pressed button {entity_id} on Inverter {self.id}"
-                # )
-
-                # except:
-                #     self.log(f"Failed to press button {entity_id}")
+                    else:
+                        self.log("Inverter already at correct time settings")
 
     def _monitor_target_soc(self, target_soc, mode="charge"):
         pass
