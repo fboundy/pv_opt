@@ -856,6 +856,15 @@ class PVOpt(hass.Hass):
         self.log("")
 
         self.write_output()
+        self.log(
+            f"Next charge window starts in {(self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60:3.0f} minutes."
+        )
+        if self.config["read_only"]:
+            self.log("Currently in READ ONLY mode")
+        else:
+            self.log(
+                f"Inverter will be updated     {self.config['optimise_frequency_minutes'] * 1.5:3.0f} minutes before window start."
+            )
 
         if (
             (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds()

@@ -7,6 +7,7 @@ from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 TIME_FORMAT = "%d/%m %H:%M"
+EXPORT_MULT = 1.0
 
 
 class Tariff:
@@ -299,7 +300,7 @@ class Contract:
 
         nc = self.imp.to_df(start, end)["fixed"]
         nc += self.imp.to_df(start, end)["unit"] * grid_imp / 2000
-        nc += self.exp.to_df(start, end)["unit"] * grid_exp / 2000
+        nc += self.exp.to_df(start, end)["unit"] * grid_exp / 2000 * EXPORT_MULT
 
         return nc
 
