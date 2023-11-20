@@ -564,24 +564,6 @@ class PVsystemModel:
                             net_cost_opt = contract.net_cost(df).sum()
                             str_log += f"Net: {net_cost_opt:5.1f}"
 
-                            #                          if contract.net_cost(df).sum() < net_cost_opt:
-
-                        #                          else:
-                        #                              done = True
-                        #                               slots = slots[:-1]
-                        #                               df = pd.concat(
-                        #                                   [
-                        #                                       prices,
-                        #                                      consumption,
-                        #                                      self.flows(
-                        #                                           initial_soc,
-                        #                                          static_flows,
-                        #                                           slots=slots,
-                        #                                           **kwargs,
-                        #                                       ),
-                        #                                  ],
-                        #                                  axis=1,
-                        #                               )
                         else:
                             done = True
                     self.log(str_log)
@@ -596,86 +578,14 @@ class PVsystemModel:
             axis=1,
         )
 
-        if discharge:
-            # --------------------------------------------------------------------------------------------
-            #                                    Discharging
-            # --------------------------------------------------------------------------------------------
+        # if discharge:
+        # Check how many slots which aren't full are at an import price less than any export price:
+        max_export_price = df[df["forced"] <= 0]["export"].max()
+        self.log(
+            f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh"
+        )
+        x = df[df["import"] < df["export"].max()]
+        self.log(f"{len(x)} slots have an import price less than the min export price")
 
-            done = False
-            i = 0
-            tested = pd.Series(index=df.index, data=0)
-
-            while not done:
-                i += 1
-                done = i >= 20
-
-                max_discharge = (
-                    self.inverter.inverter_power + df["grid"].fillna(0).clip(upper=0)
-                ) * 0.5  # Wh
-
-                max_batt = (
-                    self.battery.capacity
-                    * (df["soc"] / 100 - self.battery.max_dod)
-                    * self.inverter.inverter_efficiency
-                    - df["consumption"] * 0.5
-                )  # Wh
-
-                df["export_pot"] = (
-                    df["export"]
-                    * pd.DataFrame([max_discharge, max_batt]).T.min(axis=1)
-                    / 100
-                    / 1000
-                )  # p/kWh x Wh x £/p x kWh/Wh = £
-
-                export_slots = df["export_pot"][(df["forced"] == 0) & (tested == 0)]
-                # df["export_slots"] = 0
-                # df.loc[export_slots, "export_slots"] = 1
-
-                if len(export_slots) > 0:
-                    max_export_pot = export_slots.max()
-                    max_slot = export_slots.index[0]
-                    max_slot_price = df["export"].loc[max_slot]
-                    max_slot_energy = max_export_pot / max_slot_price * 1e5
-
-                    tested.loc[max_slot] = 1
-                    slots.append(
-                        (
-                            max_slot,
-                            -max_slot_energy * 2,
-                        )
-                    )
-
-                    df = pd.concat(
-                        [
-                            prices,
-                            self.flows(
-                                initial_soc, static_flows, slots=slots, **kwargs
-                            ),
-                        ],
-                        axis=1,
-                    )
-                    net_cost = contract.net_cost(df).sum()
-
-                    if self.log is not None:
-                        self.log(
-                            f"Discharge loop {i:>2d}: Net cost: {net_cost:6.1f}  Opt: {net_cost_opt:6.1f}"
-                        )
-
-                    if net_cost > net_cost_opt:
-                        slots = slots[:-1]
-                        df = pd.concat(
-                            [
-                                prices,
-                                self.flows(
-                                    initial_soc, static_flows, slots=slots, **kwargs
-                                ),
-                            ],
-                            axis=1,
-                        )
-                    else:
-                        net_cost_opt = net_cost
-
-                else:
-                    done = True
         df.index = pd.to_datetime(df.index)
         return df
