@@ -17,7 +17,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 # %%
 #
-PV_MULT = 4.0
+PV_MULT = 1.0
 USE_TARIFF = True
 
 VERSION = "3.0.0"
@@ -778,14 +778,7 @@ class PVOpt(hass.Hass):
         )
 
         # Load Solcast
-        try:
-            if not self.load_solcast():
-                raise Exception
-            self.log("Solar forecast loaded OK")
-
-        except Exception as e:
-            self.log(f"Unable to load solar forecast: {e}", level="ERROR")
-            return False
+        self.load_solcast()
 
         try:
             if not self.load_consumption():
@@ -1015,7 +1008,7 @@ class PVOpt(hass.Hass):
             return True
 
         except Exception as e:
-            self.log(f"Error loading Solcast: {e}")
+            self.log(f"Error loading Solcast: {e}", level="ERROR")
             return False
 
     def load_consumption(self):
@@ -1033,8 +1026,10 @@ class PVOpt(hass.Hass):
                     )
 
                 except Exception as e:
-                    self.log(f"Unable to get historical consumption from {entity_id}")
-                    self.log(f"Error: {e}")
+                    self.log(
+                        f"Unable to get historical consumption from {entity_id}. {e}",
+                        level="ERROR",
+                    )
                     return False
 
                 try:
@@ -1059,7 +1054,7 @@ class PVOpt(hass.Hass):
                     temp = temp.merge(df, "left", left_on="time", right_index=True)
                     # self.log(temp["consumption"].sum())
                     consumption += temp["consumption"]
-                    self.log(f"Estimated consumption from {entity_id} loaded OK ")
+                    self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
 
                 # self.log(temp)
 
