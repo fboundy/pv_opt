@@ -197,15 +197,16 @@ class PVOpt(hass.Hass):
         )
 
     def _setup_agile_schedule(self):
-        start = pd.Timestamp.now().round("1H") + pd.Timestamp("5T").to_pydatetime()
+        # start = (pd.Timestamp.now().round("1H") + pd.Timedelta("5T")).to_pydatetime()
+        start = (pd.Timestamp.now() + pd.Timedelta("1T")).to_pydatetime()
         self.timer_handle = self.run_every(
-            self.load_agile_cb,
+            self._load_agile_cb,
             start=start,
             interval=3600,
         )
 
     @ad.app_lock
-    def agile_cb(self, cb_args):
+    def _load_agile_cb(self, cb_args):
         # reload if the time is after 16:00 and the last data we have is today
         if (
             self.contract.imp.to_df().index[-1].day == pd.Timestamp.now().day
@@ -857,7 +858,7 @@ class PVOpt(hass.Hass):
                 enable=True,
                 start=self.charge_start_datetime,
                 end=self.charge_end_datetime,
-                power=charge_power,
+                power=self.charge_power,
             )
 
     def write_to_hass(self, entity, state, attributes):
