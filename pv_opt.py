@@ -175,6 +175,9 @@ class PVOpt(hass.Hass):
         )
         self.load_contract()
 
+        if self.agile:
+            self._setup_agile_schedule()
+
         # Optimise on an EVENT trigger:
         self.listen_event(
             self.optimise_event,
@@ -192,6 +195,23 @@ class PVOpt(hass.Hass):
         self.inverter = inv.InverterController(
             inverter_type=self.inverter_type, host=self
         )
+
+    def _setup_agile_schedule(self):
+        # start = (pd.Timestamp.now().round("1H") + pd.Timedelta("5T")).to_pydatetime()
+        start = (pd.Timestamp.now() + pd.Timedelta("1T")).to_pydatetime()
+        self.timer_handle = self.run_every(
+            self._load_agile_cb,
+            start=start,
+            interval=3600,
+        )
+
+    @ad.app_lock
+    def _load_agile_cb(self, cb_args):
+        # reload if the time is after 16:00 and the last data we have is today
+        if (
+            self.contract.imp.to_df().index[-1].day == pd.Timestamp.now().day
+        ) and pd.Timestamp.now().hour > 16:
+            self.load_contract()
 
     def _setup_schedule(self):
         if self.config["forced_charge"]:
