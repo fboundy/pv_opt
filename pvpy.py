@@ -7,7 +7,7 @@ from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 TIME_FORMAT = "%d/%m %H:%M"
-EXPORT_MULT = 1.0
+EXPORT_MULT = 1.35
 
 
 class Tariff:
@@ -533,22 +533,6 @@ class PVsystemModel:
                                     ),
                                 )
                             )
-                            # for slot in start_window:
-                            #     slots.append(
-                            #         (
-                            #             slot,
-                            #             round(
-                            #                 min(
-                            #                     min_price_energy
-                            #                     * 2000
-                            #                     / len(start_window),
-                            #                     self.inverter.charger_power
-                            #                     - x["forced"].loc[slot],
-                            #                 ),
-                            #                 0,
-                            #             ),
-                            #         )
-                            #     )
 
                             df = pd.concat(
                                 [
@@ -580,12 +564,66 @@ class PVsystemModel:
 
         # if discharge:
         # Check how many slots which aren't full are at an import price less than any export price:
-        max_export_price = df[df["forced"] <= 0]["export"].max()
+        max_export_price = df[df["forced"] <= 0]["export"].max() * EXPORT_MULT
+        self.log("")
         self.log(
             f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh"
         )
-        x = df[df["import"] < df["export"].max()]
-        self.log(f"{len(x)} slots have an import price less than the min export price")
+        x = df[df["import"] < max_export_price][
+            df["forced"] < self.inverter.charger_power
+        ]
+        self.log(f"{len(x)} slots have an import price less than the max export price")
+
+        done = len(x) == 0
+        i = 0
+        while not done:
+            i += 1
+            done = i > len(x)
+
+            min_price = x[x["forced"] < self.inverter.charger_power]["import"].min()
+            start_window = x[x["import"] == min_price].index[0]
+            str_log = f"Min import price {start_window:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} {x.loc[start_window]['forced']:0.0f}W "
+
+            if pd.Timestamp.now() > start_window.tz_localize(None):
+                str_log += "* "
+                factor = (
+                    (start_window + pd.Timedelta("30T")) - pd.Timestamp.now()
+                ).total_seconds / 1800
+            else:
+                str_log += "  "
+                factor = 1
+
+            str_log += f"SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
+
+            slots.append(
+                (
+                    start_window,
+                    self.inverter.charger_power - x["forced"].loc[start_window],
+                    ((100 - x["soc_end"].loc[start_window]) * self.battery.capacity)
+                    * 2
+                    * factor,
+                )
+            )
+
+            df = pd.concat(
+                [prices, self.flows(initial_soc, static_flows, slots=slots, **kwargs)],
+                axis=1,
+            )
+
+            net_cost = contract.net_cost(df).sum()
+            str_log += f"Net: {net_cost:5.1f}"
+            if net_cost < net_cost_opt:
+                str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
+            else:
+                done = True
+                slots = slots[:-1]
+                df = pd.concat(
+                    [
+                        prices,
+                        self.flows(initial_soc, static_flows, slots=slots, **kwargs),
+                    ],
+                    axis=1,
+                )
 
         df.index = pd.to_datetime(df.index)
         return df
