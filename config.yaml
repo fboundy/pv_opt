@@ -36,16 +36,18 @@ pv_opt:
   # Octopus account parameters
   # ========================================
 
-  octopus_auto: true # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+  octopus_auto: False # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
 
-  octopus_account: !secret octopus_account
-  octopus_api_key: !secret octopus_api_key
+  # octopus_account: !secret octopus_account
+  # octopus_api_key: !secret octopus_api_key
   
 
   # The following Can be omitted if either of the above options is working correctly:
 
-  octopus_import_tariff_code: E-2R-VAR-22-10-01-G
-  octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+  # octopus_import_tariff_code: E-2R-VAR-22-10-01-G
+  # octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+  octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+  octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
 
   # ========================================
   # Plant parameters

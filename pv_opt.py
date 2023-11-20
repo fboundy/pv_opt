@@ -17,6 +17,8 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 # %%
 #
+PV_MULT = 4.0
+USE_TARIFF = True
 
 VERSION = "3.0.0"
 
@@ -208,9 +210,14 @@ class PVOpt(hass.Hass):
     @ad.app_lock
     def _load_agile_cb(self, cb_args):
         # reload if the time is after 16:00 and the last data we have is today
+
         if (
-            self.contract.imp.to_df().index[-1].day == pd.Timestamp.now().day
+            self.contract.imp.to_df().sort_index().index[-1].day
+            == pd.Timestamp.now().day
         ) and pd.Timestamp.now().hour > 16:
+            self.log(
+                f"Contract end day: {self.contract.imp.to_df().index[-1].day} Today:{pd.Timestamp.now().day} {self.contract.imp.end().day}"
+            )
             self.load_contract()
 
     def _setup_schedule(self):
@@ -315,11 +322,11 @@ class PVOpt(hass.Hass):
                     except Exception as e:
                         self.log(e, level="ERROR")
                         self.log(
-                            "Unable to load Octopus Account details using API Key. Trying other methods.",
+                            f"Unable to load Octopus Account details using API Key: {e} Trying other methods.",
                             level="WARNING",
                         )
 
-        if self.contract is None:
+        if self.contract is None or USE_TARIFF:
             if (
                 "octopus_import_tariff_code" in self.config
                 and self.config["octopus_import_tariff_code"] is not None
@@ -346,8 +353,8 @@ class PVOpt(hass.Hass):
                         base=self,
                     )
                     self.log("Contract tariffs loaded OK from Tariff Codes")
-                except:
-                    self.log("Unable to load Tariff Codes", level="WARNING")
+                except Exception as e:
+                    self.log(f"Unable to load Tariff Codes {e}", level="ERROR")
 
         if self.contract is None:
             e = "Unable to load contract tariffs"
@@ -1001,6 +1008,7 @@ class PVOpt(hass.Hass):
 
             # Convert from kWh/30min period to W
             df *= 1000
+            df *= PV_MULT
 
             self.static = pd.concat([self.static, df.fillna(0)], axis=1)
             self.log("Solcast forecast loaded OK")
