@@ -341,8 +341,8 @@ class PVOpt(hass.Hass):
                 if "AGILE" in t.name:
                     self.agile = True
 
-                if self.agile:
-                    self.log("AGILE tariff detected. Rates will update at 16:00 daily")
+            if self.agile:
+                self.log("AGILE tariff detected. Rates will update at 16:00 daily")
         #     self.log(self.contract.__str__())
 
     def get_ha_value(self, entity_id):
@@ -836,10 +836,32 @@ class PVOpt(hass.Hass):
             self.charge_start_datetime = self.windows["start"].iloc[0]
             self.charge_end_datetime = self.windows["end"].iloc[0]
 
+            self.log(
+                f"Next charge window starts in {(self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60:3.0f} minutes."
+            )
+            if self.config["read_only"]:
+                self.log("Currently in READ ONLY mode")
+            else:
+                self.log(
+                    f"Inverter will be updated     {self.config['optimise_frequency_minutes'] * 1.5:3.0f} minutes before window start."
+                )
+
+            if (
+                (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds()
+                / 60
+                < self.config["optimise_frequency_minutes"] * 1.5
+            ) and not self.config["read_only"]:
+                self.inverter.control_charge(
+                    enable=True,
+                    start=self.charge_start_datetime,
+                    end=self.charge_end_datetime,
+                    power=self.charge_power,
+                )
+
         else:
             self.log(f"No charging slots")
             self.charge_current = 0
-            charge_power = 0
+            self.charge_power = 0
 
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
@@ -856,27 +878,6 @@ class PVOpt(hass.Hass):
         self.log("")
 
         self.write_output()
-        self.log(
-            f"Next charge window starts in {(self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60:3.0f} minutes."
-        )
-        if self.config["read_only"]:
-            self.log("Currently in READ ONLY mode")
-        else:
-            self.log(
-                f"Inverter will be updated     {self.config['optimise_frequency_minutes'] * 1.5:3.0f} minutes before window start."
-            )
-
-        if (
-            (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds()
-            / 60
-            < self.config["optimise_frequency_minutes"] * 1.5
-        ) and not self.config["read_only"]:
-            self.inverter.control_charge(
-                enable=(charge_power > 0),
-                start=self.charge_start_datetime,
-                end=self.charge_end_datetime,
-                power=charge_power,
-            )
 
     def write_to_hass(self, entity, state, attributes):
         try:

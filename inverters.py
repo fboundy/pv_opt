@@ -27,7 +27,7 @@ class InverterController:
                 times["end"] = times["start"]
 
             # Don't span midnight
-            elif times["end"].day != times["start".day]:
+            elif times["end"].day != times["start"].day:
                 times["end"] = times["end"].normalize() - pd.Timedelta("1T")
                 self.log(f"End time clipped to {times['end'].strftime(TIMEFORMAT)}")
 
@@ -82,7 +82,7 @@ class InverterController:
 
             entity_id = self.host.config[f"entity_id_timed_{direction}_current"]
 
-            current = power / self.host.config["battery_voltage"]
+            current = round(power / self.host.config["battery_voltage"], 1)
             self.log(
                 f"Power {power:0.0f} = {current:0.1f}A at {self.host.config['battery_voltage']}V"
             )
