@@ -39,23 +39,37 @@ class InverterController:
 
     def _control_charge_discharge(self, direction, enable, **kwargs):
         times = {
-            "start": kwargs.get("start", pd.Timestamp.now()),
-            "end": kwargs.get("end", pd.Timestamp("23:59")),
+            "start": kwargs.get("start", None),
+            "end": kwargs.get("end", None),
         }
-        power = kwargs.get("power", self.host.config["charger_power_watts"])
+        power = kwargs.get("power")
 
-        self.log(
-            f"Updating inverter {direction} times to {times['start'].strftime(TIMEFORMAT)}-{times['end'].strftime(TIMEFORMAT)} at {power:0.0f}W"
-        )
+        if not enable:
+            self.log(
+                f"Disabling inverter timed {direction}")
+        
+        else:
+            self.log(f"Updating inverter {direction} control:")
+            for x in kwargs:
+                self.log("  {x}: {kwargs[x]}")
+        
+
         if self.type == "SOLIS_SOLAX_MODBUS":
             # Disable by setting the times the same
             if (enable is not None) and (not enable):
+                times["start"] = pd.Timestamp.now()
                 times["end"] = times["start"]
 
             # Don't span midnight
-            elif times["end"].day != times["start"].day:
-                times["end"] = times["end"].normalize() - pd.Timedelta("1T")
-                self.log(f"End time clipped to {times['end'].strftime(TIMEFORMAT)}")
+            if times['end'] is not None:
+                if times['start'] is None:
+                    start_day = pd.Timestamp.now().day
+                else:
+                    start_day = times["start"].day
+
+                if start_day ! times["end"].day:
+                    times["end"] = times["end"].normalize() - pd.Timedelta("1T")
+                    self.log(f"End time clipped to {times['end'].strftime(TIMEFORMAT)}")
 
             write_flag = True
             value_changed = False
@@ -107,22 +121,23 @@ class InverterController:
             else:
                 self.log("Inverter already at correct time settings")
 
-            entity_id = self.host.config[f"entity_id_timed_{direction}_current"]
+            if power is not None:
+                entity_id = self.host.config[f"entity_id_timed_{direction}_current"]
 
-            current = round(power / self.host.config["battery_voltage"], 1)
-            self.log(
-                f"Power {power:0.0f} = {current:0.1f}A at {self.host.config['battery_voltage']}V"
-            )
-            changed, written = self._write_and_poll_value(
-                entity_id=entity_id, value=current, tolerance=1
-            )
-            if changed:
-                if written:
-                    self.log(f"Current {current} written to inverter")
+                current = round(power / self.host.config["battery_voltage"], 1)
+                self.log(
+                    f"Power {power:0.0f} = {current:0.1f}A at {self.host.config['battery_voltage']}V"
+                )
+                changed, written = self._write_and_poll_value(
+                    entity_id=entity_id, value=current, tolerance=1
+                )
+                if changed:
+                    if written:
+                        self.log(f"Current {current} written to inverter")
+                    else:
+                        self.log(f"Failed to write {current} to inverter")
                 else:
-                    self.log(f"Failed to write {current} to inverter")
-            else:
-                self.log("Inverter already at correct current")
+                    self.log("Inverter already at correct current")
 
     def _write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
         changed = False

@@ -900,24 +900,35 @@ class PVOpt(hass.Hass):
             time_to_slot_start < self.config["optimise_frequency_minutes"]
         ):
             self.log(
-                f"Current charge/discharge window end in {time_to_slot_start:0.1f} minutes."
+                f"Current charge/discharge windows end in {time_to_slot_start:0.1f} minutes."
             )
+
+        #     if self.charge_power > 0:
+        # #             self.inverter.control_charge(
+        # #                 enable=True,
+        # #                 start=self.charge_start_datetime,
+        # #                 end=self.charge_end_datetime,
+        # #                 power=self.charge_power,
+        # #             )
+        #     else:
+
         else:
             str_log = f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
 
             # If the next slot isn't soon then just check that current status matches what we see:
             if status["charge"]["active"]:
                 str_log += " but inverter is charging. Disabling charge."
+                self.log(str_log)
                 self.inverter.control_charge(enable=False)
 
             elif status["discharge"]["active"]:
                 str_log += " but inverter is discharging. Disabling discharge."
+                self.log(str_log)
                 self.inverter.control_discharge(enable=False)
 
             else:
                 str_log += ". Nothing to do."
-
-            self.log(str_log)
+                self.log(str_log)
 
         # else:
         #     # Next slot is up before the next optimiser run:
