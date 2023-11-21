@@ -155,6 +155,7 @@ class PVOpt(hass.Hass):
         self.cum_delta = {}
         self.timer_handle = None
         self.inverter_type = "SOLIS_SOLAX_MODBUS"
+        self.charging = False
 
         self._load_args()
 
@@ -224,7 +225,7 @@ class PVOpt(hass.Hass):
         if self.config["forced_charge"]:
             start_opt = (
                 pd.Timestamp.now()
-                .round(f"{self.config['optimise_frequency_minutes']}T")
+                .ceil(f"{self.config['optimise_frequency_minutes']}T")
                 .to_pydatetime()
             )
             self.timer_handle = self.run_every(
@@ -759,6 +760,7 @@ class PVOpt(hass.Hass):
     def optimise(self):
         # initialse a DataFrame to cover today and tomorrow at 30 minute frequency
         self.log("")
+
         if self.config["forced_discharge"]:
             discharge_enable = "enabled"
         else:
@@ -831,8 +833,8 @@ class PVOpt(hass.Hass):
         self.opt["period"] = (self.opt["forced"].diff() > 0).cumsum()
 
         self.log("")
-        if (self.opt["forced"] > 0).sum() > 0:
-            self.log("Optimal forced charge slots:")
+        if (self.opt["forced"] != 0).sum() > 0:
+            self.log("Optimal forced charge/discharge slots:")
             x = self.opt[self.opt["forced"] > 0].copy()
             # self.log(x[["forced", "period"]])
             x["start"] = x.index
@@ -850,33 +852,10 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4.1f}% -> {window[1]['soc_end']:4.1f}%"
                 )
-
             self.charge_power = self.windows["forced"].iloc[0]
             self.charge_current = self.charge_power / self.config["battery_voltage"]
             self.charge_start_datetime = self.windows["start"].iloc[0]
             self.charge_end_datetime = self.windows["end"].iloc[0]
-
-            self.log(
-                f"Next charge window starts in {(self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60:3.0f} minutes."
-            )
-            if self.config["read_only"]:
-                self.log("Currently in READ ONLY mode")
-            else:
-                self.log(
-                    f"Inverter will be updated     {self.config['optimise_frequency_minutes'] * 1.5:3.0f} minutes before window start."
-                )
-
-            if (
-                (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds()
-                / 60
-                < self.config["optimise_frequency_minutes"] * 1.5
-            ) and not self.config["read_only"]:
-                self.inverter.control_charge(
-                    enable=True,
-                    start=self.charge_start_datetime,
-                    end=self.charge_end_datetime,
-                    power=self.charge_power,
-                )
 
         else:
             self.log(f"No charging slots")
@@ -885,6 +864,48 @@ class PVOpt(hass.Hass):
 
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
+
+        status = self.inverter.status
+        self.log(f"Current inverter status: {status}")
+        # # If we are not charging now:
+        # #
+        # if not status['charge']['active'] and not status['discharge']['active']:
+        #     # If there is a charge window coming up then we can set the charge window in advance (including start time)
+        #     if self.charge_power > 0:
+        #         pass
+        #     # If there is a charge window coming up then we can set the discharge window in advance (including start time)
+        #     elif self.charge_power < 0:
+        #         pass
+        #     else:
+        #     # Just make sure we really are disabled
+        #         pass
+
+        # # If we are charging now:
+
+        #     if self.charge_power > 0:
+        #     # If we are turning charging off we just set the end time
+        #         pass
+        #     self.log(
+        #         f"Next charge window starts in {(self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60:3.0f} minutes."
+        #     )
+        #     if self.config["read_only"]:
+        #         self.log("Currently in READ ONLY mode")
+        #     else:
+        #         self.log(
+        #             f"Inverter will be updated     {self.config['optimise_frequency_minutes'] * 4:3.0f} minutes before window start."
+        #         )
+
+        #     if (
+        #         (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds()
+        #         / 60
+        #         < self.config["optimise_frequency_minutes"] * 4
+        #     ) and not self.config["read_only"]:
+        #         self.inverter.control_charge(
+        #             enable=True,
+        #             start=self.charge_start_datetime,
+        #             end=self.charge_end_datetime,
+        #             power=self.charge_power,
+        #         )
 
         self.log("")
         self.log(
@@ -1041,7 +1062,7 @@ class PVOpt(hass.Hass):
                         .mean()
                         .fillna(0)
                     )
-                    df *= 1 + self.config["consumption_margin"] / 100
+                    df = df * (1 + self.config["consumption_margin"] / 100)
 
                     # Group by time and take the mean
                     df = df.groupby(df.index.time).aggregate(

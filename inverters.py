@@ -2,6 +2,30 @@ import pandas as pd
 import time
 
 TIMEFORMAT = "%H:%M"
+INVERTER_DEFS = {
+    "SOLIS_SOLAX_MODBUS": {
+        "modes": {
+            1: "Selfuse - No Grid Charging",
+            3: "Timed Charge/Discharge - No Grid Charging",
+            17: "Backup/Reserve - No Grid Charging",
+            33: "Selfuse",
+            35: "Timed Charge/Discharge",
+            37: "Off-Grid Mode",
+            41: "Battery Awaken",
+            43: "Battery Awaken + Timed Charge/Discharge",
+            49: "Backup/Reserve - No Timed Charge/Discharge",
+            51: "Backup/Reserve",
+        },
+        "bits": [
+            "SelfUse",
+            "Timed",
+            "OffGrid" "BatteryWake",
+            "Backup",
+            "GridCharge",
+            "FeedInPriority",
+        ],
+    }
+}
 
 
 class InverterController:
@@ -65,7 +89,7 @@ class InverterController:
                         "entity_id_timed_charge_discharge_button"
                     ]
                     self.host.call_service("button/press", entity_id=entity_id)
-                    time.sleep(0.1)
+                    time.sleep(0.5)
                     time_pressed = pd.Timestamp(self.host.get_state(entity_id))
 
                     dt = (pd.Timestamp.now(self.host.tz) - time_pressed).total_seconds()
@@ -110,7 +134,7 @@ class InverterController:
                     "number/set_value", entity_id=entity_id, value=value
                 )
 
-                time.sleep(0.1)
+                time.sleep(0.5)
                 new_state = float(self.host.get_state(entity_id=entity_id))
                 written = new_state == value
 
@@ -135,3 +159,48 @@ class InverterController:
 
     def hold_soc(self, soc, end=None):
         pass
+
+    def _solis_mode_switch(self):
+        modes = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["modes"]
+        bits = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["bits"]
+        codes = {modes[m]: m for m in modes}
+
+        mode = self.host.get_state(enity_id=self.host.config["entity_id_inverter_mode"])
+        code = codes[mode]
+        status = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
+        return {"mode": mode, "code": code, "status": status}
+
+    def _solis_state(self):
+        limits = ["start", "end"]
+        time = {}
+
+        status = self._solis_mode_switch_status()[status]
+        for direction in ["charge", "discharge"]:
+            for limit in limits:
+                states = {}
+                for unit in ["hours", "minutes"]:
+                    entity_id = self.host.config[
+                        f"entity_id_timed_{direction}_{limit}_{unit}"
+                    ]
+                    states[unit] = int(self.host.get_state(entity_id=entity_id))
+                status[direction][limit] = pd.Timestamp(
+                    f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
+                )
+            time_now = pd.Timestamp.now(tz=self.tz)
+            status[direction]["current"] = self.host.get_state(
+                self.host.config[f"entity_id_timed_{direction}_current"]
+            )
+
+            status[direction]["active"] = (
+                time_now >= status[direction]["start"]
+                and time_now < status[direction]["end"]
+                and status[direction]["current"] > 0
+                and status["Timed"]
+                and status["GridCharge"]
+            )
+
+    @property
+    def status(self):
+        if self.type == "SOLIS_SOLAX_MODBUS":
+            status = self._solis_state()
+            return status

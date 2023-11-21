@@ -77,6 +77,7 @@ pv_opt:
   entity_id_timed_charge_end_minutes:    number.solis_timed_charge_end_minutes
   entity_id_timed_charge_current:    number.solis_timed_charge_current
   entity_id_timed_charge_discharge_button: button.solis_update_charge_discharge_times
+  entity_id_inverter_mode: select.solis_energy_storage_control_switch
 
   # ========================================
   # Solcast configuration
@@ -100,7 +101,7 @@ pv_opt:
   # Set this using an "input_select" helper and it can be varied on the fly
 
   solar_forecast: 
-    - input_select.solar_forecast_source
+    # - input_select.solar_forecast_source
     - Solcast
   
   # consumption estimation
@@ -115,7 +116,7 @@ pv_opt:
     # - 7
   consumption_margin: 
     - input_number.solar_opt_consumption_margin
-    - 0.10
+    - 25
   # consumption_grouping: 
   #    - input_select.solar_opt_consumption_grouping
   #    - mean
