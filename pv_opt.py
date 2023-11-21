@@ -906,6 +906,8 @@ class PVOpt(hass.Hass):
             else:
                 str_log += ". Nothing to do."
 
+            self.log(str_log)
+
         # else:
         #     # Next slot is up before the next optimiser run:
         #     # If we are not charging or discharging now:
