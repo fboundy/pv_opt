@@ -71,6 +71,7 @@ class InverterController:
 
             write_flag = True
             value_changed = False
+            self.log(f"Times: {times}")
             for limit in times:
                 if times[limit] is not None:
                     for unit in ["hours", "minutes"]:
@@ -157,10 +158,10 @@ class InverterController:
             except:
                 written = False
 
-        if verbose:
-            str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
-            str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
-            self.log(str_log)
+            if verbose:
+                str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
+                str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
+                self.log(str_log)
 
         return (changed, written)
 

@@ -895,6 +895,15 @@ class PVOpt(hass.Hass):
             self.log(
                 f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
             )
+            if self.charge_power>0:
+                self.inverter.control_charge(
+                    enable=True,
+                    start=self.charge_start_datetime,
+                    end=self.charge_end_datetime,
+                    power=self.charge_power,
+                )
+
+            
         elif (time_to_slot_start <= 0) and (
             time_to_slot_start < self.config["optimise_frequency_minutes"]
         ):
