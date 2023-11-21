@@ -216,11 +216,10 @@ class PVOpt(hass.Hass):
         # reload if the time is after 16:00 and the last data we have is today
 
         if (
-            self.contract.imp.to_df().sort_index().index[-1].day
-            == pd.Timestamp.now().day
+            self.contract.imp.end().day == pd.Timestamp.now().day
         ) and pd.Timestamp.now().hour > 16:
             self.log(
-                f"Contract end day: {self.contract.imp.to_df().index[-1].day} Today:{pd.Timestamp.now().day} {self.contract.imp.end().day}"
+                f"Contract end day: {self.contract.imp.end().day} Today:{pd.Timestamp.now().day}"
             )
             self.load_contract()
 
