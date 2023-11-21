@@ -202,8 +202,8 @@ class InverterController:
                 time_now >= status[direction]["start"]
                 and time_now < status[direction]["end"]
                 and status[direction]["current"] > 0
-                and status["Timed"]
-                and status["GridCharge"]
+                and status["switches"]["Timed"]
+                and status["switches"]["GridCharge"]
             )
         return status
 
