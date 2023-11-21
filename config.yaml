@@ -36,16 +36,19 @@ pv_opt:
   # Octopus account parameters
   # ========================================
 
-  octopus_auto: true # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+  octopus_auto: True # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
 
-  octopus_account: !secret octopus_account
-  octopus_api_key: !secret octopus_api_key
+  # octopus_account: !secret octopus_account
+  # octopus_api_key: !secret octopus_api_key
   
 
   # The following Can be omitted if either of the above options is working correctly:
 
-  octopus_import_tariff_code: E-2R-VAR-22-10-01-G
-  octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+  # octopus_import_tariff_code: E-2R-VAR-22-10-01-G
+  # octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+  
+  # octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+  # octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
 
   # ========================================
   # Plant parameters
@@ -73,7 +76,15 @@ pv_opt:
   entity_id_timed_charge_end_hours:      number.solis_timed_charge_end_hours 
   entity_id_timed_charge_end_minutes:    number.solis_timed_charge_end_minutes
   entity_id_timed_charge_current:    number.solis_timed_charge_current
+
+  entity_id_timed_discharge_start_hours:     number.solis_timed_discharge_start_hours
+  entity_id_timed_discharge_start_minutes:  number.solis_timed_discharge_start_minutes
+  entity_id_timed_discharge_end_hours:      number.solis_timed_discharge_end_hours 
+  entity_id_timed_discharge_end_minutes:    number.solis_timed_discharge_end_minutes
+  entity_id_timed_discharge_current:    number.solis_timed_discharge_current
+
   entity_id_timed_charge_discharge_button: button.solis_update_charge_discharge_times
+  entity_id_inverter_mode: select.solis_energy_storage_control_switch
 
   # ========================================
   # Solcast configuration
@@ -97,7 +108,7 @@ pv_opt:
   # Set this using an "input_select" helper and it can be varied on the fly
 
   solar_forecast: 
-    - input_select.solar_forecast_source
+    # - input_select.solar_forecast_source
     - Solcast
   
   # consumption estimation
@@ -112,7 +123,7 @@ pv_opt:
     # - 7
   consumption_margin: 
     - input_number.solar_opt_consumption_margin
-    - 0.10
+    - 25
   # consumption_grouping: 
   #    - input_select.solar_opt_consumption_grouping
   #    - mean
