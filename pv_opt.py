@@ -22,7 +22,10 @@ USE_TARIFF = True
 
 VERSION = "3.0.0"
 
-TIME_FORMAT = "%Y-%m-%d %H:%M:%S%z"
+DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
+DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
+TIME_FORMAT = "%H:%M"
+
 
 EVENT_TRIGGER = "PV_OPT"
 DEBUG_TRIGGER = "PV_DEBUG"
@@ -686,7 +689,9 @@ class PVOpt(hass.Hass):
 
     def _status(self, status):
         entity_id = f"sensor.{self.prefix.lower()}_status"
-        attributes = {"last_updated": pd.Timestamp.now().strftime(TIME_FORMAT)}
+        attributes = {
+            "last_updated": pd.Timestamp.now().strftime(DATE_TIME_FORMAT_LONG)
+        }
         self.set_state(state=status, entity_id=entity_id, attributes=attributes)
 
     @ad.app_lock
@@ -836,7 +841,6 @@ class PVOpt(hass.Hass):
         if (self.opt["forced"] != 0).sum() > 0:
             self.log("Optimal forced charge/discharge slots:")
             x = self.opt[self.opt["forced"] > 0].copy()
-            # self.log(x[["forced", "period"]])
             x["start"] = x.index
             x["end"] = x.index + pd.Timedelta("30T")
             self.windows = pd.concat(
@@ -846,7 +850,6 @@ class PVOpt(hass.Hass):
                 ],
                 axis=1,
             )
-            # self.log(self.windows)
 
             for window in self.windows.iterrows():
                 self.log(
@@ -865,20 +868,33 @@ class PVOpt(hass.Hass):
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
 
+        # Get the current status of the inverter
         status = self.inverter.status
-        self.log(f"Current inverter status: {status}")
-        # # If we are not charging now:
-        # #
-        # if not status['charge']['active'] and not status['discharge']['active']:
-        #     # If there is a charge window coming up then we can set the charge window in advance (including start time)
-        #     if self.charge_power > 0:
-        #         pass
-        #     # If there is a charge window coming up then we can set the discharge window in advance (including start time)
-        #     elif self.charge_power < 0:
-        #         pass
-        #     else:
-        #     # Just make sure we really are disabled
-        #         pass
+        self._log_inverter_status(status)
+
+        # If we are not charging or dischagin now:
+        #
+        if (not status["charge"]["active"]) and (not status["discharge"]["active"]):
+            # If there is a charge window coming up then we can set the charge window in advance (including start time)
+            if self.charge_power > 0:
+                self.inverter.control_charge(
+                    enable=True,
+                    start=self.charge_start_datetime,
+                    end=self.charge_end_datetime,
+                    power=self.charge_power,
+                )
+            # If there is a charge window coming up then we can set the discharge window in advance (including start time)
+            elif self.charge_power < 0:
+                self.inverter.control_discharge(
+                    enable=True,
+                    start=self.charge_start_datetime,
+                    end=self.charge_end_datetime,
+                    power=self.charge_power,
+                )
+            else:
+                # Just make sure we really are disabled
+                self.inverter.control_charge(enabled=False)
+                self.inverter.control_discharge(enabled=False)
 
         # # If we are charging now:
 
@@ -919,6 +935,24 @@ class PVOpt(hass.Hass):
         self.log("")
 
         self.write_output()
+
+    def _log_inverter_status(self, status):
+        self.log("")
+        self.log(f"Current inverter status:")
+        self.log("------------------------")
+        for s in status:
+            if not isinstance(status[s], dict):
+                self.log(f"  {s:18s}: {status[s]}")
+            else:
+                self.log(f"  {s:18s}:")
+                for x in status[s]:
+                    if isinstance(status[s][x], pd.Timestamp):
+                        self.log(
+                            f"    {x:16s}: {status[s][x].strftime(DATE_TIME_FORMAT_SHORT)}"
+                        )
+                    else:
+                        self.log(f"    {x:16s}: {status[s][x]}")
+        self.log("")
 
     def write_to_hass(self, entity, state, attributes):
         try:

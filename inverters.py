@@ -19,7 +19,8 @@ INVERTER_DEFS = {
         "bits": [
             "SelfUse",
             "Timed",
-            "OffGrid" "BatteryWake",
+            "OffGrid",
+            "BatteryWake",
             "Backup",
             "GridCharge",
             "FeedInPriority",
@@ -32,6 +33,7 @@ class InverterController:
     def __init__(self, inverter_type, host) -> None:
         self.type = inverter_type
         self.host = host
+        self.tz = self.host.tz
         if host is not None:
             self.log = host.log
 
@@ -142,9 +144,9 @@ class InverterController:
                 written = False
 
         if verbose:
-            self.log(
-                f"Entity: {entity_id} Value: {value}  Old State: {state} New state: {new_state} Diff: {diff} Tol: {tolerance}"
-            )
+            str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
+            str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
+            self.log(str_log)
 
         return (changed, written)
 
@@ -164,18 +166,20 @@ class InverterController:
         modes = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["modes"]
         bits = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["bits"]
         codes = {modes[m]: m for m in modes}
-
-        mode = self.host.get_state(enity_id=self.host.config["entity_id_inverter_mode"])
-        code = codes[mode]
-        status = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
-        return {"mode": mode, "code": code, "status": status}
+        inverter_mode = self.host.get_state(
+            entity_id=self.host.config["entity_id_inverter_mode"]
+        )
+        # self.log(f"codes: {codes} modes:{inverter_mode}")
+        code = codes[inverter_mode]
+        switches = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
+        return {"mode": inverter_mode, "code": code, "switches": switches}
 
     def _solis_state(self):
         limits = ["start", "end"]
-        time = {}
 
-        status = self._solis_mode_switch_status()[status]
+        status = self._solis_mode_switch()
         for direction in ["charge", "discharge"]:
+            status[direction] = {}
             for limit in limits:
                 states = {}
                 for unit in ["hours", "minutes"]:
@@ -187,8 +191,10 @@ class InverterController:
                     f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                 )
             time_now = pd.Timestamp.now(tz=self.tz)
-            status[direction]["current"] = self.host.get_state(
-                self.host.config[f"entity_id_timed_{direction}_current"]
+            status[direction]["current"] = float(
+                self.host.get_state(
+                    self.host.config[f"entity_id_timed_{direction}_current"]
+                )
             )
 
             status[direction]["active"] = (
@@ -198,6 +204,7 @@ class InverterController:
                 and status["Timed"]
                 and status["GridCharge"]
             )
+        return status
 
     @property
     def status(self):

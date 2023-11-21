@@ -707,8 +707,9 @@ class PVsystemModel:
                 if pd.Timestamp.now() > start_window.tz_localize(None):
                     str_log += "* "
                     factor = (
-                        (start_window + pd.Timedelta("30T")) - pd.Timestamp.now()
-                    ).total_seconds / 1800
+                        (start_window.tz_localize(None) + pd.Timedelta("30T"))
+                        - pd.Timestamp.now()
+                    ).total_seconds() / 1800
                 else:
                     str_log += "  "
                     factor = 1
