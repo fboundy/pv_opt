@@ -48,8 +48,8 @@ class InverterController:
             f"Updating inverter {direction} times to {times['start'].strftime(TIMEFORMAT)}-{times['end'].strftime(TIMEFORMAT)} at {power:0.0f}W"
         )
         if self.type == "SOLIS_SOLAX_MODBUS":
-            # Disable by steting the times the same
-            if not enable:
+            # Disable by setting the times the same
+            if (enable is not None) and (not enable):
                 times["end"] = times["start"]
 
             # Don't span midnight
@@ -60,30 +60,31 @@ class InverterController:
             write_flag = True
             value_changed = False
             for limit in times:
-                for unit in ["hours", "minutes"]:
-                    entity_id = self.host.config[
-                        f"entity_id_timed_{direction}_{limit}_{unit}"
-                    ]
-                    if unit == "hours":
-                        value = times[limit].hour
-                    else:
-                        value = times[limit].minute
-
-                    changed, written = self._write_and_poll_value(
-                        entity_id=entity_id, value=value, verbose=True
-                    )
-                    if changed:
-                        if written:
-                            self.log(
-                                f"Wrote {direction} {limit} {unit} of {value} to inverter"
-                            )
-                            value_changed = True
+                if times[limit] is not None:
+                    for unit in ["hours", "minutes"]:
+                        entity_id = self.host.config[
+                            f"entity_id_timed_{direction}_{limit}_{unit}"
+                        ]
+                        if unit == "hours":
+                            value = times[limit].hour
                         else:
-                            self.log(
-                                f"Failed to write {direction} {limit} {unit} to inverter",
-                                level="ERROR",
-                            )
-                            write_flag = False
+                            value = times[limit].minute
+
+                        changed, written = self._write_and_poll_value(
+                            entity_id=entity_id, value=value, verbose=True
+                        )
+                        if changed:
+                            if written:
+                                self.log(
+                                    f"Wrote {direction} {limit} {unit} of {value} to inverter"
+                                )
+                                value_changed = True
+                            else:
+                                self.log(
+                                    f"Failed to write {direction} {limit} {unit} to inverter",
+                                    level="ERROR",
+                                )
+                                write_flag = False
 
             if value_changed:
                 if write_flag:

@@ -157,12 +157,7 @@ class Tariff:
             x = pd.DataFrame(self.fixed).set_index("valid_from")["value_inc_vat"]
             x.index = pd.to_datetime(x.index)
             newindex = pd.date_range(x.index[0], df.index[-1], freq="30T")
-            x = (
-                x.reindex(newindex)
-                .sort_index()
-                .fillna(method="ffill")
-                .loc[df.index[0] :]
-            )
+            x = x.reindex(newindex).sort_index().ffill().loc[df.index[0] :]
             df = pd.concat([df, x], axis=1).set_axis(["unit", "fixed"], axis=1)
 
             mask = df.index.time != pd.Timestamp("00:00", tz="UTC").time()
