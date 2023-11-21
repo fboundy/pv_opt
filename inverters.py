@@ -45,14 +45,12 @@ class InverterController:
         power = kwargs.get("power")
 
         if not enable:
-            self.log(
-                f"Disabling inverter timed {direction}")
-        
+            self.log(f"Disabling inverter timed {direction}")
+
         else:
             self.log(f"Updating inverter {direction} control:")
             for x in kwargs:
                 self.log("  {x}: {kwargs[x]}")
-        
 
         if self.type == "SOLIS_SOLAX_MODBUS":
             # Disable by setting the times the same
@@ -61,13 +59,13 @@ class InverterController:
                 times["end"] = times["start"]
 
             # Don't span midnight
-            if times['end'] is not None:
-                if times['start'] is None:
+            if times["end"] is not None:
+                if times["start"] is None:
                     start_day = pd.Timestamp.now().day
                 else:
                     start_day = times["start"].day
 
-                if start_day ! times["end"].day:
+                if start_day != times["end"].day:
                     times["end"] = times["end"].normalize() - pd.Timedelta("1T")
                     self.log(f"End time clipped to {times['end'].strftime(TIMEFORMAT)}")
 
@@ -202,7 +200,8 @@ class InverterController:
                     entity_id = self.host.config[
                         f"entity_id_timed_{direction}_{limit}_{unit}"
                     ]
-                    states[unit] = int(self.host.get_state(entity_id=entity_id))
+                    self.log(entity_id)
+                    states[unit] = int(float(self.host.get_state(entity_id=entity_id)))
                 status[direction][limit] = pd.Timestamp(
                     f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                 )
