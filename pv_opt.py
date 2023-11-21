@@ -872,34 +872,39 @@ class PVOpt(hass.Hass):
         status = self.inverter.status
         self._log_inverter_status(status)
 
-        time_to_slot_start = (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60
-        time_to_slot_end = (self.charge_end_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60
+        time_to_slot_start = (
+            self.charge_start_datetime - pd.Timestamp.now(self.tz)
+        ).total_seconds() / 60
+        time_to_slot_end = (
+            self.charge_end_datetime - pd.Timestamp.now(self.tz)
+        ).total_seconds() / 60
 
-        if (time_to_slot_start > 0) and (time_to_slot_start < self.config['optimise_frequency_minutes']):
+        if (time_to_slot_start > 0) and (
+            time_to_slot_start < self.config["optimise_frequency_minutes"]
+        ):
             self.log(
                 f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
-            )        
-        elif (time_to_slot_start <= 0) and (time_to_slot_start < self.config['optimise_frequency_minutes']):
+            )
+        elif (time_to_slot_start <= 0) and (
+            time_to_slot_start < self.config["optimise_frequency_minutes"]
+        ):
             self.log(
                 f"Current charge/discharge window end in {time_to_slot_start:0.1f} minutes."
-            )      
+            )
         else:
             str_log = f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
 
-            #If the next slot isn't soon then just check that current status matches what we see:
+            # If the next slot isn't soon then just check that current status matches what we see:
             if status["charge"]["active"]:
                 str_log += " but inverter is charging. Disabling charge."
                 self.inverter.control_charge(enable=False)
 
             elif status["discharge"]["active"]:
-                str_log += " but inverter is discharging. Disabling discharge".
+                str_log += " but inverter is discharging. Disabling discharge."
                 self.inverter.control_discharge(enable=False)
-            
+
             else:
-                str_log+=". Nothing to do."
-
-
-
+                str_log += ". Nothing to do."
 
         # else:
         #     # Next slot is up before the next optimiser run:
@@ -930,7 +935,7 @@ class PVOpt(hass.Hass):
         #     # # If we are charging now:
         #     elif status["charge"]["active"]:
         #         # If we are turning charging off we just set the end time
-        #         if self.charge_power == 0:            
+        #         if self.charge_power == 0:
         #             self.inverter.control_charge(
         #                 enable=None,
         #                 start=None,
@@ -939,9 +944,8 @@ class PVOpt(hass.Hass):
 
         #     # If we are adding a new slot:
 
-
         #         pass
- 
+
         self.log("")
         self.log(
             f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.opt_cost.sum():5.2f}"
