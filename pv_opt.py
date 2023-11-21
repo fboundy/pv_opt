@@ -868,6 +868,17 @@ class PVOpt(hass.Hass):
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
 
+        self.log("")
+        self.log(
+            f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.opt_cost.sum():5.2f}"
+        )
+        self.log("")
+        self.log(
+            f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).total_seconds():0.2f} seconds"
+        )
+        self.log("")
+        self.log("")
+
         # Get the current status of the inverter
         status = self.inverter.status
         self._log_inverter_status(status)
@@ -947,17 +958,6 @@ class PVOpt(hass.Hass):
         #     # If we are adding a new slot:
 
         #         pass
-
-        self.log("")
-        self.log(
-            f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.opt_cost.sum():5.2f}"
-        )
-        self.log("")
-        self.log(
-            f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).total_seconds():0.2f} seconds"
-        )
-        self.log("")
-        self.log("")
 
         self.write_output()
 
