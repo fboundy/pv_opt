@@ -895,30 +895,27 @@ class PVOpt(hass.Hass):
             self.log(
                 f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
             )
-            if self.charge_power>0:
+            if self.charge_power > 0:
                 self.inverter.control_charge(
                     enable=True,
                     start=self.charge_start_datetime,
                     end=self.charge_end_datetime,
                     power=self.charge_power,
                 )
+            elif self.charge_power < 0:
+                self.inverter.control_discharge(
+                    enable=True,
+                    start=self.charge_start_datetime,
+                    end=self.charge_end_datetime,
+                    power=self.charge_power,
+                )
 
-            
         elif (time_to_slot_start <= 0) and (
             time_to_slot_start < self.config["optimise_frequency_minutes"]
         ):
             self.log(
                 f"Current charge/discharge windows end in {time_to_slot_start:0.1f} minutes."
             )
-
-        #     if self.charge_power > 0:
-        # #             self.inverter.control_charge(
-        # #                 enable=True,
-        # #                 start=self.charge_start_datetime,
-        # #                 end=self.charge_end_datetime,
-        # #                 power=self.charge_power,
-        # #             )
-        #     else:
 
         else:
             str_log = f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
@@ -937,46 +934,6 @@ class PVOpt(hass.Hass):
             else:
                 str_log += ". Nothing to do."
                 self.log(str_log)
-
-        # else:
-        #     # Next slot is up before the next optimiser run:
-        #     # If we are not charging or discharging now:
-        #     #
-        #     if (not status["charge"]["active"]) and (not status["discharge"]["active"]):
-        #         # If there is a charge window coming up then we can set the charge window in advance (including start time)
-        #         if self.charge_power > 0:
-        #             self.inverter.control_charge(
-        #                 enable=True,
-        #                 start=self.charge_start_datetime,
-        #                 end=self.charge_end_datetime,
-        #                 power=self.charge_power,
-        #             )
-        #         # If there is a dicharge window coming up then we can set the discharge window in advance (including start time)
-        #         elif self.charge_power < 0:
-        #             self.inverter.control_discharge(
-        #                 enable=True,
-        #                 start=self.charge_start_datetime,
-        #                 end=self.charge_end_datetime,
-        #                 power=self.charge_power,
-        #             )
-        #         else:
-        #             # Just make sure we really are disabled
-        #             self.inverter.control_charge(enable=False)
-        #             self.inverter.control_discharge(enable=False)
-
-        #     # # If we are charging now:
-        #     elif status["charge"]["active"]:
-        #         # If we are turning charging off we just set the end time
-        #         if self.charge_power == 0:
-        #             self.inverter.control_charge(
-        #                 enable=None,
-        #                 start=None,
-        #                 end=self.charge_end_datetime,
-        #             )
-
-        #     # If we are adding a new slot:
-
-        #         pass
 
         self.write_output()
 
