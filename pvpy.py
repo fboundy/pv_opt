@@ -184,6 +184,7 @@ class Tariff:
             # elif self.day_ahead is not None and self.day_ahead.index[-3] < df.index[-1]:
             #     # reset the day ahead forecasts if what we have goes to much the same time
             #     self.day_ahead = None
+
             self.log(
                 f">>>Tariff name: {self.name:40s} DF end: {df.index[-1].strftime(TIME_FORMAT)}  Desired end{end.strftime(TIME_FORMAT)} {df.index[-1] < end}"
             )
