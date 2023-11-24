@@ -163,6 +163,21 @@ class Tariff:
             mask = df.index.time != pd.Timestamp("00:00", tz="UTC").time()
             df.loc[mask, "fixed"] = 0
 
+        i = 0
+        while df.index[-1] < end and i < 7:
+            i += 1
+            extended_index = pd.date_range(
+                df.index[-1] + pd.Timedelta("30T"), end, freq="30T"
+            )
+            df = pd.concat(
+                [
+                    df,
+                    pd.concat([df, pd.DataFrame(index=extended_index)])
+                    .shift(48)
+                    .loc[extended_index[0] :],
+                ]
+            ).dropna()
+
         return pd.DataFrame(df)
 
 
@@ -614,7 +629,8 @@ class PVsystemModel:
                 if pd.Timestamp.now() > start_window.tz_localize(None):
                     str_log += "* "
                     factor = (
-                        (start_window.tz_localize(None) + pd.Timedelta("30T")) - pd.Timestamp.now()
+                        (start_window.tz_localize(None) + pd.Timedelta("30T"))
+                        - pd.Timestamp.now()
                     ).total_seconds() / 1800
                 else:
                     str_log += "  "
