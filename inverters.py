@@ -76,7 +76,7 @@ class InverterController:
                 if times[limit] is not None:
                     for unit in ["hours", "minutes"]:
                         entity_id = self.host.config[
-                            f"entity_id_timed_{direction}_{limit}_{unit}"
+                            f"id_timed_{direction}_{limit}_{unit}"
                         ]
                         if unit == "hours":
                             value = times[limit].hour
@@ -101,9 +101,7 @@ class InverterController:
 
             if value_changed:
                 if write_flag:
-                    entity_id = self.host.config[
-                        "entity_id_timed_charge_discharge_button"
-                    ]
+                    entity_id = self.host.config["id_timed_charge_discharge_button"]
                     self.host.call_service("button/press", entity_id=entity_id)
                     time.sleep(0.5)
                     time_pressed = pd.Timestamp(self.host.get_state(entity_id))
@@ -121,7 +119,7 @@ class InverterController:
                 self.log("Inverter already at correct time settings")
 
             if power is not None:
-                entity_id = self.host.config[f"entity_id_timed_{direction}_current"]
+                entity_id = self.host.config[f"id_timed_{direction}_current"]
 
                 current = round(power / self.host.config["battery_voltage"], 1)
                 self.log(
@@ -182,7 +180,7 @@ class InverterController:
         bits = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["bits"]
         codes = {modes[m]: m for m in modes}
         inverter_mode = self.host.get_state(
-            entity_id=self.host.config["entity_id_inverter_mode"]
+            entity_id=self.host.config["id_inverter_mode"]
         )
         # self.log(f"codes: {codes} modes:{inverter_mode}")
         code = codes[inverter_mode]
@@ -198,9 +196,7 @@ class InverterController:
             for limit in limits:
                 states = {}
                 for unit in ["hours", "minutes"]:
-                    entity_id = self.host.config[
-                        f"entity_id_timed_{direction}_{limit}_{unit}"
-                    ]
+                    entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
                     self.log(entity_id)
                     states[unit] = int(float(self.host.get_state(entity_id=entity_id)))
                 status[direction][limit] = pd.Timestamp(
@@ -208,9 +204,7 @@ class InverterController:
                 )
             time_now = pd.Timestamp.now(tz=self.tz)
             status[direction]["current"] = float(
-                self.host.get_state(
-                    self.host.config[f"entity_id_timed_{direction}_current"]
-                )
+                self.host.get_state(self.host.config[f"id_timed_{direction}_current"])
             )
 
             status[direction]["active"] = (
