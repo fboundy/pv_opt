@@ -22,6 +22,7 @@ class Tariff:
         eco7=False,
         octopus=True,
         eco7_start="01:00",  # UTC
+        host=None,
         **kwargs,
     ) -> None:
         self.name = name
@@ -42,6 +43,11 @@ class Tariff:
             self.unit = unit
             self.day = day
             self.night = night
+
+        if host is None:
+            self.log = print
+        else:
+            self.log = host.log
 
     def _oct_time(self, d):
         # print(d)
@@ -150,34 +156,37 @@ class Tariff:
             df = pd.DataFrame(self.unit).set_index("valid_from")["value_inc_vat"]
             df.index = pd.to_datetime(df.index)
             df = df.sort_index()
-            # newindex = pd.date_range(df.index[0], end, freq="30T")
-            # df = df.reindex(index=newindex).fillna(method="ffill").loc[start:]
+            newindex = pd.date_range(df.index[0], end, freq="30T")
+            df = df.reindex(index=newindex).fillna(method="ffill").loc[start:]
             i = 0
-            if (
-                (df.index[-1] < end)
-                and "AGILE" in self.name
-                and pd.Timestamp.now().hour > 11
-            ):
-                if self.day_ahead is None:
-                    self.day_ahead = self.get_day_ahead(df.index[0])
-                mask = (self.day_ahead.index.hour >= 16) & (self.day_ahead.hour < 19)
-                agile = (
-                    pd.concat(
-                        [
-                            self.day_ahead[mask] * 0.186 + 16.5,
-                            self.day_ahead[~mask] * 0.29 - 0.6,
-                        ]
-                    )
-                    .sort_index()
-                    .loc[df.index[-1] :]
-                    .iloc[1:]
-                )
-                df = pd.concat([df, agile])
 
-            elif self.day_ahead is not None and self.day_ahead.index[-3] < df.index[-1]:
-                # reset the day ahead forecasts if what we have goes to much the same time
-                self.day_ahead = None
+            # if (
+            #     (df.index[-1] < end)
+            #     and "AGILE" in self.name
+            #     and pd.Timestamp.now().hour > 11
+            # ):
+            #     if self.day_ahead is None:
+            #         self.day_ahead = self.get_day_ahead(df.index[0])
+            #     mask = (self.day_ahead.index.hour >= 16) & (self.day_ahead.hour < 19)
+            #     agile = (
+            #         pd.concat(
+            #             [
+            #                 self.day_ahead[mask] * 0.186 + 16.5,
+            #                 self.day_ahead[~mask] * 0.29 - 0.6,
+            #             ]
+            #         )
+            #         .sort_index()
+            #         .loc[df.index[-1] :]
+            #         .iloc[1:]
+            #     )
+            #     df = pd.concat([df, agile])
 
+            # elif self.day_ahead is not None and self.day_ahead.index[-3] < df.index[-1]:
+            #     # reset the day ahead forecasts if what we have goes to much the same time
+            #     self.day_ahead = None
+            self.log(
+                f">>>Tariff name: {self.name:40s} DF end: {df.index[-1].strftime(TIME_FORMAT)}  Desired end{end.strftime(TIME_FORMAT)} {df.index[-1] < end}"
+            )
             while df.index[-1] < end and i < 7:
                 i += 1
                 extended_index = pd.date_range(
@@ -482,7 +491,9 @@ class PVsystemModel:
                 axis=1,
             )
 
-        self.log(prices)
+        self.log(
+            f"  >>  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
+        )
 
         prices = prices.set_axis(["import", "export"], axis=1)
         prices["export"] *= EXPORT_MULT

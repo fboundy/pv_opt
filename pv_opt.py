@@ -281,7 +281,7 @@ class PVOpt(hass.Hass):
                         )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
 
                         tariffs[imp_exp] = pv.Tariff(
-                            tariff_code, export=(imp_exp == "export")
+                            tariff_code, export=(imp_exp == "export"), host=self
                         )
                         if "AGILE" in tariff_code:
                             self.agile = True
@@ -347,6 +347,7 @@ class PVOpt(hass.Hass):
                             tariffs[imp_exp] = pv.Tariff(
                                 self.config[f"octopus_{imp_exp}_tariff_code"],
                                 export=(imp_exp == "export"),
+                                host=self,
                             )
 
                     self.contract = pv.Contract(
