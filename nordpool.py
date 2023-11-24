@@ -62,19 +62,29 @@ agile.index = pd.to_datetime(agile.index)
 agile.name = "Agile"
 
 # %%
-merge = pd.concat([price, agile.resample("1H").mean()], axis=1)
+merge = pd.concat(
+    [
+        price.sort_index().loc[: agile.sort_index().index[-1]],
+        agile.resample("1H").mean(),
+    ],
+    axis=1,
+)
 
-merge.plot()
 mask = (merge.index.hour >= 16) & (merge.index.hour < 19)
+merge["Forecast"] = 0
+merge.loc[mask, "Forecast"] = merge[mask]["Day Ahead"] * 0.186 + 16.5
+merge.loc[~mask, "Forecast"] = merge[~mask]["Day Ahead"] * 0.229 - 0.6
+ax = merge.plot()
+
 ax = merge[mask].plot.scatter("Day Ahead", "Agile")
 merge[~mask].plot.scatter("Day Ahead", "Agile", ax=ax, color="C1")
 
 lr_peak = linregress(
-    merge[mask]["Agile"].to_numpy(), merge[mask]["Day Ahead"].to_numpy()
+    merge[mask]["Day Ahead"].to_numpy(), merge[mask]["Agile"].to_numpy()
 )
 print(lr_peak)
 lr_off_peak = lr_peak = linregress(
-    merge[~mask]["Agile"].to_numpy(), merge[~mask]["Day Ahead"].to_numpy()
+    merge[~mask]["Day Ahead"].to_numpy(), merge[~mask]["Agile"].to_numpy()
 )
 print(lr_off_peak)
 # %%

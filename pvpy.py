@@ -28,6 +28,7 @@ class Tariff:
         self.export = export
         self.eco7 = eco7
         self.area = kwargs.get("area", None)
+        self.day_ahead = None
         if self.eco7:
             self.eco7_start = pd.Timestamp(eco7_start)
             if self.eco7_start.tzinfo is None:
@@ -152,6 +153,31 @@ class Tariff:
             # newindex = pd.date_range(df.index[0], end, freq="30T")
             # df = df.reindex(index=newindex).fillna(method="ffill").loc[start:]
             i = 0
+            if (
+                (df.index[-1] < end)
+                and "AGILE" in self.name
+                and pd.Timestamp.now().hour > 11
+            ):
+                if self.day_ahead is None:
+                    self.day_ahead = self.get_day_ahead(df.index[0])
+                mask = (self.day_ahead.index.hour >= 16) & (self.day_ahead.hour < 19)
+                agile = (
+                    pd.concat(
+                        [
+                            self.day_ahead[mask] * 0.186 + 16.5,
+                            self.day_ahead[~mask] * 0.29 - 0.6,
+                        ]
+                    )
+                    .sort_index()
+                    .loc[df.index[-1] :]
+                    .iloc[1:]
+                )
+                df = pd.concat([df, agile])
+
+            elif self.day_ahead is not None and self.day_ahead.index[-3] < df.index[-1]:
+                # reset the day ahead forecasts if what we have goes to much the same time
+                self.day_ahead = None
+
             while df.index[-1] < end and i < 7:
                 i += 1
                 extended_index = pd.date_range(
@@ -179,6 +205,39 @@ class Tariff:
             df.loc[mask, "fixed"] = 0
 
         return pd.DataFrame(df)
+
+    def get_day_ahead(self, start):
+        url = "https://www.nordpoolgroup.com/api/marketdata/page/325?currency=GBP"
+
+        try:
+            r = requests.get(url)
+            r.raise_for_status()  # Raise an exception for unsuccessful HTTP status codes
+
+        except requests.exceptions.RequestException as e:
+            return
+
+        index = []
+        data = []
+        for row in r.json()["data"]["Rows"]:
+            str = ""
+            # pprint.pprint(row)
+
+            for column in row:
+                if isinstance(row[column], list):
+                    for i in row[column]:
+                        if i["CombinedName"] == "CET/CEST time":
+                            if len(i["Value"]) > 10:
+                                time = f"T{i['Value'][:2]}:00"
+                                print(time)
+                        else:
+                            if len(i["Name"]) > 8:
+                                print(i["Name"])
+                                data.append(float(i["Value"].replace(",", ".")))
+                                index.append(pd.Timestamp(i["Name"] + time))
+
+        price = pd.Series(index=index, data=data).sort_index()
+        price.index = price.index.tz_localize("CET")
+        return price.loc.resample("30T").ffill()[start:]
 
 
 class InverterModel:
