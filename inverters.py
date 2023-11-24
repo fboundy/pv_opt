@@ -50,7 +50,7 @@ class InverterController:
         else:
             self.log(f"Updating inverter {direction} control:")
             for x in kwargs:
-                self.log("  {x}: {kwargs[x]}")
+                self.log(f"  {x}: {kwargs[x]}")
 
         if self.type == "SOLIS_SOLAX_MODBUS":
             # Disable by setting the times the same

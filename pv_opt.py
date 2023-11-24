@@ -824,7 +824,9 @@ class PVOpt(hass.Hass):
         )
         self.base_cost = self.contract.net_cost(self.base)
 
-        self.log(f'Optimising for {self.config["solar_forecast"]} forecast')
+        self.log(
+            f'Optimising for {self.config["solar_forecast"]} forecast from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}'
+        )
 
         self.opt = self.pv_system.optimised_force(
             self.initial_soc,
@@ -1147,7 +1149,7 @@ class PVOpt(hass.Hass):
                 #     self.log(df.index)
                 self.static = pd.concat([self.static, df], axis=1).interpolate()
                 self.static["consumption"] *= (
-                    self.config["daily_consumption_Wh"] / -11000
+                    self.config["daily_consumption_Wh"] / 11000
                 )
                 return True
 

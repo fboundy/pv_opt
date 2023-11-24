@@ -128,7 +128,7 @@ pv_opt:
   #    - input_select.solar_opt_consumption_grouping
   #    - mean
 
-  # daily_consumption_Wh: 17000
+  daily_consumption_Wh: 17000
 
 
   # ========================================
