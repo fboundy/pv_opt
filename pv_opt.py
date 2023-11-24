@@ -125,10 +125,47 @@ DEFAULT_CONFIG = {
         "attributes": {"options": ["mean", "median", "max"]},
     },
     "alt_tariffs": {"default": [], "domain": "input_select"},
-    "id_consumption": {"default": "sensor.solis_house_load"},
-    "id_battery_soc": {"default": "sensor.solis_battery_soc"},
     "id_solcast_today": {"default": "sensor.solcast_pv_forecast_forecast_today"},
     "id_solcast_tomorrow": {"default": "sensor.solcast_pv_forecast_forecast_tomorrow"},
+}
+
+DEFAULT_CONFIG_BY_BRAND: {
+    "SOLIS_SOLAX_MODBUS": {
+        "id_battery_soc": {"default": "sensor.solis_battery_soc"},
+        "id_consumption": {"default": "sensor.solis_house_load"},
+        "id_timed_charge_start_hours": {
+            "default": "number.solis_timed_charge_start_hours"
+        },
+        "id_timed_charge_start_minutes": {
+            "default": "number.solis_timed_charge_start_minutes"
+        },
+        "id_timed_charge_end_hours": {
+            "default": "number.solis_timed_charge_end_hours",
+        },
+        "id_timed_charge_end_minutes": {
+            "default": "number.solis_timed_charge_end_minutes"
+        },
+        "id_timed_charge_current": {"default": "number.solis_timed_charge_current"},
+        "id_timed_discharge_start_hours": {
+            "default": "number.solis_timed_discharge_start_hours"
+        },
+        "id_timed_discharge_start_minutes": {
+            "default": "number.solis_timed_discharge_start_minutes"
+        },
+        "id_timed_discharge_end_hours": {
+            "default": "number.solis_timed_discharge_end_hours",
+        },
+        "id_timed_discharge_end_minutes": {
+            "default": "number.solis_timed_discharge_end_minutes"
+        },
+        "id_timed_discharge_current": {
+            "default": "number.solis_timed_discharge_current"
+        },
+        "id_timed_charge_discharge_button": {
+            "default": "button.solis_update_charge_discharge_times"
+        },
+        "id_inverter_mode": {"default": "select.solis_energy_storage_control_switch"},
+    }
 }
 
 
@@ -403,6 +440,8 @@ class PVOpt(hass.Hass):
     def get_default_config(self, item):
         if item in DEFAULT_CONFIG:
             return DEFAULT_CONFIG[item]["default"]
+        if item in DEFAULT_CONFIG_BY_BRAND(self.inverter_type):
+            return DEFAULT_CONFIG_BY_BRAND[item]["default"]
         else:
             return None
 
@@ -549,7 +588,14 @@ class PVOpt(hass.Hass):
 
                             self.log(
                                 f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
-                                level="ERROR",
+                                level="WARNING",
+                            )
+                        elif item in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]:
+                            self.config[item] = self.get_default_config(item)
+
+                            self.log(
+                                f"    {item:34s} = {str(self.config[item]):57s} Source: inverter brand default. Unable to read from HA entities listed in YAML. No default in YAML.",
+                                level="WARNING",
                             )
                         else:
                             self.config[item] = values[0]
