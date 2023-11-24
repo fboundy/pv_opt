@@ -149,8 +149,23 @@ class Tariff:
             df = pd.DataFrame(self.unit).set_index("valid_from")["value_inc_vat"]
             df.index = pd.to_datetime(df.index)
             df = df.sort_index()
-            newindex = pd.date_range(df.index[0], end, freq="30T")
-            df = df.reindex(index=newindex).fillna(method="ffill").loc[start:]
+            # newindex = pd.date_range(df.index[0], end, freq="30T")
+            # df = df.reindex(index=newindex).fillna(method="ffill").loc[start:]
+            i = 0
+            while df.index[-1] < end and i < 7:
+                i += 1
+                extended_index = pd.date_range(
+                    df.index[-1] + pd.Timedelta("30T"), end, freq="30T"
+                )
+                df = pd.concat(
+                    [
+                        df,
+                        pd.concat([df, pd.DataFrame(index=extended_index)])
+                        .shift(48)
+                        .loc[extended_index[0] :],
+                    ]
+                ).dropna()
+                df = df[df.columns[0]]
             df.name = "unit"
 
         if not self.export:
@@ -162,21 +177,6 @@ class Tariff:
 
             mask = df.index.time != pd.Timestamp("00:00", tz="UTC").time()
             df.loc[mask, "fixed"] = 0
-
-        i = 0
-        while df.index[-1] < end and i < 7:
-            i += 1
-            extended_index = pd.date_range(
-                df.index[-1] + pd.Timedelta("30T"), end, freq="30T"
-            )
-            df = pd.concat(
-                [
-                    df,
-                    pd.concat([df, pd.DataFrame(index=extended_index)])
-                    .shift(48)
-                    .loc[extended_index[0] :],
-                ]
-            ).dropna()
 
         return pd.DataFrame(df)
 
@@ -422,6 +422,8 @@ class PVsystemModel:
                 ],
                 axis=1,
             )
+
+        self.log(prices)
 
         prices = prices.set_axis(["import", "export"], axis=1)
         prices["export"] *= EXPORT_MULT
@@ -776,3 +778,6 @@ class PVsystemModel:
 
         df.index = pd.to_datetime(df.index)
         return df
+
+
+# %%
