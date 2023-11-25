@@ -504,7 +504,7 @@ class PVsystemModel:
             f"  >>  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
         )
 
-        self.log(prices)
+        # self.log(prices)
         prices = prices.set_axis(["import", "export"], axis=1)
         prices["export"] *= EXPORT_MULT
         df = pd.concat(
@@ -568,13 +568,16 @@ class PVsystemModel:
             ],
             axis=1,
         )
+        available = pd.Series(index=df.index, data=(df["forced"] == 0))
         while not done:
             i += 1
-            done = i > 96
-            import_cost = (df["import"] * df["grid"]).clip(0) / 2000
-            if len(import_cost) > 0:
+            done = (i > 96) | available.sum() == 0
+
+            import_cost = ((df["import"] * df["grid"]).clip(0) / 2000)[available]
+            if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 max_slot = import_cost[import_cost == max_import_cost].index[0]
+                available[max_slot] = False
                 max_slot_energy = df["grid"].loc[max_slot] / 2000  # kWh
                 # self.log(
                 #     f"{i}: {max_slot.strftime(TIME_FORMAT)} {max_import_cost:5.2f} {max_slot_energy:5.2f} "
@@ -600,7 +603,7 @@ class PVsystemModel:
                     x = x[x["forced"] < self.inverter.charger_power]
 
                     search_window = x.index
-                    str_log = f"{max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
+                    str_log = f"{available.sum()} {max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
                     str_log += f"Energy: {round_trip_energy_required:5.2f} kWh. "
                     if len(search_window) > 0:
                         str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
@@ -660,8 +663,8 @@ class PVsystemModel:
                             net_cost_opt = contract.net_cost(df).sum()
                             str_log += f"Net: {net_cost_opt:5.1f}"
 
-                        else:
-                            done = True
+                        # else:
+                        #     available[start_window] = True
                     self.log(str_log)
             else:
                 done = True

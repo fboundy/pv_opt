@@ -13,7 +13,7 @@ pv_opt:
   log: pv_opt_log
 
 # User configuration ---  EDIT AWAY! ---
-  prefix: PVopt
+  prefix: pv_opt
   manual_tariff: false
 
   # ========================================
@@ -90,9 +90,9 @@ pv_opt:
   # Solcast configuration
   # ========================================
   #
-  solcast_integration: true 
-  id_solcast_today: sensor.solcast_pv_forecast_forecast_today
-  id_solcast_tomorrow: sensor.solcast_pv_forecast_forecast_tomorrow
+  # solcast_integration: true 
+  # id_solcast_today: sensor.solcast_pv_forecast_forecast_today
+  # id_solcast_tomorrow: sensor.solcast_pv_forecast_forecast_tomorrow
 
   # ========================================
   # Solar and consumption forecast parameters
@@ -107,28 +107,28 @@ pv_opt:
   #
   # Set this using an "input_select" helper and it can be varied on the fly
 
-  solar_forecast: 
-    # - input_select.solar_forecast_source
-    - Solcast
+  # solar_forecast: 
+  #   # - input_select.solar_forecast_source
+  #   - Solcast
   
-  # consumption estimation
+  # # consumption estimation
   consumption_from_entity: 
-    - input_boolean.solar_opt_consumption_from_entity
+  #   - input_boolean.solar_opt_consumption_from_entity
     - true
   id_consumption: 
     - sensor.solis_house_load
     - sensor.solis_bypass_load
-  consumption_history_days: 
-    - input_number.solar_opt_consumption_days
-    # - 7
-  consumption_margin: 
-    - input_number.solar_opt_consumption_margin
-    - 25
-  # consumption_grouping: 
-  #    - input_select.solar_opt_consumption_grouping
-  #    - mean
+  # consumption_history_days: 
+  #   - input_number.solar_opt_consumption_days
+  #   # - 7
+  # consumption_margin: 
+  #   - input_number.solar_opt_consumption_margin
+  #   - 25
+  # # consumption_grouping: 
+  # #    - input_select.solar_opt_consumption_grouping
+  # #    - mean
 
-  daily_consumption_Wh: 17000
+  # daily_consumption_Wh: 17000
 
 
   # ========================================
