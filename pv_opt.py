@@ -1,6 +1,8 @@
 # %%
 import appdaemon.plugins.hass.hassapi as hass
 import appdaemon.adbase as ad
+import mqttapi as mqtt
+from json import dumps
 
 # import mqttapi as mqtt
 import pandas as pd
@@ -78,11 +80,6 @@ DEFAULT_CONFIG = {
         "domain": "input_number",
         "attributes": {"min": 80, "max": 100, "step": 1},
     },
-    "maximum_dod_percent": {
-        "default": 15,
-        "domain": "input_number",
-        "attributes": {"min": 0, "max": 50, "step": 1},
-    },
     "charger_power_watts": {
         "default": 3000,
         "domain": "input_number",
@@ -108,16 +105,16 @@ DEFAULT_CONFIG = {
         "options": ["Solcast", "Solcast_p10", "Solcast_p90"],
         "domain": "select",
     },
-    "consumption_from_entity": {"default": True, "domain": "switch"},
+    "consumption_from_entity": {"default": True},
     "consumption_history_days": {
         "default": 7,
         "domain": "input_number",
         "attributes": {"min": 1, "max": 28, "step": 1},
     },
     "consumption_margin": {
-        "default": 0.1,
+        "default": 10,
         "domain": "input_number",
-        "attributes": {"min": 0, "max": 1, "step": 0.05},
+        "attributes": {"min": 0, "max": 100, "step": 5},
     },
     "consumption_grouping": {
         "default": "mean",
@@ -129,8 +126,9 @@ DEFAULT_CONFIG = {
     "id_solcast_tomorrow": {"default": "sensor.solcast_pv_forecast_forecast_tomorrow"},
 }
 
-DEFAULT_CONFIG_BY_BRAND: {
+DEFAULT_CONFIG_BY_BRAND = {
     "SOLIS_SOLAX_MODBUS": {
+        "maximum_dod_percentage": {"default": "number.solis_battery_minimum_soc"},
         "id_battery_soc": {"default": "sensor.solis_battery_soc"},
         "id_consumption": {"default": "sensor.solis_house_load"},
         "id_timed_charge_start_hours": {
@@ -194,6 +192,23 @@ class PVOpt(hass.Hass):
         self.timer_handle = None
         self.inverter_type = "SOLIS_SOLAX_MODBUS"
         self.charging = False
+        self.handles = {}
+        self.mqtt = self.get_plugin_api("MQTT")
+
+        conf_topic = "homeassistant/switch/pvopt_test/config"
+        conf = {
+            "unique_id": "pvopt_test",
+            "name": "PVOpt Test Switch",
+            "state_topic": "homeassistant/switch/pvopt_test/state",
+            "command_topic": "homeassistant/switch/pvopt_test/set",
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "state_on": "ON",
+            "state_off": "OFF",
+            "optimistic": True,
+        }
+        self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+        # payloa
 
         self._load_args()
 
@@ -230,7 +245,11 @@ class PVOpt(hass.Hass):
             self.optimise()
             self._setup_schedule()
 
-        self.log(f"PV Opt Initialisation complete")
+        self.log(f"PV Opt Initialisation complete. Listen_state Handles:")
+        for id in self.handles:
+            self.log(
+                f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
+            )
 
     def _load_inverter(self):
         self.inverter = inv.InverterController(
@@ -440,8 +459,8 @@ class PVOpt(hass.Hass):
     def get_default_config(self, item):
         if item in DEFAULT_CONFIG:
             return DEFAULT_CONFIG[item]["default"]
-        if item in DEFAULT_CONFIG_BY_BRAND(self.inverter_type):
-            return DEFAULT_CONFIG_BY_BRAND[item]["default"]
+        if item in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]:
+            return DEFAULT_CONFIG_BY_BRAND[self.inverter_type][item]["default"]
         else:
             return None
 
@@ -658,15 +677,18 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("Checking config:")
         self.log("-----------------------")
-        items_not_defined = [i for i in DEFAULT_CONFIG if i not in self.config]
+        items_not_defined = [i for i in DEFAULT_CONFIG if i not in self.config] + [
+            i
+            for i in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]
+            if i not in self.config
+        ]
         if len(items_not_defined) > 0:
-            for item in DEFAULT_CONFIG:
-                if item not in self.config:
-                    self.config[item] = self.get_default_config(item)
-                    self.log(
-                        f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Not in YAML.",
-                        level="WARNING",
-                    )
+            for item in items_not_defined:
+                self.config[item] = self.get_default_config(item)
+                self.log(
+                    f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Not in YAML.",
+                    level="WARNING",
+                )
         else:
             self.log("All config items defined OK")
 
@@ -683,7 +705,9 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"           {entity_id:>50s} -> {self.change_items[entity_id]:40s}"
                 )
-                self.listen_state(self.optimise_state_change, entity_id)
+                self.handles[entity_id] = self.listen_state(
+                    callback=self.optimise_state_change, entity_id=entity_id
+                )
                 self.cum_delta[entity_id] = 0
 
         if "manual_tz" in self.config:
@@ -707,29 +731,33 @@ class PVOpt(hass.Hass):
         return state
 
     def _expose_configs(self):
-        untracked_items = [
-            item
-            for item in DEFAULT_CONFIG
-            if (item not in [self.change_items[entity] for entity in self.change_items])
-            and ("entity_id" not in item)
-            and ("alt_" not in item)
-        ]
-        for item in untracked_items:
-            entity_id = f"{DEFAULT_CONFIG[item]['domain']}.{self.prefix.lower()}_{item}"
-
-            attributes = {"friendly_name": self._name_from_item(item)}
-            if "attributes" in DEFAULT_CONFIG[item]:
-                attributes = attributes | DEFAULT_CONFIG[item]["attributes"]
-
-            if not self.entity_exists(entity_id=entity_id):
-                self.log(f"Creating HA Entity {entity_id} for {item}")
-                self.set_state(
-                    state=self._state_from_value(self.config[item]),
-                    entity_id=entity_id,
-                    attributes=attributes,
+        for defaults in [DEFAULT_CONFIG, DEFAULT_CONFIG_BY_BRAND[self.inverter_type]]:
+            untracked_items = [
+                item
+                for item in defaults
+                if (
+                    item
+                    not in [self.change_items[entity] for entity in self.change_items]
                 )
-                self.listen_state(self.optimise_state_change, entity_id)
-            self.change_items[entity_id] = item
+                and ("id_" not in item)
+                and ("alt_" not in item)
+                and "domain" in defaults[item]
+            ]
+            for item in untracked_items:
+                entity_id = f"{defaults[item]['domain']}.{self.prefix.lower()}_{item}"
+
+                attributes = {"friendly_name": self._name_from_item(item)}
+                if "attributes" in defaults[item]:
+                    attributes = attributes | defaults[item]["attributes"]
+
+                if not self.entity_exists(entity_id=entity_id):
+                    self.log(f"Creating HA Entity {entity_id} for {item}")
+                    self.set_state(
+                        state=self._state_from_value(self.config[item]),
+                        entity_id=entity_id,
+                        attributes=attributes,
+                    )
+                self.change_items[entity_id] = item
 
     def _status(self, status):
         entity_id = f"sensor.{self.prefix.lower()}_status"
@@ -740,6 +768,7 @@ class PVOpt(hass.Hass):
 
     @ad.app_lock
     def optimise_state_change(self, entity_id, attribute, old, new, kwargs):
+        self.log(f"State change detected for {entity_id} from {old} to {new}:")
         item = self.change_items[entity_id]
         delta = None
         value = None
@@ -991,7 +1020,7 @@ class PVOpt(hass.Hass):
                 self.inverter.control_discharge(enable=False)
 
             else:
-                str_log += ". Nothing to do."
+                str_log += " Nothing to do."
                 self.log(str_log)
 
         self.write_output()

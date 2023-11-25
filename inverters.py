@@ -197,7 +197,6 @@ class InverterController:
                 states = {}
                 for unit in ["hours", "minutes"]:
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
-                    self.log(entity_id)
                     states[unit] = int(float(self.host.get_state(entity_id=entity_id)))
                 status[direction][limit] = pd.Timestamp(
                     f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
