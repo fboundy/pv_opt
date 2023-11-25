@@ -156,52 +156,60 @@ class Tariff:
             df = pd.DataFrame(self.unit).set_index("valid_from")["value_inc_vat"]
             df.index = pd.to_datetime(df.index)
             df = df.sort_index()
-            newindex = pd.date_range(df.index[0], end, freq="30T")
-            df = df.reindex(index=newindex).fillna(method="ffill").loc[start:]
-            i = 0
 
-            # if (
-            #     (df.index[-1] < end)
-            #     and "AGILE" in self.name
-            #     and pd.Timestamp.now().hour > 11
-            # ):
-            #     if self.day_ahead is None:
-            #         self.day_ahead = self.get_day_ahead(df.index[0])
-            #     mask = (self.day_ahead.index.hour >= 16) & (self.day_ahead.hour < 19)
-            #     agile = (
-            #         pd.concat(
-            #             [
-            #                 self.day_ahead[mask] * 0.186 + 16.5,
-            #                 self.day_ahead[~mask] * 0.29 - 0.6,
-            #             ]
-            #         )
-            #         .sort_index()
-            #         .loc[df.index[-1] :]
-            #         .iloc[1:]
-            #     )
-            #     df = pd.concat([df, agile])
+            if "AGILE" in self.name:
+                if self.day_ahead is not None and df.index[-1].day == end.day:
+                    # reset the day ahead forecasts if we've got a forecast going into tomorrow
+                    self.day_ahead = None
 
-            # elif self.day_ahead is not None and self.day_ahead.index[-3] < df.index[-1]:
-            #     # reset the day ahead forecasts if what we have goes to much the same time
-            #     self.day_ahead = None
+                if pd.Timestamp.now().hour > 11 and df.index[-1].day < end.day:
+                    # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
+                    if self.day_ahead is None:
+                        self.day_ahead = self.get_day_ahead(df.index[0])
+                        if self.day_ahead is not None:
+                            self.log("Downloaded Day Ahead prices OK")
+                    if self.day_ahead is not None:
+                        self.log("Predicting Agile prices from Day Ahead")
+                        mask = (self.day_ahead.index.hour >= 16) & (
+                            self.day_ahead.hour < 19
+                        )
+                        agile = (
+                            pd.concat(
+                                [
+                                    self.day_ahead[mask] * 0.186 + 16.5,
+                                    self.day_ahead[~mask] * 0.29 - 0.6,
+                                ]
+                            )
+                            .sort_index()
+                            .loc[df.index[-1] :]
+                            .iloc[1:]
+                        )
+                        df = pd.concat([df, agile])
 
-            self.log(
-                f">>>Tariff name: {self.name:40s} DF end: {df.index[-1].strftime(TIME_FORMAT)}  Desired end{end.strftime(TIME_FORMAT)} {df.index[-1] < end}"
-            )
-            while df.index[-1] < end and i < 7:
-                i += 1
-                extended_index = pd.date_range(
-                    df.index[-1] + pd.Timedelta("30T"), end, freq="30T"
-                )
-                df = pd.concat(
-                    [
-                        df,
+            # If the index frequency >30 minutes so we need to just extend it:
+            if (
+                len(df) > 1
+                and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30
+            ):
+                newindex = pd.date_range(df.index[0], end, freq="30T")
+                df = df.reindex(index=newindex).fillna(method="ffill").loc[start:]
+            else:
+                i = 0
+                while df.index[-1] < end and i < 7:
+                    i += 1
+                    extended_index = pd.date_range(
+                        df.index[-1] + pd.Timedelta("30T"),
+                        df.index[-1] + pd.Timedelta("24H"),
+                        freq="30T",
+                    )
+                    dfx = (
                         pd.concat([df, pd.DataFrame(index=extended_index)])
                         .shift(48)
-                        .loc[extended_index[0] :],
-                    ]
-                ).dropna()
-                df = df[df.columns[0]]
+                        .loc[extended_index[0] :]
+                    )
+                    df = pd.concat([df, dfx])
+                    df = df[df.columns[0]]
+                df = df.loc[start:end]
             df.name = "unit"
 
         if not self.export:
@@ -496,6 +504,7 @@ class PVsystemModel:
             f"  >>  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
         )
 
+        self.log(prices)
         prices = prices.set_axis(["import", "export"], axis=1)
         prices["export"] *= EXPORT_MULT
         df = pd.concat(
@@ -585,7 +594,7 @@ class PVsystemModel:
                         x["soc_end"] >= 97
                     ).cumsum()
 
-                    x = x[x["countback"] == 0].iloc[1:]
+                    x = x[x["countback"] == 0]
 
                     # ignore slots which are already fully charging
                     x = x[x["forced"] < self.inverter.charger_power]
