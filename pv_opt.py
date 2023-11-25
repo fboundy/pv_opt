@@ -51,6 +51,15 @@ INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS"]
 
 IMPEXP = ["import", "export"]
 
+MQTT_CONFIGS = {
+    'switch':{
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "state_on": "ON",
+            "state_off": "OFF",
+        },
+}
+
 DEFAULT_CONFIG = {
     "forced_charge": {"default": True, "domain": "switch"},
     "forced_discharge": {"default": False, "domain": "switch"},
@@ -68,37 +77,37 @@ DEFAULT_CONFIG = {
     "battery_capacity_Wh": {
         "default": 10000,
         "domain": "input_number",
-        "attributes": {"min": 2000, "max": 20000, "step": 100},
+        "attributes": {"min": 2000, "max": 20000, "step": 100, "unit_of_measurement": "Wh", "device_class": "energy"},
     },
     "inverter_efficiency_percent": {
         "default": 97,
         "domain": "input_number",
-        "attributes": {"min": 90, "max": 100, "step": 1},
+        "attributes": {"min": 90, "max": 100, "step": 1, "unit_of_measurement": "%"},
     },
     "charger_efficiency_percent": {
         "default": 91,
         "domain": "input_number",
-        "attributes": {"min": 80, "max": 100, "step": 1},
+        "attributes": {"min": 80, "max": 100, "step": 1, "unit_of_measurement": "%"},
     },
     "charger_power_watts": {
         "default": 3000,
         "domain": "input_number",
-        "attributes": {"min": 1000, "max": 10000, "step": 100},
+        "attributes": {"min": 1000, "max": 10000, "step": 100, "unit_of_measurement": "W", "device_class": "power"},
     },
     "inverter_power_watts": {
         "default": 3600,
         "domain": "input_number",
-        "attributes": {"min": 1000, "max": 10000, "step": 100},
+        "attributes": {"min": 1000, "max": 10000, "step": 100, "unit_of_measurement": "W", "device_class": "power"},
     },
     "inverter_loss_watts": {
         "default": 100,
         "domain": "input_number",
-        "attributes": {"min": 0, "max": 300, "step": 10},
+        "attributes": {"min": 0, "max": 300, "step": 10, "unit_of_measurement": "W", "device_class": "power"},
     },
     "battery_voltage": {
         "default": 52,
         "domain": "input_number",
-        "attributes": {"min": 48, "max": 55, "step": 1},
+        "attributes": {"min": 48, "max": 55, "step": 1, "unit_of_measurement": "V", "device_class": "voltage"},
     },
     "solar_forecast": {
         "default": "Solcast",
@@ -114,7 +123,7 @@ DEFAULT_CONFIG = {
     "consumption_margin": {
         "default": 10,
         "domain": "input_number",
-        "attributes": {"min": 0, "max": 100, "step": 5},
+        "attributes": {"min": 0, "max": 100, "step": 5, "unit_of_measurement": "%"},
     },
     "consumption_grouping": {
         "default": "mean",
@@ -195,19 +204,7 @@ class PVOpt(hass.Hass):
         self.handles = {}
         self.mqtt = self.get_plugin_api("MQTT")
 
-        conf_topic = "homeassistant/switch/pvopt_test/config"
-        conf = {
-            "unique_id": "pvopt_test",
-            "name": "PVOpt Test Switch",
-            "state_topic": "homeassistant/switch/pvopt_test/state",
-            "command_topic": "homeassistant/switch/pvopt_test/set",
-            "payload_on": "ON",
-            "payload_off": "OFF",
-            "state_on": "ON",
-            "state_off": "OFF",
-            "optimistic": True,
-        }
-        self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+
         # payloa
 
         self._load_args()
@@ -744,19 +741,35 @@ class PVOpt(hass.Hass):
                 and "domain" in defaults[item]
             ]
             for item in untracked_items:
-                entity_id = f"{defaults[item]['domain']}.{self.prefix.lower()}_{item}"
-
-                attributes = {"friendly_name": self._name_from_item(item)}
-                if "attributes" in defaults[item]:
-                    attributes = attributes | defaults[item]["attributes"]
+                domain = defaults[item]['domain']
+                id = f"{self.prefix.lower()}_{item}"
+                entity_id = f"{domain}.{id}"
 
                 if not self.entity_exists(entity_id=entity_id):
-                    self.log(f"Creating HA Entity {entity_id} for {item}")
-                    self.set_state(
-                        state=self._state_from_value(self.config[item]),
-                        entity_id=entity_id,
-                        attributes=attributes,
-                    )
+                    self.log(f"Creating HA Entity {entity_id} for {item} using MQTT Discovery")
+                    conf = {
+                        "state_topic": f"homeassistant/{domain}/{id}/state",
+                        "command_topic": f"homeassistant/{domain}/{id}/set",
+                        "name": self._name_from_item(item),
+                        "optimistic": True,
+                    }
+
+                    if "attributes" in defaults[item]:
+                        conf = conf | defaults[item]["attributes"]
+
+                    if domain in MQTT_CONF:
+
+
+                conf_topic = f"homeassistant/{domain}/{id}/config"
+                self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+
+
+
+                    # self.set_state(
+                    #     state=self._state_from_value(self.config[item]),
+                    #     entity_id=entity_id,
+                    #     attributes=attributes,
+                    # )
                 self.change_items[entity_id] = item
 
     def _status(self, status):
