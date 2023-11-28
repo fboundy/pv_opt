@@ -255,7 +255,7 @@ class Tariff:
 
         price = pd.Series(index=index, data=data).sort_index()
         price.index = price.index.tz_localize("CET")
-        return price.loc.resample("30T").ffill()[start:]
+        return price.resample("30T").ffill().loc[start:]
 
 
 class InverterModel:
@@ -688,9 +688,10 @@ class PVsystemModel:
         )
 
         i = 0
-        available = (df["import"] < max_export_price) & df[
-            "forced"
-        ] < self.inverter.charger_power
+        available = (df["import"] < max_export_price) & (
+            df["forced"] < self.inverter.charger_power
+        )
+        # self.log((df["import"]<max_export_price)
         a0 = available.sum()
         self.log(
             f"{available.sum()} slots have an import price less than the max export price"

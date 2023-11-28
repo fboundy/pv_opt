@@ -278,6 +278,7 @@ class PVOpt(hass.Hass):
             self.log(
                 f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
             )
+        self._status("Idle")
 
     def _load_inverter(self):
         self.inverter = inv.InverterController(
@@ -331,6 +332,7 @@ class PVOpt(hass.Hass):
         self.contract = None
         self.log("")
         self.log("Loading Contract:")
+        self._status("Loading Contract")
         self.log("------------------------")
         self.tariff_codes = {}
         self.agile = False
@@ -799,11 +801,10 @@ class PVOpt(hass.Hass):
                     conf_topic = f"homeassistant/{domain}/{id}/config"
                     self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
 
-                # self.set_state(
-                #     state=self._state_from_value(self.config[item]),
-                #     entity_id=entity_id,
-                #     attributes=attributes,
-                # )
+                self.set_state(
+                    state=self._state_from_value(self.config[item]),
+                    entity_id=entity_id,
+                )
                 if domain != "sensor":
                     self.change_items[entity_id] = item
 
@@ -816,8 +817,10 @@ class PVOpt(hass.Hass):
 
     @ad.app_lock
     def optimise_state_change(self, entity_id, attribute, old, new, kwargs):
-        self.log(f"State change detected for {entity_id} from {old} to {new}:")
         item = self.change_items[entity_id]
+        self.log(
+            f"State change detected for {entity_id} [config item: {item}] from {old} to {new}:"
+        )
         delta = None
         value = None
         if (
@@ -839,12 +842,12 @@ class PVOpt(hass.Hass):
 
         if value is not None:
             self.log(f"State resolved to {value} [with type{type(value)}")
+            self.config[item] = value
 
         if "forced" in item:
             self._setup_schedule()
         else:
-            pass
-            # self.optimise()
+            self.optimise()
 
     def _value_from_state(self, state):
         value = None
@@ -915,6 +918,7 @@ class PVOpt(hass.Hass):
 
         except Exception as e:
             self.log(f"Unable to load estimated consumption: {e}", level="ERROR")
+            self._status("Failed to load consumption")
             return False
 
         self.time_now = pd.Timestamp.utcnow()
@@ -950,6 +954,8 @@ class PVOpt(hass.Hass):
         self.log(
             f'Optimising for {self.config["solar_forecast"]} forecast from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}'
         )
+
+        self._status("Optimising charge plan")
 
         self.opt = self.pv_system.optimised_force(
             self.initial_soc,
@@ -1004,6 +1010,7 @@ class PVOpt(hass.Hass):
         self.log("")
 
         # Get the current status of the inverter
+        self._status("Updating Inverter")
         status = self.inverter.status
         self._log_inverter_status(status)
 
@@ -1072,7 +1079,9 @@ class PVOpt(hass.Hass):
                 str_log += " Nothing to do."
                 self.log(str_log)
 
+        self._status("Writing to HA")
         self.write_output()
+        self._status("Idle")
 
     def _log_inverter_status(self, status):
         self.log("")
@@ -1144,6 +1153,13 @@ class PVOpt(hass.Hass):
             state=self.charge_start_datetime,
             attributes={
                 "friendly_name": "PV Opt Next Charge Period Start",
+                "windows": [
+                    {
+                        k: window[1][k]
+                        for k in ["start", "end", "forced", "soc", "soc_end"]
+                    }
+                    for window in self.windows.iterrows()
+                ],
             },
         )
 

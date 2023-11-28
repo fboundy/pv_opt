@@ -13,7 +13,7 @@ pv_opt:
   log: pv_opt_log
 
 # User configuration ---  EDIT AWAY! ---
-  prefix: pv_opt
+  prefix: pvopt
   manual_tariff: false
 
   # ========================================
