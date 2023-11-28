@@ -257,7 +257,7 @@ class PVOpt(hass.Hass):
         self.pv_system = pv.PVsystemModel(
             "PV_Opt", self.inverter_model, self.battery_model, log=self.log
         )
-        self.load_contract()
+        self._load_contract()
 
         if self.agile:
             self._setup_agile_schedule()
@@ -273,11 +273,12 @@ class PVOpt(hass.Hass):
             self.optimise()
             self._setup_schedule()
 
-        self.log(f"PV Opt Initialisation complete. Listen_state Handles:")
-        for id in self.handles:
-            self.log(
-                f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
-            )
+        if self.debug:
+            self.log(f"PV Opt Initialisation complete. Listen_state Handles:")
+            for id in self.handles:
+                self.log(
+                    f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
+                )
         self._status("Idle")
 
     def _load_inverter(self):
@@ -304,7 +305,7 @@ class PVOpt(hass.Hass):
             self.log(
                 f"Contract end day: {self.contract.imp.end().day} Today:{pd.Timestamp.now().day}"
             )
-            self.load_contract()
+            self._load_contract()
 
     def _setup_schedule(self):
         if self.config["forced_charge"]:
@@ -328,17 +329,17 @@ class PVOpt(hass.Hass):
                 self.log("Optimer Schedule Disabled")
                 self._set_status("Disabled")
 
-    def load_contract(self):
+    def _load_contract(self):
         self.contract = None
         self.log("")
         self.log("Loading Contract:")
         self._status("Loading Contract")
-        self.log("------------------------")
+        self.log("-----------------")
         self.tariff_codes = {}
         self.agile = False
         try:
             if self.config["octopus_auto"]:
-                self.log(f"Trying to auto detect Octopus tariffs")
+                self.log(f"Trying to auto detect Octopus tariffs:")
 
                 octopus_entities = [
                     name
@@ -355,7 +356,7 @@ class PVOpt(hass.Hass):
 
                 for imp_exp in IMPEXP:
                     for entity in entities[imp_exp]:
-                        self.log(f"Found {imp_exp} entity {entity}")
+                        self.log(f"    Found {imp_exp} entity {entity}")
 
                 tariffs = {x: None for x in IMPEXP}
                 for imp_exp in IMPEXP:
@@ -451,8 +452,8 @@ class PVOpt(hass.Hass):
             raise ValueError(e)
 
         else:
-            for n, t in zip(imp_exp, [self.contract.imp, self.contract.exp]):
-                self.log(f"  {n.title()}: {t.name}")
+            for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
+                self.log(f"  {imp_exp.title()}: {t.name}")
                 if "AGILE" in t.name:
                     self.agile = True
 
@@ -726,13 +727,13 @@ class PVOpt(hass.Hass):
 
         self.log("")
         self.log("Exposing config to Home Assistant:")
-        self.log("-----------------------")
+        self.log("----------------------------------")
         self._expose_configs()
 
         if self.change_items:
             self.log("")
             self.log("State change entities:")
-            self.log("-----------------------------")
+            self.log("----------------------")
             for entity_id in self.change_items:
                 if not "sensor" in entity_id:
                     self.log(
