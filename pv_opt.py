@@ -1,6 +1,8 @@
 # %%
 import appdaemon.plugins.hass.hassapi as hass
 import appdaemon.adbase as ad
+import mqttapi as mqtt
+from json import dumps
 
 # import mqttapi as mqtt
 import pandas as pd
@@ -49,75 +51,111 @@ INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS"]
 
 IMPEXP = ["import", "export"]
 
+MQTT_CONFIGS = {
+    "switch": {
+        "payload_on": "ON",
+        "payload_off": "OFF",
+        "state_on": "ON",
+        "state_off": "OFF",
+    },
+}
+
 DEFAULT_CONFIG = {
     "forced_charge": {"default": True, "domain": "switch"},
     "forced_discharge": {"default": False, "domain": "switch"},
     "read_only": {"default": False, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
-        "min": 5,
-        "max": 60,
-        "step": 5,
-        "domain": "input_number",
+        "attributes": {
+            "min": 5,
+            "max": 60,
+            "step": 5,
+        },
+        "domain": "number",
     },
     "manual_tariff": {"default": False, "domain": "switch"},
     "octopus_auto": {"default": True, "domain": "switch"},
     "solcast_integration": {"default": True, "domain": "switch"},
     "battery_capacity_Wh": {
         "default": 10000,
-        "domain": "input_number",
-        "attributes": {"min": 2000, "max": 20000, "step": 100},
+        "domain": "number",
+        "attributes": {
+            "min": 2000,
+            "max": 20000,
+            "step": 100,
+            "unit_of_measurement": "Wh",
+            "device_class": "energy",
+        },
     },
     "inverter_efficiency_percent": {
         "default": 97,
-        "domain": "input_number",
-        "attributes": {"min": 90, "max": 100, "step": 1},
+        "domain": "number",
+        "attributes": {"min": 90, "max": 100, "step": 1, "unit_of_measurement": "%"},
     },
     "charger_efficiency_percent": {
         "default": 91,
-        "domain": "input_number",
-        "attributes": {"min": 80, "max": 100, "step": 1},
-    },
-    "maximum_dod_percent": {
-        "default": 15,
-        "domain": "input_number",
-        "attributes": {"min": 0, "max": 50, "step": 1},
+        "domain": "number",
+        "attributes": {"min": 80, "max": 100, "step": 1, "unit_of_measurement": "%"},
     },
     "charger_power_watts": {
         "default": 3000,
-        "domain": "input_number",
-        "attributes": {"min": 1000, "max": 10000, "step": 100},
+        "domain": "number",
+        "attributes": {
+            "min": 1000,
+            "max": 10000,
+            "step": 100,
+            "unit_of_measurement": "W",
+            "device_class": "power",
+        },
     },
     "inverter_power_watts": {
         "default": 3600,
-        "domain": "input_number",
-        "attributes": {"min": 1000, "max": 10000, "step": 100},
+        "domain": "number",
+        "attributes": {
+            "min": 1000,
+            "max": 10000,
+            "step": 100,
+            "unit_of_measurement": "W",
+            "device_class": "power",
+        },
     },
     "inverter_loss_watts": {
         "default": 100,
-        "domain": "input_number",
-        "attributes": {"min": 0, "max": 300, "step": 10},
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 300,
+            "step": 10,
+            "unit_of_measurement": "W",
+            "device_class": "power",
+        },
     },
     "battery_voltage": {
         "default": 52,
-        "domain": "input_number",
-        "attributes": {"min": 48, "max": 55, "step": 1},
+        "domain": "number",
+        "attributes": {
+            "min": 48,
+            "max": 55,
+            "step": 1,
+            "unit_of_measurement": "V",
+            "device_class": "voltage",
+        },
     },
     "solar_forecast": {
         "default": "Solcast",
-        "options": ["Solcast", "Solcast_p10", "Solcast_p90"],
+        "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90"]},
         "domain": "select",
     },
-    "consumption_from_entity": {"default": True, "domain": "switch"},
+    "consumption_from_entity": {"default": True},
     "consumption_history_days": {
         "default": 7,
-        "domain": "input_number",
+        "domain": "number",
         "attributes": {"min": 1, "max": 28, "step": 1},
     },
     "consumption_margin": {
-        "default": 0.1,
-        "domain": "input_number",
-        "attributes": {"min": 0, "max": 1, "step": 0.05},
+        "default": 10,
+        "domain": "number",
+        "attributes": {"min": 0, "max": 100, "step": 5, "unit_of_measurement": "%"},
     },
     "consumption_grouping": {
         "default": "mean",
@@ -125,10 +163,48 @@ DEFAULT_CONFIG = {
         "attributes": {"options": ["mean", "median", "max"]},
     },
     "alt_tariffs": {"default": [], "domain": "input_select"},
-    "id_consumption": {"default": "sensor.solis_house_load"},
-    "id_battery_soc": {"default": "sensor.solis_battery_soc"},
     "id_solcast_today": {"default": "sensor.solcast_pv_forecast_forecast_today"},
     "id_solcast_tomorrow": {"default": "sensor.solcast_pv_forecast_forecast_tomorrow"},
+}
+
+DEFAULT_CONFIG_BY_BRAND = {
+    "SOLIS_SOLAX_MODBUS": {
+        "maximum_dod_percentage": {"default": "number.solis_battery_minimum_soc"},
+        "id_battery_soc": {"default": "sensor.solis_battery_soc"},
+        "id_consumption": {"default": "sensor.solis_house_load"},
+        "id_timed_charge_start_hours": {
+            "default": "numbers.solis_timed_charge_start_hours"
+        },
+        "id_timed_charge_start_minutes": {
+            "default": "number.solis_timed_charge_start_minutes"
+        },
+        "id_timed_charge_end_hours": {
+            "default": "number.solis_timed_charge_end_hours",
+        },
+        "id_timed_charge_end_minutes": {
+            "default": "number.solis_timed_charge_end_minutes"
+        },
+        "id_timed_charge_current": {"default": "number.solis_timed_charge_current"},
+        "id_timed_discharge_start_hours": {
+            "default": "number.solis_timed_discharge_start_hours"
+        },
+        "id_timed_discharge_start_minutes": {
+            "default": "number.solis_timed_discharge_start_minutes"
+        },
+        "id_timed_discharge_end_hours": {
+            "default": "number.solis_timed_discharge_end_hours",
+        },
+        "id_timed_discharge_end_minutes": {
+            "default": "number.solis_timed_discharge_end_minutes"
+        },
+        "id_timed_discharge_current": {
+            "default": "number.solis_timed_discharge_current"
+        },
+        "id_timed_charge_discharge_button": {
+            "default": "button.solis_update_charge_discharge_times"
+        },
+        "id_inverter_mode": {"default": "select.solis_energy_storage_control_switch"},
+    }
 }
 
 
@@ -157,6 +233,10 @@ class PVOpt(hass.Hass):
         self.timer_handle = None
         self.inverter_type = "SOLIS_SOLAX_MODBUS"
         self.charging = False
+        self.handles = {}
+        self.mqtt = self.get_plugin_api("MQTT")
+
+        # payloa
 
         self._load_args()
 
@@ -193,7 +273,12 @@ class PVOpt(hass.Hass):
             self.optimise()
             self._setup_schedule()
 
-        self.log(f"PV Opt Initialisation complete")
+        self.log(f"PV Opt Initialisation complete. Listen_state Handles:")
+        for id in self.handles:
+            self.log(
+                f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
+            )
+        self._status("Idle")
 
     def _load_inverter(self):
         self.inverter = inv.InverterController(
@@ -247,6 +332,7 @@ class PVOpt(hass.Hass):
         self.contract = None
         self.log("")
         self.log("Loading Contract:")
+        self._status("Loading Contract")
         self.log("------------------------")
         self.tariff_codes = {}
         self.agile = False
@@ -403,6 +489,8 @@ class PVOpt(hass.Hass):
     def get_default_config(self, item):
         if item in DEFAULT_CONFIG:
             return DEFAULT_CONFIG[item]["default"]
+        if item in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]:
+            return DEFAULT_CONFIG_BY_BRAND[self.inverter_type][item]["default"]
         else:
             return None
 
@@ -525,7 +613,8 @@ class PVOpt(hass.Hass):
                     # try getting values from all the entities
                     elif valid_strings:
                         self.config[item] = valid_strings[0][0]
-                        self.change_items[valid_strings[0][1]] = item
+                        if not "sensor" in valid_strings[0][1]:
+                            self.change_items[valid_strings[0][1]] = item
                         self.log(
                             f"    {item:34s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
                         )
@@ -549,7 +638,14 @@ class PVOpt(hass.Hass):
 
                             self.log(
                                 f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
-                                level="ERROR",
+                                level="WARNING",
+                            )
+                        elif item in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]:
+                            self.config[item] = self.get_default_config(item)
+
+                            self.log(
+                                f"    {item:34s} = {str(self.config[item]):57s} Source: inverter brand default. Unable to read from HA entities listed in YAML. No default in YAML.",
+                                level="WARNING",
                             )
                         else:
                             self.config[item] = values[0]
@@ -594,7 +690,8 @@ class PVOpt(hass.Hass):
                         )
                         # If these change then we need to trigger automatically
                         for v in values[:-1]:
-                            self.change_items[v] = item
+                            if not "sensor" in v:
+                                self.change_items[v] = item
 
                     else:
                         self.config[item] = values[-1]
@@ -612,15 +709,18 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("Checking config:")
         self.log("-----------------------")
-        items_not_defined = [i for i in DEFAULT_CONFIG if i not in self.config]
+        items_not_defined = [i for i in DEFAULT_CONFIG if i not in self.config] + [
+            i
+            for i in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]
+            if i not in self.config
+        ]
         if len(items_not_defined) > 0:
-            for item in DEFAULT_CONFIG:
-                if item not in self.config:
-                    self.config[item] = self.get_default_config(item)
-                    self.log(
-                        f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Not in YAML.",
-                        level="WARNING",
-                    )
+            for item in items_not_defined:
+                self.config[item] = self.get_default_config(item)
+                self.log(
+                    f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Not in YAML.",
+                    level="WARNING",
+                )
         else:
             self.log("All config items defined OK")
 
@@ -634,11 +734,14 @@ class PVOpt(hass.Hass):
             self.log("State change entities:")
             self.log("-----------------------------")
             for entity_id in self.change_items:
-                self.log(
-                    f"           {entity_id:>50s} -> {self.change_items[entity_id]:40s}"
-                )
-                self.listen_state(self.optimise_state_change, entity_id)
-                self.cum_delta[entity_id] = 0
+                if not "sensor" in entity_id:
+                    self.log(
+                        f"           {entity_id:>50s} -> {self.change_items[entity_id]:40s}"
+                    )
+                    self.handles[entity_id] = self.listen_state(
+                        callback=self.optimise_state_change, entity_id=entity_id
+                    )
+                    self.cum_delta[entity_id] = 0
 
         if "manual_tz" in self.config:
             self.tz = self.params["manual_tz"]
@@ -661,29 +764,49 @@ class PVOpt(hass.Hass):
         return state
 
     def _expose_configs(self):
-        untracked_items = [
-            item
-            for item in DEFAULT_CONFIG
-            if (item not in [self.change_items[entity] for entity in self.change_items])
-            and ("entity_id" not in item)
-            and ("alt_" not in item)
-        ]
-        for item in untracked_items:
-            entity_id = f"{DEFAULT_CONFIG[item]['domain']}.{self.prefix.lower()}_{item}"
+        for defaults in [DEFAULT_CONFIG, DEFAULT_CONFIG_BY_BRAND[self.inverter_type]]:
+            untracked_items = [
+                item
+                for item in defaults
+                if (
+                    item
+                    not in [self.change_items[entity] for entity in self.change_items]
+                )
+                and ("id_" not in item)
+                and ("alt_" not in item)
+                and "domain" in defaults[item]
+            ]
+            for item in untracked_items:
+                domain = defaults[item]["domain"]
+                id = f"{self.prefix.lower()}_{item}"
+                entity_id = f"{domain}.{id}"
 
-            attributes = {"friendly_name": self._name_from_item(item)}
-            if "attributes" in DEFAULT_CONFIG[item]:
-                attributes = attributes | DEFAULT_CONFIG[item]["attributes"]
+                if not self.entity_exists(entity_id=entity_id):
+                    self.log(
+                        f"Creating HA Entity {entity_id} for {item} using MQTT Discovery"
+                    )
+                    conf = {
+                        "state_topic": f"homeassistant/{domain}/{id}/state",
+                        "command_topic": f"homeassistant/{domain}/{id}/set",
+                        "name": self._name_from_item(item),
+                        "optimistic": True,
+                    }
 
-            if not self.entity_exists(entity_id=entity_id):
-                self.log(f"Creating HA Entity {entity_id} for {item}")
+                    if "attributes" in defaults[item]:
+                        conf = conf | defaults[item]["attributes"]
+
+                    if domain in MQTT_CONFIGS:
+                        conf = conf | MQTT_CONFIGS[domain]
+
+                    conf_topic = f"homeassistant/{domain}/{id}/config"
+                    self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+
                 self.set_state(
                     state=self._state_from_value(self.config[item]),
                     entity_id=entity_id,
-                    attributes=attributes,
                 )
-                self.listen_state(self.optimise_state_change, entity_id)
-            self.change_items[entity_id] = item
+                if domain != "sensor":
+                    self.change_items[entity_id] = item
 
     def _status(self, status):
         entity_id = f"sensor.{self.prefix.lower()}_status"
@@ -695,6 +818,9 @@ class PVOpt(hass.Hass):
     @ad.app_lock
     def optimise_state_change(self, entity_id, attribute, old, new, kwargs):
         item = self.change_items[entity_id]
+        self.log(
+            f"State change detected for {entity_id} [config item: {item}] from {old} to {new}:"
+        )
         delta = None
         value = None
         if (
@@ -716,12 +842,12 @@ class PVOpt(hass.Hass):
 
         if value is not None:
             self.log(f"State resolved to {value} [with type{type(value)}")
+            self.config[item] = value
 
         if "forced" in item:
             self._setup_schedule()
         else:
-            pass
-            # self.optimise()
+            self.optimise()
 
     def _value_from_state(self, state):
         value = None
@@ -760,6 +886,7 @@ class PVOpt(hass.Hass):
         self.log(f"Optimser triggered by Scheduler ")
         self.optimise()
 
+    @ad.app_lock
     def optimise(self):
         # initialse a DataFrame to cover today and tomorrow at 30 minute frequency
         self.log("")
@@ -791,6 +918,7 @@ class PVOpt(hass.Hass):
 
         except Exception as e:
             self.log(f"Unable to load estimated consumption: {e}", level="ERROR")
+            self._status("Failed to load consumption")
             return False
 
         self.time_now = pd.Timestamp.utcnow()
@@ -826,6 +954,8 @@ class PVOpt(hass.Hass):
         self.log(
             f'Optimising for {self.config["solar_forecast"]} forecast from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}'
         )
+
+        self._status("Optimising charge plan")
 
         self.opt = self.pv_system.optimised_force(
             self.initial_soc,
@@ -880,6 +1010,7 @@ class PVOpt(hass.Hass):
         self.log("")
 
         # Get the current status of the inverter
+        self._status("Updating Inverter")
         status = self.inverter.status
         self._log_inverter_status(status)
 
@@ -915,7 +1046,7 @@ class PVOpt(hass.Hass):
             time_to_slot_start < self.config["optimise_frequency_minutes"]
         ):
             self.log(
-                f"Current charge/discharge windows ends in {time_to_slot_start:0.1f} minutes."
+                f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
             )
             if self.charge_power > 0:
                 self.inverter.control_charge(
@@ -945,10 +1076,12 @@ class PVOpt(hass.Hass):
                 self.inverter.control_discharge(enable=False)
 
             else:
-                str_log += ". Nothing to do."
+                str_log += " Nothing to do."
                 self.log(str_log)
 
+        self._status("Writing to HA")
         self.write_output()
+        self._status("Idle")
 
     def _log_inverter_status(self, status):
         self.log("")
@@ -1002,14 +1135,14 @@ class PVOpt(hass.Hass):
 
     def write_output(self):
         self.write_cost(
-            "PVopt Base Cost",
+            "PV Opt Base Cost",
             entity=f"sensor.{self.prefix}_base_cost",
             cost=self.base_cost.sum(),
             df=self.base,
         )
 
         self.write_cost(
-            "PVopt Optimised Cost",
+            "PV Opt Optimised Cost",
             entity=f"sensor.{self.prefix}_opt_cost",
             cost=self.opt_cost.sum(),
             df=self.opt,
@@ -1019,7 +1152,14 @@ class PVOpt(hass.Hass):
             entity=f"sensor.{self.prefix}_charge_start",
             state=self.charge_start_datetime,
             attributes={
-                "friendly_name": "PVopt Next Charge Period Start",
+                "friendly_name": "PV Opt Next Charge Period Start",
+                "windows": [
+                    {
+                        k: window[1][k]
+                        for k in ["start", "end", "forced", "soc", "soc_end"]
+                    }
+                    for window in self.windows.iterrows()
+                ],
             },
         )
 
@@ -1027,7 +1167,7 @@ class PVOpt(hass.Hass):
             entity=f"sensor.{self.prefix}_charge_end",
             state=self.charge_end_datetime,
             attributes={
-                "friendly_name": "PV_Opt Next Charge Period End",
+                "friendly_name": "PV Opt Next Charge Period End",
             },
         )
 
@@ -1035,8 +1175,7 @@ class PVOpt(hass.Hass):
             entity=f"sensor.{self.prefix}_charge_current",
             state=round(self.charge_current, 2),
             attributes={
-                "unique_id": OUTPUT_CURRENT_ENTITY,
-                "friendly_name": "PV_Opt Charging Current",
+                "friendly_name": "PV Opt Charging Current",
                 "unit_of_measurement": "A",
                 "state_class": "measurement",
                 "device_class": "current",
