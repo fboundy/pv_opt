@@ -145,7 +145,7 @@ class Tariff:
                     end,
                     freq="30T",
                 )
-            ).fillna(method="ffill")
+            ).ffill()
             mask = (df.index.time >= self.eco7_start.time()) & (
                 df.index.time < (self.eco7_start + pd.Timedelta("7H")).time()
             )
@@ -192,7 +192,7 @@ class Tariff:
                 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30
             ):
                 newindex = pd.date_range(df.index[0], end, freq="30T")
-                df = df.reindex(index=newindex).fillna(method="ffill").loc[start:]
+                df = df.reindex(index=newindex).ffill().loc[start:]
             else:
                 i = 0
                 while df.index[-1] < end and i < 7:
@@ -465,7 +465,7 @@ class PVsystemModel:
             chg[0] = [initial_soc / 100 * self.battery.capacity]
 
         df["chg"] = chg[:-1]
-        df["chg"].interpolate(method="ffill", inplace=True)
+        df["chg"] = df["chg"].ffill()
         df["battery"] = (pd.Series(chg).diff(-1) / freq)[:-1].to_list()
         df.loc[df["battery"] > 0, "battery"] = (
             df["battery"] * self.inverter.inverter_efficiency
@@ -571,17 +571,16 @@ class PVsystemModel:
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
         while not done:
             i += 1
-            done = (i > 96) | available.sum() == 0
+            if (i > 96) or (available.sum() == 0):
+                done = True
 
             import_cost = ((df["import"] * df["grid"]).clip(0) / 2000)[available]
             if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 max_slot = import_cost[import_cost == max_import_cost].index[0]
-                available[max_slot] = False
+
                 max_slot_energy = df["grid"].loc[max_slot] / 2000  # kWh
-                # self.log(
-                #     f"{i}: {max_slot.strftime(TIME_FORMAT)} {max_import_cost:5.2f} {max_slot_energy:5.2f} "
-                # )
+
                 if max_slot_energy > 0:
                     round_trip_energy_required = (
                         max_slot_energy
@@ -602,8 +601,10 @@ class PVsystemModel:
                     # ignore slots which are already fully charging
                     x = x[x["forced"] < self.inverter.charger_power]
 
+                    x = x[x["soc_end"] <= 97]
+
                     search_window = x.index
-                    str_log = f"{available.sum()} {max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
+                    str_log = f"{i} {available.sum()} {max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
                     str_log += f"Energy: {round_trip_energy_required:5.2f} kWh. "
                     if len(search_window) > 0:
                         str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
@@ -663,9 +664,12 @@ class PVsystemModel:
                             net_cost_opt = contract.net_cost(df).sum()
                             str_log += f"Net: {net_cost_opt:5.1f}"
 
-                        # else:
-                        #     available[start_window] = True
+                        else:
+                            available[max_slot] = False
                     self.log(str_log)
+                else:
+                    self.log(f">>>{str_log}")
+                    done = True
             else:
                 done = True
 
@@ -710,7 +714,7 @@ class PVsystemModel:
             if len(x[x["import"] == min_price]) > 0:
                 start_window = x[x["import"] == min_price].index[0]
                 available.loc[start_window] = False
-                str_log = f"{available.sum()} Min import price {min_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} {x.loc[start_window]['forced']:0.0f}W "
+                str_log = f"{available.sum()} Min import price {min_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} {x.loc[start_window]['forced']:4.0f}W "
 
                 if pd.Timestamp.now() > start_window.tz_localize(None):
                     str_log += "* "
@@ -751,7 +755,7 @@ class PVsystemModel:
                 net_cost = contract.net_cost(df).sum()
                 str_log += f"Net: {net_cost:5.1f} "
                 if net_cost < net_cost_opt:
-                    str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}%"
+                    str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                     str_log += f"Max export: {-df['grid'].min():0.0f}W "
                     net_cost_opt = net_cost
                 else:

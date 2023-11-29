@@ -235,6 +235,7 @@ class PVOpt(hass.Hass):
         self.charging = False
         self.handles = {}
         self.mqtt = self.get_plugin_api("MQTT")
+        self.saving_events = {}
 
         # payloa
 
@@ -375,6 +376,35 @@ class PVOpt(hass.Hass):
                     "current", imp=tariffs["import"], exp=tariffs["export"], base=self
                 )
                 self.log("Contract tariffs loaded OK")
+
+                saving_events_entity = [
+                    name
+                    for name in self.get_state("event").keys()
+                    if ("octoplus_saving_session_events" in name)
+                ][0]
+                self.log(f"Saving events entity:{saving_events_entity}")
+                available_events = self.get_state(
+                    saving_events_entity, attribute="all"
+                )["attributes"]["available_events"]
+                self.log("Joining the following new Octoplus Events:")
+                for event in available_events:
+                    if event["id"] not in self.saving_events:
+                        self.saving_events[event["id"]] = event
+                    self.log(
+                        f"{event['id']:8d}: {event['code']:12s} {event['start'].strftime(DATE_TIME_FORMAT_SHORT)} {event['end'].strftime(DATE_TIME_FORMAT_SHORT)} {event['octopoints_per_kwh']/8}p/kWh"
+                    )
+                    self.call_service(
+                        "octopus_energy/join_octoplus_saving_session_event",
+                        entity_id=saving_events_entity,
+                        event_code=event["code"],
+                    )
+                joined_events = self.get_state(saving_events_entity, attribute="all")[
+                    "attributes"
+                ]["joined_events"]
+
+                for event in joined_events:
+                    if event["id"] not in self.saving_events:
+                        self.saving_events[event["id"]] = event
 
         except Exception as e:
             self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
