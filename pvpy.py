@@ -227,10 +227,10 @@ class Tariff:
         if self.host is not None:
             self.log(">>> Checking for Savings Events")
             events = self.host.saving_events
-            for event in events:
-                event_start = pd.Timestamp(event["start"])
-                event_end = pd.Timestamp(event["end"])
-                event_value = int(event["octopoints_per_kwh"]) / 8
+            for id in events:
+                event_start = pd.Timestamp(events[id]["start"])
+                event_end = pd.Timestamp(events[id]["end"])
+                event_value = int(events[id]["octopoints_per_kwh"]) / 8
 
                 if event_start <= end or event_end > start:
                     event_start = max(event_start, start)
