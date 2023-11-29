@@ -683,12 +683,11 @@ class PVsystemModel:
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                             net_cost_opt = contract.net_cost(df).sum()
                             str_log += f"Net: {net_cost_opt:5.1f}"
-
+                            self.log(str_log)
                         else:
                             available[max_slot] = False
-                    self.log(str_log)
                 else:
-                    self.log(f">>>{str_log}")
+                    # self.log(f">>>{str_log}")
                     done = True
             else:
                 done = True
@@ -790,6 +789,7 @@ class PVsystemModel:
                         str_log += f"Max export: {-df['grid'].min():0.0f}W "
                         net_cost_opt = net_cost
                         slots_added += 1
+                        self.log(str_log)
                     else:
                         # done = True
                         slots = slots[:-1]
@@ -802,7 +802,7 @@ class PVsystemModel:
                             ],
                             axis=1,
                         )
-                    self.log(str_log)
+
                     done = available.sum() == 0
                 else:
                     done = True
@@ -882,7 +882,7 @@ class PVsystemModel:
                         str_log += f"Max export: {-df['grid'].min():0.0f}W "
                         net_cost_opt = net_cost
                         slots_added += 1
-
+                        self.log(str_log)
                     else:
                         # done = True
                         slots = slots[:-1]
@@ -895,7 +895,7 @@ class PVsystemModel:
                             ],
                             axis=1,
                         )
-                    self.log(str_log)
+
                 else:
                     done = True
 
