@@ -166,6 +166,7 @@ class Tariff:
                 if pd.Timestamp.now().hour > 11 and df.index[-1].day < end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
+                        self.log(">>>Getting day ahead prices")
                         self.day_ahead = self.get_day_ahead(df.index[0])
                         if self.day_ahead is not None:
                             self.log("Downloaded Day Ahead prices OK")

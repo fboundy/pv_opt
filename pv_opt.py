@@ -1,7 +1,7 @@
 # %%
 import appdaemon.plugins.hass.hassapi as hass
 import appdaemon.adbase as ad
-import mqttapi as mqtt
+import appdaemon.plugins.mqtt.mqttapi as mqtt
 from json import dumps
 
 # import mqttapi as mqtt
@@ -969,15 +969,16 @@ class PVOpt(hass.Hass):
 
         # Load Solcast
         self.load_solcast()
+        self.load_consumption()
 
-        try:
-            if not self.load_consumption():
-                raise Exception
+        # try:
+        #     if not self.load_consumption():
+        #         raise Exception
 
-        except Exception as e:
-            self.log(f"Unable to load estimated consumption: {e}", level="ERROR")
-            self._status("Failed to load consumption")
-            return False
+        # except Exception as e:
+        #     self.log(f"Unable to load estimated consumption: {e}", level="ERROR")
+        #     self._status("Failed to load consumption")
+        #     return False
 
         self.time_now = pd.Timestamp.utcnow()
         self.static = self.static[self.time_now.floor("30T") :].fillna(0)
@@ -1003,10 +1004,15 @@ class PVOpt(hass.Hass):
             ]
         ).sort_index()
         self.initial_soc = x.interpolate().loc[self.static.index[0]]
+        self.log(f"Initial SOC: {self.initial_soc}")
 
+        self.log("Calculating Base flows")
         self.base = self.pv_system.flows(
             self.initial_soc, self.static, solar=self.config["solar_forecast"]
         )
+        self.log("Calculating Base cost")
+        self.log(f">>>{self.contract.host}")
+
         self.base_cost = self.contract.net_cost(self.base)
 
         self.log(
