@@ -256,7 +256,7 @@ class PVOpt(hass.Hass):
             max_dod=self.config["maximum_dod_percent"] / 100,
         )
         self.pv_system = pv.PVsystemModel(
-            "PV_Opt", self.inverter_model, self.battery_model, log=self.log
+            "PV_Opt", self.inverter_model, self.battery_model, host=self
         )
         self._load_contract()
 
