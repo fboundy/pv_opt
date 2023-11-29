@@ -171,21 +171,32 @@ class Tariff:
                         if self.day_ahead is not None:
                             self.log("Downloaded Day Ahead prices OK")
                     if self.day_ahead is not None:
-                        self.log("Predicting Agile prices from Day Ahead")
+                        self.day_ahead = self.day_ahead.sort_index()
+                        # self.log("Predicting Agile prices from Day Ahead")
                         mask = (self.day_ahead.index.hour >= 16) & (
-                            self.day_ahead.hour < 19
+                            self.day_ahead.index.hour < 19
                         )
                         agile = (
                             pd.concat(
                                 [
                                     self.day_ahead[mask] * 0.186 + 16.5,
-                                    self.day_ahead[~mask] * 0.29 - 0.6,
+                                    self.day_ahead[~mask] * 0.229 - 0.6,
                                 ]
                             )
                             .sort_index()
                             .loc[df.index[-1] :]
                             .iloc[1:]
                         )
+                        # agile = self.day_ahead.loc[df.index[-1:]].iloc[1:]
+
+                        # agile = self.day_ahead.loc[df.index[-1:]].iloc[1:].copy()
+                        # mask = (agile.index.hour >= 16) & (agile.index.hour < 19)
+                        # agile[mask] = agile[mask] * 0.186 + 16.5
+                        # agile[~mask] = agile[~mask] * 0.229 - 0.6
+
+                        # self.log(f">>{df.index}")
+                        # self.log(f">>>{agile.index}")
+
                         df = pd.concat([df, agile])
 
             # If the index frequency >30 minutes so we need to just extend it:
@@ -271,6 +282,7 @@ class Tariff:
 
         price = pd.Series(index=index, data=data).sort_index()
         price.index = price.index.tz_localize("CET")
+        price.index = price.index.tz_convert("UTC")
         price = price[~price.index.duplicated()]
         self.log(f">>> Duplicates: {price.index.has_duplicates}")
         return price.resample("30T").ffill().loc[start:]
