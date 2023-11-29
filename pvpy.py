@@ -511,8 +511,18 @@ class PVsystemModel:
         # self.log(prices)
         prices = prices.set_axis(["import", "export"], axis=1)
 
-        events = self.
+        # Update for Octopus Savings Events if they exists
+        if self.host is not None:
+            events = self.host.savings_events
+            for event in events:
+                event_start = pd.Timestamp(event["start"])
+                event_end = pd.Timestamp(event["end"])
+                event_value = int(event["octopoints_per_kwh"]) / 8
 
+                if event_start <= prices.index[-1] or event_end > prices.index[-1]:
+                    start = max(event_start, prices.index[0])
+                    end = min(event_end - pd.Timedelta("30T"), prices.index[-1])
+                    prices.loc[start:end] += event_value
 
         prices["export"] *= EXPORT_MULT
         df = pd.concat(
