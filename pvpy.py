@@ -44,6 +44,7 @@ class Tariff:
             self.day = day
             self.night = night
 
+        self.host = host
         if host is None:
             self.log = print
         else:
