@@ -224,7 +224,7 @@ class Tariff:
             df.loc[mask, "fixed"] = 0
 
         # Update for Octopus Savings Events if they exists
-        if self.host is not None:
+        if (self.host is not None) and ("unit" in df.columns):
             self.log(">>> Checking for Savings Events")
             events = self.host.saving_events
             for id in events:
