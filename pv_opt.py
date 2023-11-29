@@ -1028,7 +1028,18 @@ class PVOpt(hass.Hass):
         self.log("")
         if (self.opt["forced"] != 0).sum() > 0:
             self.log("Optimal forced charge/discharge slots:")
-            x = self.opt[self.opt["forced"] != 0].copy()
+            x = self.opt[self.opt["forced"] > 0].copy()
+            x["start"] = x.index
+            x["end"] = x.index + pd.Timedelta("30T")
+            windows = pd.concat(
+                [
+                    x.groupby("period").first()[["start", "soc", "forced"]],
+                    x.groupby("period").last()[["end", "soc_end"]],
+                ],
+                axis=1,
+            )
+
+            x = self.opt[self.opt["forced"] < 0].copy()
             x["start"] = x.index
             x["end"] = x.index + pd.Timedelta("30T")
             self.windows = pd.concat(
@@ -1038,6 +1049,8 @@ class PVOpt(hass.Hass):
                 ],
                 axis=1,
             )
+
+            self.windows = pd.concat([windows, self.windows]).sort_values("start")
 
             for window in self.windows.iterrows():
                 self.log(

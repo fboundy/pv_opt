@@ -719,8 +719,10 @@ class PVsystemModel:
             )
 
             i = 0
-            available = (df["import"] < max_export_price) & (
-                df["forced"] < self.inverter.charger_power
+            available = (
+                (df["import"] < max_export_price)
+                & (df["forced"] < self.inverter.charger_power)
+                & (df["forced"] >= 0)
             )
             # self.log((df["import"]<max_export_price)
             a0 = available.sum()
@@ -732,7 +734,7 @@ class PVsystemModel:
             while not done:
                 x = df[available][df["import"] < max_export_price][
                     df["forced"] < self.inverter.charger_power
-                ].copy()
+                ][df["forced"] >= 0].copy()
                 i += 1
                 done = i > a0
 
