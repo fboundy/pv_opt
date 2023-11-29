@@ -864,7 +864,7 @@ class PVsystemModel:
                 net_cost = contract.net_cost(df).sum()
                 str_log += f"Net: {net_cost:5.1f} "
                 if net_cost < net_cost_opt:
-                    str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}%"
+                    str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                     str_log += f"Max export: {-df['grid'].min():0.0f}W "
                     net_cost_opt = net_cost
                 else:
@@ -880,7 +880,6 @@ class PVsystemModel:
                         axis=1,
                     )
                 self.log(str_log)
-                done = True
             else:
                 done = True
 

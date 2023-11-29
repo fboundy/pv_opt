@@ -1028,7 +1028,7 @@ class PVOpt(hass.Hass):
         self.log("")
         if (self.opt["forced"] != 0).sum() > 0:
             self.log("Optimal forced charge/discharge slots:")
-            x = self.opt[self.opt["forced"] > 0].copy()
+            x = self.opt[self.opt["forced"] != 0].copy()
             x["start"] = x.index
             x["end"] = x.index + pd.Timedelta("30T")
             self.windows = pd.concat(
