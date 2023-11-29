@@ -397,12 +397,16 @@ class Contract:
 
 class PVsystemModel:
     def __init__(
-        self, name: str, inverter: InverterModel, battery: BatteryModel, log=None
+        self, name: str, inverter: InverterModel, battery: BatteryModel, host=None
     ) -> None:
         self.name = name
         self.inverter = inverter
         self.battery = battery
-        self.log = log
+        self.host = host
+        if host:
+            self.log = host.log
+        else:
+            self.log = print
 
     def __str__(self):
         pass
@@ -506,6 +510,10 @@ class PVsystemModel:
 
         # self.log(prices)
         prices = prices.set_axis(["import", "export"], axis=1)
+
+        events = self.
+
+
         prices["export"] *= EXPORT_MULT
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
