@@ -463,9 +463,9 @@ class PVOpt(hass.Hass):
 
             self.log("")
 
-        self._load_savings_events()
+        self._load_saving_events()
 
-    def _load_savings_events(self):
+    def _load_saving_events(self):
         if (
             len(
                 [

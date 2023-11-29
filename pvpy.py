@@ -226,7 +226,7 @@ class Tariff:
         # Update for Octopus Savings Events if they exists
         if self.host is not None:
             self.log(">>> Checking for Savings Events")
-            events = self.host.savings_events
+            events = self.host.saving_events
             for event in events:
                 event_start = pd.Timestamp(event["start"])
                 event_end = pd.Timestamp(event["end"])
