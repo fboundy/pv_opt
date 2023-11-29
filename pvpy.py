@@ -223,6 +223,7 @@ class Tariff:
             mask = df.index.time != pd.Timestamp("00:00", tz="UTC").time()
             df.loc[mask, "fixed"] = 0
 
+        df = pd.DataFrame(df)
         # Update for Octopus Savings Events if they exists
         if (self.host is not None) and ("unit" in df.columns):
             self.log(">>> Checking for Savings Events")
@@ -237,7 +238,7 @@ class Tariff:
                     event_end = min(event_end - pd.Timedelta("30T"), end)
                     df["unit"].loc[event_start:event_end] += event_value
 
-        return pd.DataFrame(df)
+        return df
 
     def get_day_ahead(self, start):
         url = "https://www.nordpoolgroup.com/api/marketdata/page/325?currency=GBP"
