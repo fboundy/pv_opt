@@ -373,7 +373,7 @@ class PVOpt(hass.Hass):
                             self.agile = True
 
                 self.contract = pv.Contract(
-                    "current", imp=tariffs["import"], exp=tariffs["export"], base=self
+                    "current", imp=tariffs["import"], exp=tariffs["export"], host=self
                 )
                 self.log("Contract tariffs loaded OK")
 
@@ -400,7 +400,7 @@ class PVOpt(hass.Hass):
                         )
 
                         self.contract = pv.Contract(
-                            "current", octopus_account=self.octopus_account, base=self
+                            "current", octopus_account=self.octopus_account, host=self
                         )
 
                         self.log(
@@ -440,7 +440,7 @@ class PVOpt(hass.Hass):
                         "current",
                         imp=tariffs["import"],
                         exp=tariffs["export"],
-                        base=self,
+                        host=self,
                     )
                     self.log("Contract tariffs loaded OK from Tariff Codes")
                 except Exception as e:

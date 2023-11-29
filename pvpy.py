@@ -270,6 +270,8 @@ class Tariff:
 
         price = pd.Series(index=index, data=data).sort_index()
         price.index = price.index.tz_localize("CET")
+        price = price[~price.index.duplicated()]
+        self.log(f">>> Duplicates: {price.index.has_duplicates}")
         return price.resample("30T").ffill().loc[start:]
 
 
@@ -335,12 +337,12 @@ class Contract:
         imp: Tariff = None,
         exp: Tariff = None,
         octopus_account: OctopusAccount = None,
-        base=None,
+        host=None,
     ) -> None:
         self.name = name
-        self.base = base
-        if self.base:
-            self.log = base.log
+        self.host = host
+        if self.host:
+            self.log = host.log
         else:
             self.log = print
 
@@ -376,9 +378,9 @@ class Contract:
 
                 self.log(f"Retrieved most recent tariff code {tariff_code}")
                 if mpan["is_export"]:
-                    self.exp = Tariff(tariff_code, export=True)
+                    self.exp = Tariff(tariff_code, export=True, host=self.host)
                 else:
-                    self.imp = Tariff(tariff_code)
+                    self.imp = Tariff(tariff_code, host=self.host)
 
             if self.imp is None:
                 e = "Either a named import tariff or valid Octopus Account details much be provided"
@@ -399,9 +401,6 @@ class Contract:
             grid_flow = grid_flow[grid_col]
         grid_imp = grid_flow.clip(0)
         grid_exp = grid_flow.clip(upper=0)
-        # if self.base is not None:
-        #     self.base.log(f"Start: {start}")
-        #     self.base.log(f"End: {end}")
 
         nc = self.imp.to_df(start, end)["fixed"]
         nc += self.imp.to_df(start, end)["unit"] * grid_imp / 2000
