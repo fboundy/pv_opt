@@ -377,35 +377,6 @@ class PVOpt(hass.Hass):
                 )
                 self.log("Contract tariffs loaded OK")
 
-                saving_events_entity = [
-                    name
-                    for name in self.get_state("event").keys()
-                    if ("octoplus_saving_session_events" in name)
-                ][0]
-                self.log(f"Saving events entity:{saving_events_entity}")
-                available_events = self.get_state(
-                    saving_events_entity, attribute="all"
-                )["attributes"]["available_events"]
-                self.log("Joining the following new Octoplus Events:")
-                for event in available_events:
-                    if event["id"] not in self.saving_events:
-                        self.saving_events[event["id"]] = event
-                    self.log(
-                        f"{event['id']:8d}: {event['code']:12s} {event['start'].strftime(DATE_TIME_FORMAT_SHORT)} {event['end'].strftime(DATE_TIME_FORMAT_SHORT)} {event['octopoints_per_kwh']/8}p/kWh"
-                    )
-                    self.call_service(
-                        "octopus_energy/join_octoplus_saving_session_event",
-                        entity_id=saving_events_entity,
-                        event_code=event["code"],
-                    )
-                joined_events = self.get_state(saving_events_entity, attribute="all")[
-                    "attributes"
-                ]["joined_events"]
-
-                for event in joined_events:
-                    if event["id"] not in self.saving_events:
-                        self.saving_events[event["id"]] = event
-
         except Exception as e:
             self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
             self.log(
@@ -489,7 +460,63 @@ class PVOpt(hass.Hass):
 
             if self.agile:
                 self.log("AGILE tariff detected. Rates will update at 16:00 daily")
-        #     self.log(self.contract.__str__())
+
+            self.log("")
+
+        self._load_savings_events()
+
+    def _load_savings_events(self):
+        if (
+            len(
+                [
+                    name
+                    for name in self.get_state("event").keys()
+                    if ("octoplus_saving_session_events" in name)
+                ]
+            )
+            > 0
+        ):
+            saving_events_entity = [
+                name
+                for name in self.get_state("event").keys()
+                if ("octoplus_saving_session_events" in name)
+            ][0]
+            self.log("")
+            self.log(f"Found Octopus Savings Events entity: {saving_events_entity}")
+
+            available_events = self.get_state(saving_events_entity, attribute="all")[
+                "attributes"
+            ]["available_events"]
+
+            if len(available_events) > 0:
+                self.log("Joining the following new Octoplus Events:")
+                for event in available_events:
+                    if event["id"] not in self.saving_events:
+                        self.saving_events[event["id"]] = event
+                        self.log(
+                            f"{event['id']:8d}: {pd.Timestamp(event['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(event['end']).strftime(DATE_TIME_FORMAT_SHORT)} at {int(event['octopoints_per_kwh'])/8:5.1f}p/kWh"
+                        )
+                        self.call_service(
+                            "octopus_energy/join_octoplus_saving_session_event",
+                            entity_id=saving_events_entity,
+                            event_code=event["code"],
+                        )
+
+            joined_events = self.get_state(saving_events_entity, attribute="all")[
+                "attributes"
+            ]["joined_events"]
+
+            for event in joined_events:
+                if event["id"] not in self.saving_events:
+                    self.saving_events[event["id"]] = event
+
+        if len(self.saving_events) > 0:
+            self.log("")
+            self.log("The following Octopus Sevings Events have been Joined:")
+            for id in self.saving_events:
+                self.log(
+                    f"{id:8d}: {pd.Timestamp(self.saving_events[id]['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(self.saving_events[id]['end']).strftime(DATE_TIME_FORMAT_SHORT)} at {int(self.saving_events[id]['octopoints_per_kwh'])/8:5.1f}p/kWh"
+                )
 
     def get_ha_value(self, entity_id):
         value = None
