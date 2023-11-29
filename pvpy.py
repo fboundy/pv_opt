@@ -226,7 +226,6 @@ class Tariff:
         df = pd.DataFrame(df)
         # Update for Octopus Savings Events if they exists
         if (self.host is not None) and ("unit" in df.columns):
-            self.log(">>> Checking for Savings Events")
             events = self.host.saving_events
             for id in events:
                 event_start = pd.Timestamp(events[id]["start"])
