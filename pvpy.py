@@ -166,25 +166,37 @@ class Tariff:
                 if pd.Timestamp.now().hour > 11 and df.index[-1].day < end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
+                        self.log(">>>Getting day ahead prices")
                         self.day_ahead = self.get_day_ahead(df.index[0])
                         if self.day_ahead is not None:
                             self.log("Downloaded Day Ahead prices OK")
                     if self.day_ahead is not None:
-                        self.log("Predicting Agile prices from Day Ahead")
+                        self.day_ahead = self.day_ahead.sort_index()
+                        # self.log("Predicting Agile prices from Day Ahead")
                         mask = (self.day_ahead.index.hour >= 16) & (
-                            self.day_ahead.hour < 19
+                            self.day_ahead.index.hour < 19
                         )
                         agile = (
                             pd.concat(
                                 [
                                     self.day_ahead[mask] * 0.186 + 16.5,
-                                    self.day_ahead[~mask] * 0.29 - 0.6,
+                                    self.day_ahead[~mask] * 0.229 - 0.6,
                                 ]
                             )
                             .sort_index()
                             .loc[df.index[-1] :]
                             .iloc[1:]
                         )
+                        # agile = self.day_ahead.loc[df.index[-1:]].iloc[1:]
+
+                        # agile = self.day_ahead.loc[df.index[-1:]].iloc[1:].copy()
+                        # mask = (agile.index.hour >= 16) & (agile.index.hour < 19)
+                        # agile[mask] = agile[mask] * 0.186 + 16.5
+                        # agile[~mask] = agile[~mask] * 0.229 - 0.6
+
+                        # self.log(f">>{df.index}")
+                        # self.log(f">>>{agile.index}")
+
                         df = pd.concat([df, agile])
 
             # If the index frequency >30 minutes so we need to just extend it:
@@ -270,6 +282,9 @@ class Tariff:
 
         price = pd.Series(index=index, data=data).sort_index()
         price.index = price.index.tz_localize("CET")
+        price.index = price.index.tz_convert("UTC")
+        price = price[~price.index.duplicated()]
+        self.log(f">>> Duplicates: {price.index.has_duplicates}")
         return price.resample("30T").ffill().loc[start:]
 
 
@@ -335,12 +350,12 @@ class Contract:
         imp: Tariff = None,
         exp: Tariff = None,
         octopus_account: OctopusAccount = None,
-        base=None,
+        host=None,
     ) -> None:
         self.name = name
-        self.base = base
-        if self.base:
-            self.log = base.log
+        self.host = host
+        if self.host:
+            self.log = host.log
         else:
             self.log = print
 
@@ -376,9 +391,9 @@ class Contract:
 
                 self.log(f"Retrieved most recent tariff code {tariff_code}")
                 if mpan["is_export"]:
-                    self.exp = Tariff(tariff_code, export=True)
+                    self.exp = Tariff(tariff_code, export=True, host=self.host)
                 else:
-                    self.imp = Tariff(tariff_code)
+                    self.imp = Tariff(tariff_code, host=self.host)
 
             if self.imp is None:
                 e = "Either a named import tariff or valid Octopus Account details much be provided"
@@ -399,9 +414,6 @@ class Contract:
             grid_flow = grid_flow[grid_col]
         grid_imp = grid_flow.clip(0)
         grid_exp = grid_flow.clip(upper=0)
-        # if self.base is not None:
-        #     self.base.log(f"Start: {start}")
-        #     self.base.log(f"End: {end}")
 
         nc = self.imp.to_df(start, end)["fixed"]
         nc += self.imp.to_df(start, end)["unit"] * grid_imp / 2000

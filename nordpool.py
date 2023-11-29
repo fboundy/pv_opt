@@ -60,6 +60,23 @@ agile = pd.Series(
 )
 agile.index = pd.to_datetime(agile.index)
 agile.name = "Agile"
+agile = agile.sort_index()
+# %%
+mask = (price.index.hour >= 16) & (price.index.hour < 19)
+
+
+pred = (
+    pd.concat(
+        [
+            price[mask] * 0.186 + 16.5,
+            price[~mask] * 0.229 - 0.6,
+        ]
+    )
+    .sort_index()
+    .loc[agile.index[-1] :]
+    .iloc[1:]
+)
+
 
 # %%
 merge = pd.concat(
@@ -75,6 +92,7 @@ merge["Forecast"] = 0
 merge.loc[mask, "Forecast"] = merge[mask]["Day Ahead"] * 0.186 + 16.5
 merge.loc[~mask, "Forecast"] = merge[~mask]["Day Ahead"] * 0.229 - 0.6
 ax = merge.plot()
+
 
 ax = merge[mask].plot.scatter("Day Ahead", "Agile")
 merge[~mask].plot.scatter("Day Ahead", "Agile", ax=ax, color="C1")

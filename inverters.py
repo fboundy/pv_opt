@@ -121,7 +121,7 @@ class InverterController:
             if power is not None:
                 entity_id = self.host.config[f"id_timed_{direction}_current"]
 
-                current = round(power / self.host.config["battery_voltage"], 1)
+                current = abs(round(power / self.host.config["battery_voltage"], 1))
                 self.log(
                     f"Power {power:0.0f} = {current:0.1f}A at {self.host.config['battery_voltage']}V"
                 )
@@ -169,7 +169,7 @@ class InverterController:
     def control_charge(self, enable, **kwargs):
         self._control_charge_discharge("charge", enable, **kwargs)
 
-    def control_dicharge(self, enable, **kwargs):
+    def control_discharge(self, enable, **kwargs):
         self._control_charge_discharge("discharge", enable, **kwargs)
 
     def hold_soc(self, soc, end=None):
