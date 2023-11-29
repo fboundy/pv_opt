@@ -664,7 +664,6 @@ class PVsystemModel:
                             net_cost_opt = contract.net_cost(df).sum()
                             str_log += f"Net: {net_cost_opt:5.1f}"
                             self.log(str_log)
-
                         else:
                             available[max_slot] = False
                 else:
@@ -752,28 +751,30 @@ class PVsystemModel:
                     axis=1,
                 )
 
-                net_cost = contract.net_cost(df).sum()
-                str_log += f"Net: {net_cost:5.1f} "
-                if net_cost < net_cost_opt:
-                    str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
-                    str_log += f"Max export: {-df['grid'].min():0.0f}W "
-                    net_cost_opt = net_cost
-                    self.log(str_log)
+                    net_cost = contract.net_cost(df).sum()
+                    str_log += f"Net: {net_cost:5.1f} "
+                    if net_cost < net_cost_opt:
+                        str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
+                        str_log += f"Max export: {-df['grid'].min():0.0f}W "
+                        net_cost_opt = net_cost
+                        slots_added += 1
+                        self.log(str_log)
+                    else:
+                        # done = True
+                        slots = slots[:-1]
+                        df = pd.concat(
+                            [
+                                prices,
+                                self.flows(
+                                    initial_soc, static_flows, slots=slots, **kwargs
+                                ),
+                            ],
+                            axis=1,
+                        )
+
+                    done = available.sum() == 0
                 else:
-                    # done = True
-                    slots = slots[:-1]
-                    df = pd.concat(
-                        [
-                            prices,
-                            self.flows(
-                                initial_soc, static_flows, slots=slots, **kwargs
-                            ),
-                        ],
-                        axis=1,
-                    )
-                done = available.sum() == 0
-            else:
-                done = True
+                    done = True
 
         # ---------------------
         # Discharging
@@ -841,29 +842,29 @@ class PVsystemModel:
                     axis=1,
                 )
 
-                net_cost = contract.net_cost(df).sum()
-                str_log += f"Net: {net_cost:5.1f} "
-                if net_cost < net_cost_opt:
-                    str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}%"
-                    str_log += f"Max export: {-df['grid'].min():0.0f}W "
-                    net_cost_opt = net_cost
-                    self.log(str_log)
-                else:
-                    # done = True
-                    slots = slots[:-1]
-                    df = pd.concat(
-                        [
-                            prices,
-                            self.flows(
-                                initial_soc, static_flows, slots=slots, **kwargs
-                            ),
-                        ],
-                        axis=1,
-                    )
+                    net_cost = contract.net_cost(df).sum()
+                    str_log += f"Net: {net_cost:5.1f} "
+                    if net_cost < net_cost_opt:
+                        str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
+                        str_log += f"Max export: {-df['grid'].min():0.0f}W "
+                        net_cost_opt = net_cost
+                        slots_added += 1
+                        self.log(str_log)
+                    else:
+                        # done = True
+                        slots = slots[:-1]
+                        df = pd.concat(
+                            [
+                                prices,
+                                self.flows(
+                                    initial_soc, static_flows, slots=slots, **kwargs
+                                ),
+                            ],
+                            axis=1,
+                        )
 
-                done = True
-            else:
-                done = True
+                else:
+                    done = True
 
         df.index = pd.to_datetime(df.index)
         return df
