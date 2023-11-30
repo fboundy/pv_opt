@@ -6,6 +6,7 @@ from json import dumps
 
 # import mqttapi as mqtt
 import pandas as pd
+import time
 
 # import requests
 # import datetime
@@ -13,6 +14,7 @@ import pvpy as pv
 import inverters as inv
 import numpy as np
 from numpy import nan
+
 
 # import pvpy as pv
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -236,6 +238,7 @@ class PVOpt(hass.Hass):
         self.handles = {}
         self.mqtt = self.get_plugin_api("MQTT")
         self.saving_events = {}
+        self.contract = None
 
         # payloa
 
@@ -258,6 +261,7 @@ class PVOpt(hass.Hass):
         self.pv_system = pv.PVsystemModel(
             "PV_Opt", self.inverter_model, self.battery_model, host=self
         )
+
         self._load_contract()
 
         if self.agile:
@@ -331,110 +335,49 @@ class PVOpt(hass.Hass):
                 self._set_status("Disabled")
 
     def _load_contract(self):
-        self.contract = None
         self.log("")
         self.log("Loading Contract:")
         self._status("Loading Contract")
         self.log("-----------------")
         self.tariff_codes = {}
         self.agile = False
-        try:
+
+        while self.contract is None:
             if self.config["octopus_auto"]:
-                self.log(f"Trying to auto detect Octopus tariffs:")
-
-                octopus_entities = [
-                    name
-                    for name in self.get_state(BOTTLECAP_DAVE["domain"]).keys()
-                    if (
-                        "octopus_energy_electricity" in name
-                        and BOTTLECAP_DAVE["rates"] in name
-                    )
-                ]
-
-                entities = {}
-                entities["import"] = [x for x in octopus_entities if not "export" in x]
-                entities["export"] = [x for x in octopus_entities if "export" in x]
-
-                for imp_exp in IMPEXP:
-                    for entity in entities[imp_exp]:
-                        self.log(f"    Found {imp_exp} entity {entity}")
-
-                tariffs = {x: None for x in IMPEXP}
-                for imp_exp in IMPEXP:
-                    if len(entities[imp_exp]) > 0:
-                        tariff_code = self.get_state(
-                            entities[imp_exp][0], attribute="all"
-                        )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
-
-                        tariffs[imp_exp] = pv.Tariff(
-                            tariff_code, export=(imp_exp == "export"), host=self
-                        )
-                        if "AGILE" in tariff_code:
-                            self.agile = True
-
-                self.contract = pv.Contract(
-                    "current", imp=tariffs["import"], exp=tariffs["export"], host=self
-                )
-                self.log("Contract tariffs loaded OK")
-
-        except Exception as e:
-            self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
-            self.log(
-                "Failed to find tariff from Octopus Energy Integration", level="WARNING"
-            )
-
-        if self.contract is None:
-            if ("octopus_account" in self.config) and (
-                "octopus_api_key" in self.config
-            ):
-                if (self.config["octopus_account"] is not None) and (
-                    self.config["octopus_api_key"] is not None
-                ):
-                    try:
-                        self.log(
-                            f"Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
-                        )
-                        self.octopus_account = pv.OctopusAccount(
-                            self.config["octopus_account"],
-                            self.config["octopus_api_key"],
-                        )
-
-                        self.contract = pv.Contract(
-                            "current", octopus_account=self.octopus_account, host=self
-                        )
-
-                        self.log(
-                            "Tariffs loaded using Octopus Account details from API Key",
-                            level="WARN",
-                        )
-
-                    except Exception as e:
-                        self.log(e, level="ERROR")
-                        self.log(
-                            f"Unable to load Octopus Account details using API Key: {e} Trying other methods.",
-                            level="WARNING",
-                        )
-
-        if self.contract is None or USE_TARIFF:
-            if (
-                "octopus_import_tariff_code" in self.config
-                and self.config["octopus_import_tariff_code"] is not None
-            ):
                 try:
-                    str = f"INFO Trying to load tariff codes: Import: {self.config['octopus_import_tariff_code']}"
+                    self.log(f"Trying to auto detect Octopus tariffs:")
 
-                    if "octopus_export_tariff_code" in self.config:
-                        str += f" Export: {self.config['octopus_export_tariff_code']}"
-                    self.log(str)
+                    octopus_entities = [
+                        name
+                        for name in self.get_state(BOTTLECAP_DAVE["domain"]).keys()
+                        if (
+                            "octopus_energy_electricity" in name
+                            and BOTTLECAP_DAVE["rates"] in name
+                        )
+                    ]
+
+                    entities = {}
+                    entities["import"] = [
+                        x for x in octopus_entities if not "export" in x
+                    ]
+                    entities["export"] = [x for x in octopus_entities if "export" in x]
+
+                    for imp_exp in IMPEXP:
+                        for entity in entities[imp_exp]:
+                            self.log(f"    Found {imp_exp} entity {entity}")
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
-                        if f"octopus_{imp_exp}_tariff_code" in self.config:
+                        if len(entities[imp_exp]) > 0:
+                            tariff_code = self.get_state(
+                                entities[imp_exp][0], attribute="all"
+                            )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
+
                             tariffs[imp_exp] = pv.Tariff(
-                                self.config[f"octopus_{imp_exp}_tariff_code"],
-                                export=(imp_exp == "export"),
-                                host=self,
+                                tariff_code, export=(imp_exp == "export"), host=self
                             )
+                            if "AGILE" in tariff_code:
+                                self.agile = True
 
                     self.contract = pv.Contract(
                         "current",
@@ -442,28 +385,101 @@ class PVOpt(hass.Hass):
                         exp=tariffs["export"],
                         host=self,
                     )
-                    self.log("Contract tariffs loaded OK from Tariff Codes")
+                    self.log("Contract tariffs loaded OK")
+
                 except Exception as e:
-                    self.log(f"Unable to load Tariff Codes {e}", level="ERROR")
+                    self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
+                    self.log(
+                        "Failed to find tariff from Octopus Energy Integration",
+                        level="WARNING",
+                    )
+                    self.contract = None
 
-        if self.contract is None:
-            e = "Unable to load contract tariffs"
-            self.log(e, level="ERROR")
-            self._status(e)
-            raise ValueError(e)
+            if self.contract is None:
+                if ("octopus_account" in self.config) and (
+                    "octopus_api_key" in self.config
+                ):
+                    if (self.config["octopus_account"] is not None) and (
+                        self.config["octopus_api_key"] is not None
+                    ):
+                        try:
+                            self.log(
+                                f"Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
+                            )
+                            self.octopus_account = pv.OctopusAccount(
+                                self.config["octopus_account"],
+                                self.config["octopus_api_key"],
+                            )
 
-        else:
-            for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
-                self.log(f"  {imp_exp.title()}: {t.name}")
-                if "AGILE" in t.name:
-                    self.agile = True
+                            self.contract = pv.Contract(
+                                "current",
+                                octopus_account=self.octopus_account,
+                                host=self,
+                            )
 
-            if self.agile:
-                self.log("AGILE tariff detected. Rates will update at 16:00 daily")
+                            self.log(
+                                "Tariffs loaded using Octopus Account details from API Key",
+                                level="WARN",
+                            )
 
-            self.log("")
+                        except Exception as e:
+                            self.log(e, level="ERROR")
+                            self.log(
+                                f"Unable to load Octopus Account details using API Key: {e} Trying other methods.",
+                                level="WARNING",
+                            )
 
-        self._load_saving_events()
+            if self.contract is None or USE_TARIFF:
+                if (
+                    "octopus_import_tariff_code" in self.config
+                    and self.config["octopus_import_tariff_code"] is not None
+                ):
+                    try:
+                        str = f"INFO Trying to load tariff codes: Import: {self.config['octopus_import_tariff_code']}"
+
+                        if "octopus_export_tariff_code" in self.config:
+                            str += (
+                                f" Export: {self.config['octopus_export_tariff_code']}"
+                            )
+                        self.log(str)
+
+                        tariffs = {x: None for x in IMPEXP}
+                        for imp_exp in IMPEXP:
+                            if f"octopus_{imp_exp}_tariff_code" in self.config:
+                                tariffs[imp_exp] = pv.Tariff(
+                                    self.config[f"octopus_{imp_exp}_tariff_code"],
+                                    export=(imp_exp == "export"),
+                                    host=self,
+                                )
+
+                        self.contract = pv.Contract(
+                            "current",
+                            imp=tariffs["import"],
+                            exp=tariffs["export"],
+                            host=self,
+                        )
+                        self.log("Contract tariffs loaded OK from Tariff Codes")
+                    except Exception as e:
+                        self.log(f"Unable to load Tariff Codes {e}", level="ERROR")
+
+            if self.contract is None:
+                e = "Unable to load contract tariffs. Waiting 2 minutes to re-try"
+                self.log(e, level="ERROR")
+                self._status(e)
+                time.sleep(120)
+
+            else:
+                for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
+                    self.log(f"  {imp_exp.title()}: {t.name}")
+                    if "AGILE" in t.name:
+                        self.agile = True
+
+                if self.agile:
+                    self.log("AGILE tariff detected. Rates will update at 16:00 daily")
+
+                self.log("")
+
+                self._load_saving_events()
 
     def _load_saving_events(self):
         if (

@@ -74,7 +74,7 @@ class Tariff:
         }
 
         # print(params)
-
+        
         if not self.export:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standing-charges/"
             self.fixed = [
