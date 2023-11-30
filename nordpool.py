@@ -31,7 +31,18 @@ for row in r.json()["data"]["Rows"]:
                     if len(i["Name"]) > 8:
                         print(i["Name"])
                         data.append(float(i["Value"].replace(",", ".")))
-                        index.append(pd.Timestamp(i["Name"] + time))
+
+                        index.append(
+                            pd.Timestamp(
+                                i["Name"].split("-")[2]
+                                + "-"
+                                + i["Name"].split("-")[1]
+                                + "-"
+                                + i["Name"].split("-")[0]
+                                + " "
+                                + time
+                            )
+                        )
 
 price = pd.Series(index=index, data=data).sort_index()
 price.index = price.index.tz_localize("CET")

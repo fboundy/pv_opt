@@ -148,7 +148,6 @@ DEFAULT_CONFIG = {
         "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90"]},
         "domain": "select",
     },
-    "consumption_from_entity": {"default": True},
     "consumption_history_days": {
         "default": 7,
         "domain": "number",
@@ -157,7 +156,7 @@ DEFAULT_CONFIG = {
     "consumption_margin": {
         "default": 10,
         "domain": "number",
-        "attributes": {"min": 0, "max": 100, "step": 5, "unit_of_measurement": "%"},
+        "attributes": {"min": -50, "max": 100, "step": 5, "unit_of_measurement": "%"},
     },
     "consumption_grouping": {
         "default": "mean",
@@ -250,14 +249,14 @@ class PVOpt(hass.Hass):
 
         self._status("Initialising PV Model")
         self.inverter_model = pv.InverterModel(
-            inverter_efficiency=self.config["inverter_efficiency_percent"] / 100,
-            inverter_power=self.config["inverter_power_watts"],
-            inverter_loss=self.config["inverter_loss_watts"],
-            charger_efficiency=self.config["charger_efficiency_percent"] / 100,
-            charger_power=self.config["charger_power_watts"],
+            inverter_efficiency=self._get_config("inverter_efficiency_percent") / 100,
+            inverter_power=self._get_config("inverter_power_watts"),
+            inverter_loss=self._get_config("inverter_loss_watts"),
+            charger_efficiency=self._get_config("charger_efficiency_percent") / 100,
+            charger_power=self._get_config("charger_power_watts"),
         )
         self.battery_model = pv.BatteryModel(
-            capacity=self.config["battery_capacity_Wh"],
+            capacity=self._get_config("battery_capacity_Wh"),
             max_dod=self._get_config("maximum_dod_percent") / 100,
         )
         self.pv_system = pv.PVsystemModel(
@@ -274,7 +273,7 @@ class PVOpt(hass.Hass):
             self.optimise_event,
             EVENT_TRIGGER,
         )
-        if self.config["forced_charge"]:
+        if self._get_config("forced_charge"):
             self.log("")
             self.log("Running initial Optimisation:")
             self.optimise()
@@ -324,19 +323,19 @@ class PVOpt(hass.Hass):
                 return self.config[item]
 
     def _setup_schedule(self):
-        if self.config["forced_charge"]:
+        if self._get_config("forced_charge"):
             start_opt = (
                 pd.Timestamp.now()
-                .ceil(f"{self.config['optimise_frequency_minutes']}T")
+                .ceil(f"{self._get_config('optimise_frequency_minutes')}T")
                 .to_pydatetime()
             )
             self.timer_handle = self.run_every(
                 self.optimise_time,
                 start=start_opt,
-                interval=self.config["optimise_frequency_minutes"] * 60,
+                interval=self._get_config("optimise_frequency_minutes") * 60,
             )
             self.log(
-                f"Optimiser will run every {self.config['optimise_frequency_minutes']} minutes from {start_opt.strftime('%H:%M')} or on {EVENT_TRIGGER} Event"
+                f"Optimiser will run every {self._get_config('optimise_frequency_minutes')} minutes from {start_opt.strftime('%H:%M')} or on {EVENT_TRIGGER} Event"
             )
 
         else:
@@ -354,7 +353,7 @@ class PVOpt(hass.Hass):
         self.agile = False
 
         while self.contract is None:
-            if self.config["octopus_auto"]:
+            if self._get_config("octopus_auto"):
                 try:
                     self.log(f"Trying to auto detect Octopus tariffs:")
 
@@ -658,12 +657,6 @@ class PVOpt(hass.Hass):
                     for t in [str, float, int, bool]
                 }
 
-                # check for validity. Valid formats are:
-                #   - all strings: add the entitity values from HA (if the last string is
-                #     not an entity then treat it as a default)
-                #   - single number or single boolean: just use that
-                #   - single number as last entry with any number of strings before that
-
                 if (
                     len(values) == 1
                     and isinstance(values[0], str)
@@ -891,10 +884,13 @@ class PVOpt(hass.Hass):
                     conf_topic = f"homeassistant/{domain}/{id}/config"
                     self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
 
-                self.set_state(
-                    state=self._state_from_value(self.config[item]),
-                    entity_id=entity_id,
-                )
+                    # Only set the state for entities that don't currently exist
+                    self.set_state(
+                        state=self._state_from_value(self.config[item]),
+                        entity_id=entity_id,
+                    )
+                # Now that we have published it, write the entity back to the config so we check the entity in future
+                self.config[item] = entity_id
                 if domain != "sensor":
                     self.change_items[entity_id] = item
 
@@ -930,9 +926,9 @@ class PVOpt(hass.Hass):
             self.log(f"Entity {entity_id} changed from {old} to {new}. ")
             value = self._value_from_state(new)
 
-        if value is not None:
-            self.log(f"State resolved to {value} [with type{type(value)}")
-            self.config[item] = value
+        # if value is not None:
+        #     self.log(f"State resolved to {value} [with type{type(value)}")
+        #     self.config[item] = value
 
         if "forced" in item:
             self._setup_schedule()
@@ -981,7 +977,7 @@ class PVOpt(hass.Hass):
         # initialse a DataFrame to cover today and tomorrow at 30 minute frequency
         self.log("")
 
-        if self.config["forced_discharge"]:
+        if self._get_config("forced_discharge"):
             discharge_enable = "enabled"
         else:
             discharge_enable = "disabled"
@@ -1003,18 +999,9 @@ class PVOpt(hass.Hass):
         self.load_solcast()
         self.load_consumption()
 
-        # try:
-        #     if not self.load_consumption():
-        #         raise Exception
-
-        # except Exception as e:
-        #     self.log(f"Unable to load estimated consumption: {e}", level="ERROR")
-        #     self._status("Failed to load consumption")
-        #     return False
-
         self.time_now = pd.Timestamp.utcnow()
         self.static = self.static[self.time_now.floor("30T") :].fillna(0)
-        self.soc_now = float(self.get_state(self.config["id_battery_soc"]))
+        self.soc_now = self._get_config("id_battery_soc")
 
         # if self.config["alt_tariffs"] is None:
         #     self.tariffs = [None]
@@ -1040,14 +1027,14 @@ class PVOpt(hass.Hass):
 
         self.log("Calculating Base flows")
         self.base = self.pv_system.flows(
-            self.initial_soc, self.static, solar=self.config["solar_forecast"]
+            self.initial_soc, self.static, solar=self._get_config("solar_forecast")
         )
         self.log("Calculating Base cost")
 
         self.base_cost = self.contract.net_cost(self.base)
 
         self.log(
-            f'Optimising for {self.config["solar_forecast"]} forecast from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}'
+            f'Optimising for {self._get_config("solar_forecast")} forecast from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}'
         )
 
         self._status("Optimising charge plan")
@@ -1056,8 +1043,8 @@ class PVOpt(hass.Hass):
             self.initial_soc,
             self.static,
             self.contract,
-            solar=self.config["solar_forecast"],
-            discharge=self.config["forced_discharge"],
+            solar=self._get_config("solar_forecast"),
+            discharge=self._get_config("forced_discharge"),
         )
         self.opt_cost = self.contract.net_cost(self.opt)
         self.opt["period"] = (self.opt["forced"].diff() > 0).cumsum()
@@ -1094,7 +1081,9 @@ class PVOpt(hass.Hass):
                     f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4.1f}% -> {window[1]['soc_end']:4.1f}%"
                 )
             self.charge_power = self.windows["forced"].iloc[0]
-            self.charge_current = self.charge_power / self.config["battery_voltage"]
+            self.charge_current = self.charge_power / self._get_config(
+                "battery_voltage"
+            )
             self.charge_start_datetime = self.windows["start"].iloc[0]
             self.charge_end_datetime = self.windows["end"].iloc[0]
 
@@ -1130,7 +1119,7 @@ class PVOpt(hass.Hass):
         ).total_seconds() / 60
 
         if (time_to_slot_start > 0) and (
-            time_to_slot_start < self.config["optimise_frequency_minutes"]
+            time_to_slot_start < self._get_config("optimise_frequency_minutes")
         ):
             self.log(
                 f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
@@ -1151,7 +1140,7 @@ class PVOpt(hass.Hass):
                 )
 
         elif (time_to_slot_start <= 0) and (
-            time_to_slot_start < self.config["optimise_frequency_minutes"]
+            time_to_slot_start < self._get_config("optimise_frequency_minutes")
         ):
             self.log(
                 f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
@@ -1330,78 +1319,53 @@ class PVOpt(hass.Hass):
     def load_consumption(self):
         self.log("Getting expected consumption data")
 
-        if self.config["consumption_from_entity"]:
-            consumption = pd.Series(index=self.static.index, data=0)
-            for entity_id in self.config["id_consumption"]:
-                try:
-                    # load history fot the last N days from the specified sensors
-                    # self.log(self.config["consumption_history_days"])
-                    df = self.hass2df(
-                        entity_id,
-                        days=int(self.config["consumption_history_days"]),
-                    )
-
-                except Exception as e:
-                    self.log(
-                        f"Unable to get historical consumption from {entity_id}. {e}",
-                        level="ERROR",
-                    )
-                    return False
-
-                try:
-                    df.index = pd.to_datetime(df.index)
-                    df = (
-                        pd.to_numeric(df, errors="coerce")
-                        .dropna()
-                        .resample("30T")
-                        .mean()
-                        .fillna(0)
-                    )
-                    df = df * (1 + self.config["consumption_margin"] / 100)
-
-                    # Group by time and take the mean
-                    df = df.groupby(df.index.time).aggregate(
-                        self.config["consumption_grouping"]
-                    )
-                    df.name = "consumption"
-
-                    temp = self.static.copy()
-                    temp["time"] = temp.index.time
-                    temp = temp.merge(df, "left", left_on="time", right_index=True)
-                    # self.log(temp["consumption"].sum())
-                    consumption += temp["consumption"]
-                    self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
-
-                # self.log(temp)
-
-                except Exception as e:
-                    self.log(f"Error loading consumption data: {e}")
-                    return False
-
-            self.static["consumption"] = consumption
-            return True
-
-        else:
+        consumption = pd.Series(index=self.static.index, data=0)
+        for entity_id in self.config["id_consumption"]:
             try:
-                df = pd.DataFrame(
-                    index=["0:00", "4:00", "8:30", "14:30", "19:30", "22:00", "23:30"],
-                    data=[200, 150, 500, 390, 800, 800, 320],
+                df = self.hass2df(
+                    entity_id,
+                    days=int(self._get_config("consumption_history_days")),
                 )
-                df.index = pd.to_datetime(df.index).tz_localize(self.tz)
-                df2 = df.copy()
-                df2.index += pd.Timedelta("1D")
-                df = pd.concat([df, df2]).set_axis(["consumption"], axis=1)
-                # if self.debug:
-                #     self.log(df.index)
-                self.static = pd.concat([self.static, df], axis=1).interpolate()
-                self.static["consumption"] *= (
-                    self.config["daily_consumption_Wh"] / 11000
-                )
-                return True
 
             except Exception as e:
-                self.log(f"Error calculating modelled consumption data: {e}")
+                self.log(
+                    f"Unable to get historical consumption from {entity_id}. {e}",
+                    level="ERROR",
+                )
                 return False
+
+            try:
+                df.index = pd.to_datetime(df.index)
+                df = (
+                    pd.to_numeric(df, errors="coerce")
+                    .dropna()
+                    .resample("30T")
+                    .mean()
+                    .fillna(0)
+                )
+                df = df * (1 + self._get_config("consumption_margin") / 100)
+
+                # Group by time and take the mean
+                df = df.groupby(df.index.time).aggregate(
+                    self._get_config("consumption_grouping")
+                )
+                df.name = "consumption"
+
+                temp = self.static.copy()
+                temp["time"] = temp.index.time
+                temp = temp.merge(df, "left", left_on="time", right_index=True)
+                # self.log(temp["consumption"].sum())
+                consumption += temp["consumption"]
+                self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
+
+            # self.log(temp)
+
+            except Exception as e:
+                self.log(f"Error loading consumption data: {e}")
+                return False
+
+        self.static["consumption"] = consumption
+        return True
 
 
 # %%
