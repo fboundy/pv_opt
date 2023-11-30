@@ -161,18 +161,22 @@ class Tariff:
             if "AGILE" in self.name:
                 if self.day_ahead is not None and df.index[-1].day == end.day:
                     # reset the day ahead forecasts if we've got a forecast going into tomorrow
+                    self.log(">>>Resetting day ahead prices")
                     self.day_ahead = None
 
                 if pd.Timestamp.now().hour > 11 and df.index[-1].day < end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
+                    self.log(">>>Checking for day ahead prices")
                     if self.day_ahead is None:
-                        self.log(">>>Getting day ahead prices")
                         self.day_ahead = self.get_day_ahead(df.index[0])
                         if self.day_ahead is not None:
-                            self.log("Downloaded Day Ahead prices OK")
+                            self.log(">>>Downloaded Day Ahead prices OK")
+                        else:
+                            self.log(">>>Failed to get Day Ahead prices OK")
+
                     if self.day_ahead is not None:
                         self.day_ahead = self.day_ahead.sort_index()
-                        self.log("Predicting Agile prices from Day Ahead")
+                        self.log(">>>Predicting Agile prices from Day Ahead")
                         mask = (self.day_ahead.index.hour >= 16) & (
                             self.day_ahead.index.hour < 19
                         )

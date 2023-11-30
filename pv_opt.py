@@ -1043,7 +1043,6 @@ class PVOpt(hass.Hass):
             self.initial_soc, self.static, solar=self.config["solar_forecast"]
         )
         self.log("Calculating Base cost")
-        self.log(f">>>{self.contract.host}")
 
         self.base_cost = self.contract.net_cost(self.base)
 
