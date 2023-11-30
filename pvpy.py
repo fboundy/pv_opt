@@ -74,7 +74,7 @@ class Tariff:
         }
 
         # print(params)
-        
+
         if not self.export:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standing-charges/"
             self.fixed = [
@@ -172,7 +172,7 @@ class Tariff:
                             self.log("Downloaded Day Ahead prices OK")
                     if self.day_ahead is not None:
                         self.day_ahead = self.day_ahead.sort_index()
-                        # self.log("Predicting Agile prices from Day Ahead")
+                        self.log("Predicting Agile prices from Day Ahead")
                         mask = (self.day_ahead.index.hour >= 16) & (
                             self.day_ahead.index.hour < 19
                         )

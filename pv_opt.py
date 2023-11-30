@@ -64,7 +64,7 @@ MQTT_CONFIGS = {
 
 DEFAULT_CONFIG = {
     "forced_charge": {"default": True, "domain": "switch"},
-    "forced_discharge": {"default": False, "domain": "switch"},
+    "forced_discharge": {"default": True, "domain": "switch"},
     "read_only": {"default": False, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
@@ -171,11 +171,11 @@ DEFAULT_CONFIG = {
 
 DEFAULT_CONFIG_BY_BRAND = {
     "SOLIS_SOLAX_MODBUS": {
-        "maximum_dod_percentage": {"default": "number.solis_battery_minimum_soc"},
+        "maximum_dod_percent": {"default": "number.solis_battery_minimum_soc"},
         "id_battery_soc": {"default": "sensor.solis_battery_soc"},
         "id_consumption": {"default": "sensor.solis_house_load"},
         "id_timed_charge_start_hours": {
-            "default": "numbers.solis_timed_charge_start_hours"
+            "default": "number.solis_timed_charge_start_hours"
         },
         "id_timed_charge_start_minutes": {
             "default": "number.solis_timed_charge_start_minutes"
@@ -240,8 +240,10 @@ class PVOpt(hass.Hass):
         self.saving_events = {}
         self.contract = None
 
-        # payloa
-
+        # Load arguments from the YAML file
+        # If there are none then use the defaults in DEFAULT_CONFIG and DEFAULT_CONFIG_BY_BRAND
+        # if there are existing entities for the configs in HA then read those values
+        # if not, set up entities using MQTT discovery and write the initial state to them
         self._load_args()
 
         self._load_inverter()
@@ -256,7 +258,7 @@ class PVOpt(hass.Hass):
         )
         self.battery_model = pv.BatteryModel(
             capacity=self.config["battery_capacity_Wh"],
-            max_dod=self.config["maximum_dod_percent"] / 100,
+            max_dod=self._get_config("maximum_dod_percent") / 100,
         )
         self.pv_system = pv.PVsystemModel(
             "PV_Opt", self.inverter_model, self.battery_model, host=self
@@ -311,6 +313,15 @@ class PVOpt(hass.Hass):
                 f"Contract end day: {self.contract.imp.end().day} Today:{pd.Timestamp.now().day}"
             )
             self._load_contract()
+
+    def _get_config(self, item):
+        if item in self.config:
+            if isinstance(self.config[item], str) and self.entity_exists(
+                self.config[item]
+            ):
+                return self.get_ha_value(self.config[item])
+            else:
+                return self.config[item]
 
     def _setup_schedule(self):
         if self.config["forced_charge"]:
@@ -523,16 +534,20 @@ class PVOpt(hass.Hass):
             ]["joined_events"]
 
             for event in joined_events:
-                if event["id"] not in self.saving_events:
+                if event["id"] not in self.saving_events and pd.Timestamp(
+                    event["end"], tz="UTC"
+                ) > pd.Timestamp.now(tz="UTC"):
                     self.saving_events[event["id"]] = event
 
+        self.log("")
         if len(self.saving_events) > 0:
-            self.log("")
-            self.log("The following Octopus Sevings Events have been Joined:")
+            self.log("The following Octopus Saving Events have been joined:")
             for id in self.saving_events:
                 self.log(
                     f"{id:8d}: {pd.Timestamp(self.saving_events[id]['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(self.saving_events[id]['end']).strftime(DATE_TIME_FORMAT_SHORT)} at {int(self.saving_events[id]['octopoints_per_kwh'])/8:5.1f}p/kWh"
                 )
+        else:
+            self.log("No upcoming Octopus Saving Events detected or joined:")
 
     def get_ha_value(self, entity_id):
         value = None
@@ -590,11 +605,13 @@ class PVOpt(hass.Hass):
         self.log("-----------------------------------")
 
         if items is None:
-            items = [i for i in self.args if i not in ["module", "class", "prefix"]]
+            items = [
+                i for i in self.args if i not in ["module", "class", "prefix", "log"]
+            ]
 
         for item in items:
             # Attempt to read entity states for all string paramters unless they start
-            # with"entity_id":
+            # with"id_":
             if not isinstance(self.args[item], list):
                 self.args[item] = [self.args[item]]
             values = self.args[item]
@@ -605,16 +622,14 @@ class PVOpt(hass.Hass):
                     f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Null entry found in YAML.",
                     level="WARNING",
                 )
-            # if the item starts with 'entitiy_id' then it must be an entity that exists:
+
+            # if the item starts with 'id_' then it must be an entity that exists:
             elif "id_" in item:
                 if min([self.entity_exists(v) for v in values]):
                     if len(values) == 1:
                         self.config[item] = values[0]
                     else:
                         self.config[item] = values
-
-                    # for v in values:
-                    #     self.change_items[v] = item
 
                     self.log(
                         f"    {item:34s} = {str(self.config[item]):57s} Source: value(s) in YAML"
@@ -624,14 +639,15 @@ class PVOpt(hass.Hass):
                     self.config = self.get_default_config(item)
                     self.log(
                         f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Entities listed in YAML {value} do not all exist in HA.",
-                        level="ERROR",
+                        level="WARNING",
                     )
                 else:
                     e = f"    {item:34s} : Neither the entities listed in the YAML {values[0]} nor the system default of {self.get_default_config(item)} exist in HA."
-                    self.log(e)
+                    self.log(e, level="ERROR")
                     raise ValueError(e)
 
             else:
+                # The value should be read explicitly
                 if self.debug:
                     self.log(f"{item}:")
                     for value in self.args[item]:

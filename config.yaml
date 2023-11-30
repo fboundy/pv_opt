@@ -57,11 +57,11 @@ pv_opt:
   # these are required but will be defaulted if not specified
 
   battery_capacity_Wh: 10000
-  inverter_efficiency_percent: 97 # Default: 97
-  charger_efficiency_percent: 91 # Default: 91
-  maximum_dod_percent:
-    - number.solis_battery_minimum_soc
-    - 15
+  # inverter_efficiency_percent: 97 # Default: 97
+  # charger_efficiency_percent: 91 # Default: 91
+  # maximum_dod_percent:
+  #   - number.solis_battery_minimum_soc
+  #   - 15
   charger_power_watts: 3500
   inverter_power_watts: 3600
   inverter_loss_watts: 100
@@ -70,20 +70,20 @@ pv_opt:
     - 52
 
   id_battery_soc: sensor.solis_battery_soc
-  id_timed_charge_start_hours: number.solis_timed_charge_start_hours
-  id_timed_charge_start_minutes: number.solis_timed_charge_start_minutes
-  id_timed_charge_end_hours: number.solis_timed_charge_end_hours
-  id_timed_charge_end_minutes: number.solis_timed_charge_end_minutes
-  id_timed_charge_current: number.solis_timed_charge_current
+  # id_timed_charge_start_hours: number.solis_timed_charge_start_hours
+  # id_timed_charge_start_minutes: number.solis_timed_charge_start_minutes
+  # id_timed_charge_end_hours: number.solis_timed_charge_end_hours
+  # id_timed_charge_end_minutes: number.solis_timed_charge_end_minutes
+  # id_timed_charge_current: number.solis_timed_charge_current
 
-  id_timed_discharge_start_hours: number.solis_timed_discharge_start_hours
-  id_timed_discharge_start_minutes: number.solis_timed_discharge_start_minutes
-  id_timed_discharge_end_hours: number.solis_timed_discharge_end_hours
-  id_timed_discharge_end_minutes: number.solis_timed_discharge_end_minutes
-  id_timed_discharge_current: number.solis_timed_discharge_current
+  # id_timed_discharge_start_hours: number.solis_timed_discharge_start_hours
+  # id_timed_discharge_start_minutes: number.solis_timed_discharge_start_minutes
+  # id_timed_discharge_end_hours: number.solis_timed_discharge_end_hours
+  # id_timed_discharge_end_minutes: number.solis_timed_discharge_end_minutes
+  # id_timed_discharge_current: number.solis_timed_discharge_current
 
-  id_timed_charge_discharge_button: button.solis_update_charge_discharge_times
-  id_inverter_mode: select.solis_energy_storage_control_switch
+  # id_timed_charge_discharge_button: button.solis_update_charge_discharge_times
+  # id_inverter_mode: select.solis_energy_storage_control_switch
 
   # ========================================
   # Solcast configuration
