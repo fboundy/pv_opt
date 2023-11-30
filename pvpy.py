@@ -202,6 +202,8 @@ class Tariff:
                         # self.log(f">>>{agile.index}")
 
                         df = pd.concat([df, agile])
+                else:
+                    self.log(">>> No Day Ahead checks")
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (
