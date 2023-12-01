@@ -1160,8 +1160,12 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("")
 
+        self._status("Writing to HA")
+        self.write_output()
+
         if self._get_config("read_only"):
             self.log("Read only mode enabled. Not querying inverter.")
+            self._status("Idle (Read Only)")
 
         else:
             # Get the current status of the inverter
@@ -1234,12 +1238,12 @@ class PVOpt(hass.Hass):
                     str_log += " Nothing to do."
                     self.log(str_log)
 
-        self._status("Writing to HA")
-        self.write_output()
-        if self._get_config("read_only"):
-            self._status("Idle (Read Only)")
-        else:
-            self._status("Idle")
+            if status["charge"]["active"]:
+                self._status("Charging")
+            elif status["discharge"]["active"]:
+                self._status("Discharging")
+            else:
+                self._status("Idle")
 
     def _log_inverter_status(self, status):
         self.log("")
