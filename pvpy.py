@@ -74,7 +74,7 @@ class Tariff:
         }
 
         # print(params)
-        
+
         if not self.export:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standing-charges/"
             self.fixed = [
@@ -161,18 +161,28 @@ class Tariff:
             if "AGILE" in self.name:
                 if self.day_ahead is not None and df.index[-1].day == end.day:
                     # reset the day ahead forecasts if we've got a forecast going into tomorrow
+                    self.log(">>>Resetting day ahead prices")
                     self.day_ahead = None
 
-                if pd.Timestamp.now().hour > 11 and df.index[-1].day < end.day:
+                if pd.Timestamp.now().hour > 11 and df.index[-1].day != end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
+                    self.log(">>>Checking for day ahead prices")
                     if self.day_ahead is None:
-                        self.log(">>>Getting day ahead prices")
                         self.day_ahead = self.get_day_ahead(df.index[0])
                         if self.day_ahead is not None:
-                            self.log("Downloaded Day Ahead prices OK")
+                            str_log = f">>>Downloaded Day Ahead prices OK. "
+                            str_log += f"Date range: {self.day_ahead.index[0].strftime(TIME_FORMAT)}"
+                            str_log += (
+                                f" - {self.day_ahead.index[-1].strftime(TIME_FORMAT)}"
+                            )
+                            self.log(str_log)
+                        else:
+                            self.log(">>>Failed to get Day Ahead prices OK")
+
                     if self.day_ahead is not None:
                         self.day_ahead = self.day_ahead.sort_index()
-                        # self.log("Predicting Agile prices from Day Ahead")
+                        str_log = ">>>Predicting Agile prices from Day Ahead: "
+                        str_log += f"End before: {df.index[-1].strftime(TIME_FORMAT)} "
                         mask = (self.day_ahead.index.hour >= 16) & (
                             self.day_ahead.index.hour < 19
                         )
@@ -198,6 +208,16 @@ class Tariff:
                         # self.log(f">>>{agile.index}")
 
                         df = pd.concat([df, agile])
+                        str_log += f"End after: {df.index[-1].strftime(TIME_FORMAT)} "
+                        self.log(str_log)
+                else:
+                    str_log = ">>> No Day Ahead checks: "
+                    if self.day_ahead is None:
+                        str_log += "self.day_ahead is NULL, "
+                    if pd.Timestamp.now().hour > 11:
+                        str_log += "hour > 11, "
+                    str_log += f"Index end day: {df.index[-1].day}  End day: {end.day}"
+                    self.log(str_log)
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (
@@ -278,7 +298,17 @@ class Tariff:
                             if len(i["Name"]) > 8:
                                 print(i["Name"])
                                 data.append(float(i["Value"].replace(",", ".")))
-                                index.append(pd.Timestamp(i["Name"] + time))
+                                index.append(
+                                    pd.Timestamp(
+                                        i["Name"].split("-")[2]
+                                        + "-"
+                                        + i["Name"].split("-")[1]
+                                        + "-"
+                                        + i["Name"].split("-")[0]
+                                        + " "
+                                        + time
+                                    )
+                                )
 
         price = pd.Series(index=index, data=data).sort_index()
         price.index = price.index.tz_localize("CET")
