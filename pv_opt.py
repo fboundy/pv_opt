@@ -173,6 +173,8 @@ DEFAULT_CONFIG_BY_BRAND = {
         "maximum_dod_percent": {"default": "number.solis_battery_minimum_soc"},
         "id_battery_soc": {"default": "sensor.solis_battery_soc"},
         "id_consumption": {"default": "sensor.solis_house_load"},
+        "id_battery_charge_power": {"default": "sensor.solis_battery_input_energy"},
+        "id_inverter_ac_power": {"default": "sensor.solis_active_power"},
         "id_timed_charge_start_hours": {
             "default": "number.solis_timed_charge_start_hours"
         },
@@ -244,8 +246,8 @@ class PVOpt(hass.Hass):
         # if there are existing entities for the configs in HA then read those values
         # if not, set up entities using MQTT discovery and write the initial state to them
         self._load_args()
-
         self._load_inverter()
+        self._estimate_capacity()
 
         self._status("Initialising PV Model")
         self.inverter_model = pv.InverterModel(
@@ -286,6 +288,31 @@ class PVOpt(hass.Hass):
                     f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
                 )
         self._status("Idle")
+
+    def _estimate_capacity(self):
+        df = pd.DataFrame(
+            self.hass2df(
+                entity_id=self.config["id_battery_charge_power"], days=7
+            ).astype(int, errors="ignore")
+        ).set_axis(["Power"], axis=1)
+        df["period"] = (df["Power"] > 200).diff().abs().cumsum()
+        df["dt"] = -df.index.diff(-1).total_seconds() / 3600
+        df["Energy"] = df["dt"] * df["Power"]
+        x = df.groupby("period").sum()
+        p = x[x["Energy"] == x["Energy"].max()].index[0]
+        start = df[df["period"] == p].index[0]
+        end = df[df["period"] == p].index[-1]
+        soc = (
+            self.hass2df(entity_id=self.config["id_battery_soc"], days=7)
+            .astype(int, errors="ignore")
+            .loc[start:end]
+        )
+        start = soc.index[0]
+        end = soc.index[-1]
+        energy = df.loc[start:end]["Energy"].sum()
+        dsoc = soc.iloc[-1] - soc.iloc[0]
+
+        return energy * 100 / dsoc
 
     def _load_inverter(self):
         self.inverter = inv.InverterController(
@@ -558,8 +585,8 @@ class PVOpt(hass.Hass):
             # if the state is None return None
             if state is not None:
                 # if the state is 'on' or 'off' then it's a bool
-                if state in ["on", "off"]:
-                    value = state == "on"
+                if state.lower() in ["on", "off"]:
+                    value = state.lower() == "on"
 
                 # see if we can coerce it into an int 1st and then a floar
                 for t in [int, float]:
@@ -808,6 +835,7 @@ class PVOpt(hass.Hass):
             self.log("All config items defined OK")
 
         self.log("")
+
         self.log("Exposing config to Home Assistant:")
         self.log("----------------------------------")
         self._expose_configs()
@@ -884,11 +912,34 @@ class PVOpt(hass.Hass):
                     conf_topic = f"homeassistant/{domain}/{id}/config"
                     self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
 
+                    if item == "battery_capacity_Wh":
+                        capacity = self._estimate_capacity()
+                        if capacity is not None:
+                            self.config[item] = round(capacity / 100, 0) * 100
+                            self.log(f"Battery capacity estimated to be {capacity} Wh")
+
                     # Only set the state for entities that don't currently exist
                     self.set_state(
                         state=self._state_from_value(self.config[item]),
                         entity_id=entity_id,
                     )
+
+                # Or entities where the sensor value is no use
+                if (
+                    self.get_state(entity_id) == "unknown"
+                    or self.get_state(entity_id) == "unavailable"
+                ):
+                    if item == "battery_capacity_Wh":
+                        capacity = self._estimate_capacity()
+                        if capacity is not None:
+                            self.config[item] = round(capacity / 100, 0) * 100
+                            self.log(f"Battery capacity estimated to be {capacity} Wh")
+
+                    self.set_state(
+                        state=self._state_from_value(self.config[item]),
+                        entity_id=entity_id,
+                    )
+
                 # Now that we have published it, write the entity back to the config so we check the entity in future
                 self.config[item] = entity_id
                 if domain != "sensor":
