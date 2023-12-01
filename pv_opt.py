@@ -287,7 +287,10 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
                 )
-        self._status("Idle")
+        if self._get_config("read_only"):
+            self._status("Idle (Read Only)")
+        else:
+            self._status("Idle")
 
     def _estimate_capacity(self):
         df = pd.DataFrame(
@@ -983,8 +986,8 @@ class PVOpt(hass.Hass):
 
         if "forced" in item:
             self._setup_schedule()
-        else:
-            self.optimise()
+
+        self.optimise()
 
     def _value_from_state(self, state):
         value = None
@@ -1157,79 +1160,86 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("")
 
-        # Get the current status of the inverter
-        self._status("Updating Inverter")
-        status = self.inverter.status
-        self._log_inverter_status(status)
-
-        time_to_slot_start = (
-            self.charge_start_datetime - pd.Timestamp.now(self.tz)
-        ).total_seconds() / 60
-        time_to_slot_end = (
-            self.charge_end_datetime - pd.Timestamp.now(self.tz)
-        ).total_seconds() / 60
-
-        if (time_to_slot_start > 0) and (
-            time_to_slot_start < self._get_config("optimise_frequency_minutes")
-        ):
-            self.log(
-                f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
-            )
-            if self.charge_power > 0:
-                self.inverter.control_charge(
-                    enable=True,
-                    start=self.charge_start_datetime,
-                    end=self.charge_end_datetime,
-                    power=self.charge_power,
-                )
-            elif self.charge_power < 0:
-                self.inverter.control_discharge(
-                    enable=True,
-                    start=self.charge_start_datetime,
-                    end=self.charge_end_datetime,
-                    power=self.charge_power,
-                )
-
-        elif (time_to_slot_start <= 0) and (
-            time_to_slot_start < self._get_config("optimise_frequency_minutes")
-        ):
-            self.log(
-                f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
-            )
-            if self.charge_power > 0:
-                self.inverter.control_charge(
-                    enable=True,
-                    end=self.charge_end_datetime,
-                    power=self.charge_power,
-                )
-            elif self.charge_power < 0:
-                self.inverter.control_discharge(
-                    enable=True,
-                    end=self.charge_end_datetime,
-                    power=self.charge_power,
-                )
+        if self._get_config("read_only"):
+            self.log("Read only mode enabled. Not querying inverter.")
 
         else:
-            str_log = f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
+            # Get the current status of the inverter
+            self._status("Updating Inverter")
+            status = self.inverter.status
+            self._log_inverter_status(status)
 
-            # If the next slot isn't soon then just check that current status matches what we see:
-            if status["charge"]["active"]:
-                str_log += " but inverter is charging. Disabling charge."
-                self.log(str_log)
-                self.inverter.control_charge(enable=False)
+            time_to_slot_start = (
+                self.charge_start_datetime - pd.Timestamp.now(self.tz)
+            ).total_seconds() / 60
+            time_to_slot_end = (
+                self.charge_end_datetime - pd.Timestamp.now(self.tz)
+            ).total_seconds() / 60
 
-            elif status["discharge"]["active"]:
-                str_log += " but inverter is discharging. Disabling discharge."
-                self.log(str_log)
-                self.inverter.control_discharge(enable=False)
+            if (time_to_slot_start > 0) and (
+                time_to_slot_start < self._get_config("optimise_frequency_minutes")
+            ):
+                self.log(
+                    f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
+                )
+                if self.charge_power > 0:
+                    self.inverter.control_charge(
+                        enable=True,
+                        start=self.charge_start_datetime,
+                        end=self.charge_end_datetime,
+                        power=self.charge_power,
+                    )
+                elif self.charge_power < 0:
+                    self.inverter.control_discharge(
+                        enable=True,
+                        start=self.charge_start_datetime,
+                        end=self.charge_end_datetime,
+                        power=self.charge_power,
+                    )
+
+            elif (time_to_slot_start <= 0) and (
+                time_to_slot_start < self._get_config("optimise_frequency_minutes")
+            ):
+                self.log(
+                    f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
+                )
+                if self.charge_power > 0:
+                    self.inverter.control_charge(
+                        enable=True,
+                        end=self.charge_end_datetime,
+                        power=self.charge_power,
+                    )
+                elif self.charge_power < 0:
+                    self.inverter.control_discharge(
+                        enable=True,
+                        end=self.charge_end_datetime,
+                        power=self.charge_power,
+                    )
 
             else:
-                str_log += " Nothing to do."
-                self.log(str_log)
+                str_log = f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
+
+                # If the next slot isn't soon then just check that current status matches what we see:
+                if status["charge"]["active"]:
+                    str_log += " but inverter is charging. Disabling charge."
+                    self.log(str_log)
+                    self.inverter.control_charge(enable=False)
+
+                elif status["discharge"]["active"]:
+                    str_log += " but inverter is discharging. Disabling discharge."
+                    self.log(str_log)
+                    self.inverter.control_discharge(enable=False)
+
+                else:
+                    str_log += " Nothing to do."
+                    self.log(str_log)
 
         self._status("Writing to HA")
         self.write_output()
-        self._status("Idle")
+        if self._get_config("read_only"):
+            self._status("Idle (Read Only)")
+        else:
+            self._status("Idle")
 
     def _log_inverter_status(self, status):
         self.log("")
