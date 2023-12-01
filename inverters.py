@@ -36,6 +36,11 @@ class InverterController:
         self.tz = self.host.tz
         if host is not None:
             self.log = host.log
+        self.enable()
+
+    def enable(self):
+        if self.type == "SOLIS_SOLAX_MODBUS":
+            self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True)
 
     def _control_charge_discharge(self, direction, enable, **kwargs):
         times = {
@@ -174,6 +179,11 @@ class InverterController:
 
     def hold_soc(self, soc, end=None):
         pass
+
+    def _solis_set_mode_switch(self, **kwargs):
+        status = self._solis_mode_switch()
+        self.log(">>>Inverter init")
+        self.log(status)
 
     def _solis_mode_switch(self):
         modes = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["modes"]
