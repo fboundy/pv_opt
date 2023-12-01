@@ -173,6 +173,8 @@ DEFAULT_CONFIG_BY_BRAND = {
         "maximum_dod_percent": {"default": "number.solis_battery_minimum_soc"},
         "id_battery_soc": {"default": "sensor.solis_battery_soc"},
         "id_consumption": {"default": "sensor.solis_house_load"},
+        "id_grid_import_today": {"default": "sensor.solis_grid_import_today"},
+        "id_grid_export_today": {"default": "sensor.solis_grid_export_today"},
         "id_battery_charge_power": {"default": "sensor.solis_battery_input_energy"},
         "id_inverter_ac_power": {"default": "sensor.solis_active_power"},
         "id_timed_charge_start_hours": {
