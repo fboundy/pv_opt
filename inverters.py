@@ -36,6 +36,11 @@ class InverterController:
         self.tz = self.host.tz
         if host is not None:
             self.log = host.log
+        self.enable_timed_mode()
+
+    def enable_timed_mode(self):
+        if self.type == "SOLIS_SOLAX_MODBUS":
+            self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True)
 
     def _control_charge_discharge(self, direction, enable, **kwargs):
         times = {
@@ -121,9 +126,9 @@ class InverterController:
             if power is not None:
                 entity_id = self.host.config[f"id_timed_{direction}_current"]
 
-                current = abs(round(power / self.host.config["battery_voltage"], 1))
+                current = abs(round(power / self.host.get_config("battery_voltage"), 1))
                 self.log(
-                    f"Power {power:0.0f} = {current:0.1f}A at {self.host.config['battery_voltage']}V"
+                    f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V"
                 )
                 changed, written = self._write_and_poll_value(
                     entity_id=entity_id, value=current, tolerance=1
@@ -167,13 +172,45 @@ class InverterController:
         pass
 
     def control_charge(self, enable, **kwargs):
+        self.enable_timed_mode()
         self._control_charge_discharge("charge", enable, **kwargs)
 
     def control_discharge(self, enable, **kwargs):
+        self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
     def hold_soc(self, soc, end=None):
         pass
+
+    def _solis_set_mode_switch(self, **kwargs):
+        status = self._solis_mode_switch()
+        # self.log(">>>Inverter init")
+        # self.log(status)
+        switches = status["switches"]
+        # self.log(f">>>kwargs: {kwargs}")
+        for switch in switches:
+            if switch in kwargs:
+                switches[switch] = kwargs[switch]
+                # self.log(f"  {switch}: {switches[switch]}")
+
+        # self.log(f">>>Switches: {switches}")
+        bits = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["bits"]
+        bin_list = [2**i * switches[bit] for i, bit in enumerate(bits)]
+        # self.log(f">>>bin_list: {bin_list}")
+        code = sum(bin_list)
+        # self.log(f">>>Code: {code}")
+        mode = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["modes"].get(code)
+        # self.log(f">>>Mode: {mode}")
+        if mode is not None:
+            entity_id = self.host.config["id_inverter_mode"]
+            # self.log(f">>>Entity {entity_id}")
+            if self.host.get_state(entity_id=entity_id) != mode:
+                self.host.call_service(
+                    "select/select_option", entity_id=entity_id, option=mode
+                )
+                self.log(f"Setting {entity_id} to {mode}")
+
+        # code = sum(val*(2**idx) for idx, val in enumerate(binary))
 
     def _solis_mode_switch(self):
         modes = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["modes"]
