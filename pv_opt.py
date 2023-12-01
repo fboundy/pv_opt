@@ -287,10 +287,6 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
                 )
-        if self.get_config("read_only"):
-            self._status("Idle (Read Only)")
-        else:
-            self._status("Idle")
 
     def _estimate_capacity(self):
         df = pd.DataFrame(
@@ -1205,15 +1201,28 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
                 )
+
                 if self.charge_power > 0:
+                    if not status["charge"]["active"]:
+                        start = pd.Timestamp.now()
+                    else:
+                        start = None
+
                     self.inverter.control_charge(
                         enable=True,
+                        start=start,
                         end=self.charge_end_datetime,
                         power=self.charge_power,
                     )
                 elif self.charge_power < 0:
+                    if not status["discharge"]["active"]:
+                        start = pd.Timestamp.now()
+                    else:
+                        start = None
+
                     self.inverter.control_discharge(
                         enable=True,
+                        start=start,
                         end=self.charge_end_datetime,
                         power=self.charge_power,
                     )
@@ -1235,6 +1244,9 @@ class PVOpt(hass.Hass):
                 else:
                     str_log += " Nothing to do."
                     self.log(str_log)
+
+            status = self.inverter.status
+            self._log_inverter_status(status)
 
             if status["charge"]["active"]:
                 self._status("Charging")
