@@ -126,9 +126,9 @@ class InverterController:
             if power is not None:
                 entity_id = self.host.config[f"id_timed_{direction}_current"]
 
-                current = abs(round(power / self.host.config["battery_voltage"], 1))
+                current = abs(round(power / self.host.get_config("battery_voltage"), 1))
                 self.log(
-                    f"Power {power:0.0f} = {current:0.1f}A at {self.host.config['battery_voltage']}V"
+                    f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V"
                 )
                 changed, written = self._write_and_poll_value(
                     entity_id=entity_id, value=current, tolerance=1
