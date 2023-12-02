@@ -1,0 +1,5 @@
+{
+  "name" : "pv_opt",
+  "render_readme" : true,
+  "persistent_directory" : "config"
+}
