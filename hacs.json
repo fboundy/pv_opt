@@ -1,0 +1,5 @@
+{
+  "name" : "pvopt",
+  "render_readme" : true,
+  "persistent_directory" : "config"
+}
