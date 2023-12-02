@@ -1,5 +1,5 @@
 {
-  "name" : "pv_opt",
+  "name" : "HA PV Optimiser",
   "render_readme" : true,
   "persistent_directory" : "config"
 }
