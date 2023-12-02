@@ -173,8 +173,8 @@ DEFAULT_CONFIG_BY_BRAND = {
         "maximum_dod_percent": {"default": "number.solis_battery_minimum_soc"},
         "id_battery_soc": {"default": "sensor.solis_battery_soc"},
         "id_consumption": {"default": "sensor.solis_house_load"},
-        "id_grid_import_today": {"default": "sensor.solis_grid_import_today"},
-        "id_grid_export_today": {"default": "sensor.solis_grid_export_today"},
+        "id_grid_import_power": {"default": "sensor.solis_grid_import_power"},
+        "id_grid_export_power": {"default": "sensor.solis_grid_export_power"},
         "id_battery_charge_power": {"default": "sensor.solis_battery_input_energy"},
         "id_inverter_ac_power": {"default": "sensor.solis_active_power"},
         "id_timed_charge_start_hours": {
@@ -272,6 +272,8 @@ class PVOpt(hass.Hass):
         if self.agile:
             self._setup_agile_schedule()
 
+        self._cost_today()
+
         # Optimise on an EVENT trigger:
         self.listen_event(
             self.optimise_event,
@@ -328,6 +330,36 @@ class PVOpt(hass.Hass):
             start=start,
             interval=3600,
         )
+
+    def _cost_today(self):
+        index = pd.date_range(
+            pd.Timestamp.now(tz="UTC").normalize(),
+            pd.Timestamp.now(tz="UTC"),
+            freq="30T",
+        )
+        grid = (
+            (
+                self.hass2df(self.config["id_grid_import_power"], days=1)
+                .astype(float)
+                .resample("30T")
+                .mean()
+                .reindex(index)
+                .fillna(0)
+                .reindex(index)
+            )
+            - (
+                self.hass2df(self.config["id_grid_export_power"], days=1)
+                .astype(float)
+                .resample("30T")
+                .mean()
+                .reindex(index)
+                .fillna(0)
+            )
+        ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+        # self.log(">>>")
+        cost_today = self.contract.net_cost(grid_flow=grid).sum()
+        # self.log(cost_today)
+        return cost_today
 
     @ad.app_lock
     def _load_agile_cb(self, cb_args):
@@ -1157,7 +1189,7 @@ class PVOpt(hass.Hass):
         self.log("")
 
         self._status("Writing to HA")
-        self.write_output()
+        self._write_output()
 
         if self.get_config("read_only"):
             self.log("Read only mode enabled. Not querying inverter.")
@@ -1286,6 +1318,11 @@ class PVOpt(hass.Hass):
             self.log(f"Couldn't write to entity {entity}: {e}")
 
     def write_cost(self, name, entity, cost, df):
+        cost_today = self._cost_today()
+        midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta("24H")
+        # self.log(
+        #     f">>> {cost.loc[:midnight].sum():0.0f} {cost.loc[midnight:].sum():0.0f}  {cost.sum():0.0f}  {cost.loc[midnight]:0.0f}"
+        # )
         df = df.fillna(0).round(2)
         df["period_start"] = (
             df.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
@@ -1295,10 +1332,16 @@ class PVOpt(hass.Hass):
 
         self.write_to_hass(
             entity=entity,
-            state=round(cost, 2),
+            state=round((cost.sum() + cost_today) / 100, 2),
             attributes={
                 "friendly_name": name,
                 "unit_of_measurement": "GBP",
+                "cost_today": round(
+                    (cost.loc[: midnight - pd.Timedelta("30T")].sum() + cost_today)
+                    / 100,
+                    2,
+                ),
+                "cost_tomorrow": round((cost.loc[midnight:].sum()) / 100, 2),
             }
             | {
                 col: df[["period_start", col]].to_dict("records")
@@ -1307,18 +1350,18 @@ class PVOpt(hass.Hass):
             },
         )
 
-    def write_output(self):
+    def _write_output(self):
         self.write_cost(
             "PV Opt Base Cost",
             entity=f"sensor.{self.prefix}_base_cost",
-            cost=self.base_cost.sum(),
+            cost=self.base_cost,
             df=self.base,
         )
 
         self.write_cost(
             "PV Opt Optimised Cost",
             entity=f"sensor.{self.prefix}_opt_cost",
-            cost=self.opt_cost.sum(),
+            cost=self.opt_cost,
             df=self.opt,
         )
 
