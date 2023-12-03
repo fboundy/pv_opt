@@ -7,7 +7,6 @@ from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 TIME_FORMAT = "%d/%m %H:%M"
-EXPORT_MULT = 1.0
 
 
 class Tariff:
@@ -447,7 +446,7 @@ class Contract:
 
         nc = self.imp.to_df(start, end)["fixed"]
         nc += self.imp.to_df(start, end)["unit"] * grid_imp / 2000
-        nc += self.exp.to_df(start, end)["unit"] * grid_exp / 2000 * EXPORT_MULT
+        nc += self.exp.to_df(start, end)["unit"] * grid_exp / 2000
 
         return nc
 
@@ -568,7 +567,6 @@ class PVsystemModel:
         # self.log(prices)
         prices = prices.set_axis(["import", "export"], axis=1)
 
-        prices["export"] *= EXPORT_MULT
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
             axis=1,
@@ -749,8 +747,8 @@ class PVsystemModel:
             slots_added = 0
             j += 1
             # No need to iterate if this is charge only
-            if not discharge: 
-                j+=3
+            if not discharge:
+                j += 3
 
             # Check how many slots which aren't full are at an import price less than any export price:
             max_export_price = df[df["forced"] <= 0]["export"].max()
@@ -856,7 +854,7 @@ class PVsystemModel:
             # Discharging
             # ---------------------
             if discharge:
-            # Check how many slots which aren't full are at an export price less than any import price:
+                # Check how many slots which aren't full are at an export price less than any import price:
                 min_import_price = df["import"].min()
                 self.log("")
                 self.log("Forced Discharging")
@@ -899,7 +897,10 @@ class PVsystemModel:
                             -min(
                                 self.inverter.inverter_power,
                                 (
-                                    (x["soc_end"].loc[start_window] - self.battery.max_dod)
+                                    (
+                                        x["soc_end"].loc[start_window]
+                                        - self.battery.max_dod
+                                    )
                                     / 100
                                     * self.battery.capacity
                                 )
