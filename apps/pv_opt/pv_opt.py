@@ -21,10 +21,9 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 # %%
 #
-PV_MULT = 1.0
 USE_TARIFF = True
 
-VERSION = "3.0.1"
+VERSION = "3.1.0"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -65,7 +64,7 @@ MQTT_CONFIGS = {
 DEFAULT_CONFIG = {
     "forced_charge": {"default": True, "domain": "switch"},
     "forced_discharge": {"default": True, "domain": "switch"},
-    "read_only": {"default": False, "domain": "switch"},
+    "read_only": {"default": True, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
         "attributes": {
@@ -172,7 +171,9 @@ DEFAULT_CONFIG_BY_BRAND = {
     "SOLIS_SOLAX_MODBUS": {
         "maximum_dod_percent": {"default": "number.solis_battery_minimum_soc"},
         "id_battery_soc": {"default": "sensor.solis_battery_soc"},
-        "id_consumption": {"default": "sensor.solis_house_load"},
+        "id_consumption": {
+            "default": ["sensor.solis_house_load", "sensor.solis_bypass_load"]
+        },
         "id_grid_import_power": {"default": "sensor.solis_grid_import_power"},
         "id_grid_export_power": {"default": "sensor.solis_grid_export_power"},
         "id_battery_charge_power": {"default": "sensor.solis_battery_input_energy"},
@@ -1426,7 +1427,6 @@ class PVOpt(hass.Hass):
 
             # Convert from kWh/30min period to W
             df *= 1000
-            df *= PV_MULT
 
             self.static = pd.concat([self.static, df.fillna(0)], axis=1)
             self.log("Solcast forecast loaded OK")
