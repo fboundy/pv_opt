@@ -664,7 +664,7 @@ class PVsystemModel:
                     x = x[x["soc_end"] <= 97]
 
                     search_window = x.index
-                    str_log = f"{i} {available.sum()} {max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
+                    str_log = f"{i:>2d} {available.sum():>2d} {max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
                     str_log += f"Energy: {round_trip_energy_required:5.2f} kWh. "
                     if len(search_window) > 0:
                         str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
@@ -785,7 +785,7 @@ class PVsystemModel:
                 if len(x[x["import"] == min_price]) > 0:
                     start_window = x[x["import"] == min_price].index[0]
                     available.loc[start_window] = False
-                    str_log = f"{available.sum()} Min import price {min_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} {x.loc[start_window]['forced']:4.0f}W "
+                    str_log = f"{available.sum():>2d} Min import price {min_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} {x.loc[start_window]['forced']:4.0f}W "
 
                     if pd.Timestamp.now() > start_window.tz_localize(None):
                         str_log += "* "
@@ -878,7 +878,7 @@ class PVsystemModel:
                     if len(x[x["export"] == max_price]) > 0:
                         start_window = x[x["export"] == max_price].index[0]
                         available.loc[start_window] = False
-                        str_log = f"{available.sum()} Max export price {max_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} "
+                        str_log = f"{available.sum():>2d} Max export price {max_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} "
 
                         if pd.Timestamp.now() > start_window.tz_localize(None):
                             str_log += "* "

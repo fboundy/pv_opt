@@ -843,7 +843,7 @@ class PVOpt(hass.Hass):
             for entity_id in self.change_items:
                 if not "sensor" in entity_id:
                     self.log(
-                        f"           {entity_id:>50s} -> {self.change_items[entity_id]:40s}"
+                        f"        {entity_id:>42s} -> {self.change_items[entity_id]:40s}"
                     )
                     self.handles[entity_id] = self.listen_state(
                         callback=self.optimise_state_change, entity_id=entity_id
