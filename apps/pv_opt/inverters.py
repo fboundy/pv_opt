@@ -65,7 +65,7 @@ INVERTER_DEFS = {
             "Backup",
             "GridCharge",
             "FeedInPriority",
-        ],        
+        ],
         "registers": {
             "timed_charge_current": 43141,
             "timed_charge_start_hours": 43143,
@@ -76,7 +76,7 @@ INVERTER_DEFS = {
             "timed_discharge_start_hours": 43147,
             "timed_discharge_start_minutes": 43148,
             "timed_discharge_end_hours": 43149,
-            "timed_discharge_end_minutes": 43150,           
+            "timed_discharge_end_minutes": 43150,
             "storage_control_switch": 43110,
         },
         "brand_config": {
@@ -94,8 +94,8 @@ INVERTER_DEFS = {
             "id_timed_discharge_end_minutes": "sensor.solis_timed_discharge_end_minute",
             "id_timed_discharge_current": "sensor.solis_timed_discharge_current_limit",
             "id_inverter_mode": "sensor.solis_energy_storage_control_switch",
-        },        
-    }
+        },
+    },
 }
 
 
@@ -163,10 +163,9 @@ class InverterController:
         pass
 
     def _control_charge_discharge(self, direction, enable, **kwargs):
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS"
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS":
             self._solis_control_charge_discharge(direction, enable, **kwargs)
 
-        
     def _solis_control_charge_discharge(self, direction, enable, **kwargs):
         times = {
             "start": kwargs.get("start", None),
@@ -215,7 +214,9 @@ class InverterController:
                             entity_id=entity_id, value=value, verbose=True
                         )
                     else:
-                        changed, written =self._solis_core_write_time(direction, limit, unit, value)
+                        changed, written = self._solis_core_write_time(
+                            direction, limit, unit, value
+                        )
 
                     if changed:
                         if written:
@@ -231,7 +232,7 @@ class InverterController:
                             write_flag = False
 
         if value_changed:
-            if self.type == "SOLIS_SOLAX_MODBUS" and write_flag :
+            if self.type == "SOLIS_SOLAX_MODBUS" and write_flag:
                 entity_id = self.host.config["id_timed_charge_discharge_button"]
                 self.host.call_service("button/press", entity_id=entity_id)
                 time.sleep(0.5)
@@ -249,7 +250,6 @@ class InverterController:
         else:
             self.log("Inverter already at correct time settings")
 
-
         if power is not None:
             entity_id = self.host.config[f"id_timed_{direction}_current"]
 
@@ -262,7 +262,9 @@ class InverterController:
                     entity_id=entity_id, value=current, tolerance=1
                 )
             else:
-                changed, written = self._solis_core_write_current(direction, current, tolerance=1)
+                changed, written = self._solis_core_write_current(
+                    direction, current, tolerance=1
+                )
 
             if changed:
                 if written:
@@ -273,7 +275,7 @@ class InverterController:
                 self.log("Inverter already at correct current")
 
     def _solis_set_mode_switch(self, **kwargs):
-        if self.type == 'SOLIS_SOLAX_MODBUS':
+        if self.type == "SOLIS_SOLAX_MODBUS":
             status = self._solis_solax_mode_switch()
         else:
             status = self._solis_solax_mode_switch()
@@ -288,7 +290,7 @@ class InverterController:
         code = sum(bin_list)
         entity_id = self.host.config["id_inverter_mode"]
 
-        if self.type ==  'SOLIS_SOLAX_MODBUS':
+        if self.type == "SOLIS_SOLAX_MODBUS":
             mode = INVERTER_DEFS[self.type]["modes"].get(code)
             if mode is not None:
                 if self.host.get_state(entity_id=entity_id) != mode:
@@ -297,9 +299,10 @@ class InverterController:
                     )
                     self.log(f"Setting {entity_id} to {mode}")
         else:
-            address = INVERTER_DEFS[self.type]['registers']["storage_control_switch"]
-            self._solis_core_write_holding_register(address=address, value=code, entity_id=entity_id)
-
+            address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
+            self._solis_core_write_holding_register(
+                address=address, value=code, entity_id=entity_id
+            )
 
     def _solis_solax_mode_switch(self):
         modes = INVERTER_DEFS["SOLIS_SOLAX_MODBUS"]["modes"]
@@ -315,12 +318,9 @@ class InverterController:
 
     def _solis_core_mode_switch(self):
         bits = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["bits"]
-        code = self.host.get_state(
-            entity_id=self.host.config["id_inverter_mode"]
-        )
+        code = self.host.get_state(entity_id=self.host.config["id_inverter_mode"])
         switches = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
         return {"code": code, "switches": switches}
-
 
     def _solis_state(self):
         limits = ["start", "end"]
@@ -353,8 +353,9 @@ class InverterController:
             )
         return status
 
-
-    def _solis_core_write_holding_register(self, address, value, entity_id=None, tolerance=0):
+    def _solis_core_write_holding_register(
+        self, address, value, entity_id=None, tolerance=0
+    ):
         changed = True
         written = False
         hub = self.host.get_config("modbus_hub")
@@ -362,26 +363,37 @@ class InverterController:
 
         if entity_id is not None:
             old_value = self.host.get_state(entity_id=entity_id)
-            if isinstance(old_value, int) and abs(old_value-value)<=tolerance:
+            if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                 self.log(f"Inverter value already set to {value:d}.")
                 changed = False
 
         if changed:
             data = {"address": address, "slave": slave, "value": value, "hub": hub}
-            self.log(f">>>Writing to Modbus with data@ {data}")         
+            self.log(f">>>Writing to Modbus with data@ {data}")
             # self.host.call_service("modbus/write_register", data)
             new_value = self.host.get_state(entity_id=entity_id)
-            written =  isinstance(new_value, int) and new_value==value
+            written = isinstance(new_value, int) and new_value == value
 
-        return changed, written            
+        return changed, written
 
     def _solis_core_write_current(self, direction, current, tolerance):
-        address = INVERTER_DEFS["SOLIS_CORE_MODBUS"]['registers'][f'timed_{direction}_current']
+        address = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["registers"][
+            f"timed_{direction}_current"
+        ]
         entity_id = self.host.get_config[f"id_timed_{direction}_current"]
-        return self._solis_core_write_holding_register(address=address, value=current*10, entity_id=entity_id, tolerance=tolerance*10)
+        return self._solis_core_write_holding_register(
+            address=address,
+            value=current * 10,
+            entity_id=entity_id,
+            tolerance=tolerance * 10,
+        )
 
     def _solis_core_write_time(self, direction, limit, unit, value):
-        address = INVERTER_DEFS["SOLIS_CORE_MODBUS"]['registers'][f'timed_{direction}_{limit}_{unit}']
+        address = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["registers"][
+            f"timed_{direction}_{limit}_{unit}"
+        ]
         entity_id = self.host.get_config[f"id_timed_{direction}_{limit}_{unit}"]
 
-        return self._solis_core_write_holding_register(address=address, value=value, entity_id=entity_id)        
+        return self._solis_core_write_holding_register(
+            address=address, value=value, entity_id=entity_id
+        )
