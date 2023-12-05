@@ -995,6 +995,7 @@ class PVOpt(hass.Hass):
     def optimise(self):
         # initialse a DataFrame to cover today and tomorrow at 30 minute frequency
         self.log("")
+        self._load_saving_events()
 
         if self.get_config("forced_discharge"):
             discharge_enable = "enabled"
