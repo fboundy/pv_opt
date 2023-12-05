@@ -79,21 +79,33 @@ INVERTER_DEFS = {
             "timed_discharge_end_minutes": 43150,
             "storage_control_switch": 43110,
         },
+        "default_config": {
+            "maximum_dod_percent": "sensor.solmod_overdischarge_soc",
+            "id_battery_soc": "sensor.solmod_battery_soc",
+            "id_consumption": [
+                "sensor.solmod_house_load_power",
+                "sensor.solmod_backup_load_power",
+            ],
+            "id_grid_power": "sensor.solmod_grid_active_power",
+            # "id_battery_power": "sensor.solmod_battery_power",
+            # "id_battery_current_direction": "sensor.solmod_battery_current_direction",
+            "id_inverter_ac_power": "sensor.solmod_inverter_ac_power",
+        },
         "brand_config": {
-            "modbus_hub": "solis",
+            "modbus_hub": "solmod",
             "modbus_slave": 1,
-            "battery_voltage": "sensor.solis_battery_voltage",
-            "id_timed_charge_start_hours": "sensor.solis_timed_charge_start_hour",
-            "id_timed_charge_start_minutes": "sensor.solis_timed_charge_start_minute",
-            "id_timed_charge_end_hours": "sensor.solis_timed_charge_end_hour",
-            "id_timed_charge_end_minutes": "sensor.solis_timed_charge_end_minute",
-            "id_timed_charge_current": "sensor.solis_timed_charge_current_limit",
-            "id_timed_discharge_start_hours": "sensor.solis_timed_discharge_start_hour",
-            "id_timed_discharge_start_minutes": "sensor.solis_timed_discharge_start_minute",
-            "id_timed_discharge_end_hours": "sensor.solis_timed_discharge_end_hour",
-            "id_timed_discharge_end_minutes": "sensor.solis_timed_discharge_end_minute",
-            "id_timed_discharge_current": "sensor.solis_timed_discharge_current_limit",
-            "id_inverter_mode": "sensor.solis_energy_storage_control_switch",
+            "battery_voltage": "sensor.solmod_battery_voltage",
+            "id_timed_charge_start_hours": "sensor.solmod_timed_charge_start_hour",
+            "id_timed_charge_start_minutes": "sensor.solmod_timed_charge_start_minute",
+            "id_timed_charge_end_hours": "sensor.solmod_timed_charge_end_hour",
+            "id_timed_charge_end_minutes": "sensor.solmod_timed_charge_end_minute",
+            "id_timed_charge_current": "sensor.solmod_timed_charge_current_limit",
+            "id_timed_discharge_start_hours": "sensor.solmod_timed_discharge_start_hour",
+            "id_timed_discharge_start_minutes": "sensor.solmod_timed_discharge_start_minute",
+            "id_timed_discharge_end_hours": "sensor.solmod_timed_discharge_end_hour",
+            "id_timed_discharge_end_minutes": "sensor.solmod_timed_discharge_end_minute",
+            "id_timed_discharge_current": "sensor.solmod_timed_discharge_current_limit",
+            "id_inverter_mode": "sensor.solmod_energy_storage_control_switch",
         },
     },
 }
@@ -278,7 +290,7 @@ class InverterController:
         if self.type == "SOLIS_SOLAX_MODBUS":
             status = self._solis_solax_mode_switch()
         else:
-            status = self._solis_solax_mode_switch()
+            status = self._solis_core_mode_switch()
 
         switches = status["switches"]
         for switch in switches:
@@ -318,7 +330,7 @@ class InverterController:
 
     def _solis_core_mode_switch(self):
         bits = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["bits"]
-        code = self.host.get_state(entity_id=self.host.config["id_inverter_mode"])
+        code = int(self.host.get_state(entity_id=self.host.config["id_inverter_mode"]))
         switches = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
         return {"code": code, "switches": switches}
 
@@ -360,16 +372,17 @@ class InverterController:
         written = False
         hub = self.host.get_config("modbus_hub")
         slave = self.host.get_config("modbus_slave")
-
+        self.log(f">>> entity{entity_id}")
         if entity_id is not None:
-            old_value = self.host.get_state(entity_id=entity_id)
+            old_value = int(self.host.get_state(entity_id=entity_id))
+            self.log(f">>>Old value: {old_value} Value: {value}")
             if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                 self.log(f"Inverter value already set to {value:d}.")
                 changed = False
 
         if changed:
             data = {"address": address, "slave": slave, "value": value, "hub": hub}
-            self.log(f">>>Writing to Modbus with data@ {data}")
+            self.log(f">>>Writing to Modbus with data: {data}")
             # self.host.call_service("modbus/write_register", data)
             new_value = self.host.get_state(entity_id=entity_id)
             written = isinstance(new_value, int) and new_value == value

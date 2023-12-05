@@ -23,7 +23,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.1.0"
+VERSION = "3.2.0"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -178,6 +178,7 @@ class PVOpt(hass.Hass):
         self._load_tz()
         self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
 
+        self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self._load_inverter()
 
@@ -242,29 +243,33 @@ class PVOpt(hass.Hass):
                 )
 
     def _estimate_capacity(self):
-        df = pd.DataFrame(
-            self.hass2df(
-                entity_id=self.config["id_battery_charge_power"], days=7
-            ).astype(int, errors="ignore")
-        ).set_axis(["Power"], axis=1)
-        df["period"] = (df["Power"] > 200).diff().abs().cumsum()
-        df["dt"] = -df.index.diff(-1).total_seconds() / 3600
-        df["Energy"] = df["dt"] * df["Power"]
-        x = df.groupby("period").sum()
-        p = x[x["Energy"] == x["Energy"].max()].index[0]
-        start = df[df["period"] == p].index[0]
-        end = df[df["period"] == p].index[-1]
-        soc = (
-            self.hass2df(entity_id=self.config["id_battery_soc"], days=7)
-            .astype(int, errors="ignore")
-            .loc[start:end]
-        )
-        start = soc.index[0]
-        end = soc.index[-1]
-        energy = df.loc[start:end]["Energy"].sum()
-        dsoc = soc.iloc[-1] - soc.iloc[0]
+        if "id_battery_charge_power" in self.config:
+            df = pd.DataFrame(
+                self.hass2df(
+                    entity_id=self.config["id_battery_charge_power"], days=7
+                ).astype(int, errors="ignore")
+            ).set_axis(["Power"], axis=1)
 
-        return energy * 100 / dsoc
+            df["period"] = (df["Power"] > 200).diff().abs().cumsum()
+            df["dt"] = -df.index.diff(-1).total_seconds() / 3600
+            df["Energy"] = df["dt"] * df["Power"]
+            x = df.groupby("period").sum()
+            p = x[x["Energy"] == x["Energy"].max()].index[0]
+            start = df[df["period"] == p].index[0]
+            end = df[df["period"] == p].index[-1]
+            soc = (
+                self.hass2df(entity_id=self.config["id_battery_soc"], days=7)
+                .astype(int, errors="ignore")
+                .loc[start:end]
+            )
+            start = soc.index[0]
+            end = soc.index[-1]
+            energy = df.loc[start:end]["Energy"].sum()
+            dsoc = soc.iloc[-1] - soc.iloc[0]
+
+            return energy * 100 / dsoc
+        else:
+            return None
 
     def _load_tz(self):
         self.tz = self.args.pop("manual_tz", "GB")
@@ -295,25 +300,42 @@ class PVOpt(hass.Hass):
             pd.Timestamp.now(tz="UTC"),
             freq="30T",
         )
-        grid = (
-            (
-                self.hass2df(self.config["id_grid_import_power"], days=1)
-                .astype(float)
-                .resample("30T")
-                .mean()
-                .reindex(index)
-                .fillna(0)
-                .reindex(index)
-            )
-            - (
-                self.hass2df(self.config["id_grid_export_power"], days=1)
-                .astype(float)
-                .resample("30T")
-                .mean()
-                .reindex(index)
-                .fillna(0)
-            )
-        ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+        if (
+            "id_grid_import_power" in self.config
+            and "id_grid_export_power" in self.config
+        ):
+            grid = (
+                (
+                    self.hass2df(self.config["id_grid_import_power"], days=1)
+                    .astype(float)
+                    .resample("30T")
+                    .mean()
+                    .reindex(index)
+                    .fillna(0)
+                    .reindex(index)
+                )
+                - (
+                    self.hass2df(self.config["id_grid_export_power"], days=1)
+                    .astype(float)
+                    .resample("30T")
+                    .mean()
+                    .reindex(index)
+                    .fillna(0)
+                )
+            ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+        elif "id_grid_power" in self.config:
+            grid = (
+                -(
+                    self.hass2df(self.config["id_grid_power"], days=1)
+                    .astype(float)
+                    .resample("30T")
+                    .mean()
+                    .reindex(index)
+                    .fillna(0)
+                    .reindex(index)
+                )
+            ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+
         # self.log(">>>")
         cost_today = self.contract.net_cost(grid_flow=grid).sum()
         # self.log(cost_today)
