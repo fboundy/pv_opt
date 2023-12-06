@@ -178,7 +178,7 @@ class PVOpt(hass.Hass):
         self._load_tz()
         self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
 
-        self.log(self.args)
+        # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self._load_inverter()
 
@@ -1166,6 +1166,8 @@ class PVOpt(hass.Hass):
                 self.charge_end_datetime - pd.Timestamp.now(self.tz)
             ).total_seconds() / 60
 
+            did_something = True
+
             if (time_to_slot_start > 0) and (
                 time_to_slot_start < self.get_config("optimise_frequency_minutes")
             ):
@@ -1179,6 +1181,8 @@ class PVOpt(hass.Hass):
                         end=self.charge_end_datetime,
                         power=self.charge_power,
                     )
+                    self.inverter.control_discharge(enable=False)
+
                 elif self.charge_power < 0:
                     self.inverter.control_discharge(
                         enable=True,
@@ -1186,6 +1190,7 @@ class PVOpt(hass.Hass):
                         end=self.charge_end_datetime,
                         power=self.charge_power,
                     )
+                    self.inverter.control_charge(enable=False)
 
             elif (time_to_slot_start <= 0) and (
                 time_to_slot_start < self.get_config("optimise_frequency_minutes")
@@ -1220,7 +1225,12 @@ class PVOpt(hass.Hass):
                     )
 
             else:
-                str_log = f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
+                if self.charge_power > 0:
+                    direction = "charge"
+                elif self.charge_power < 0:
+                    direction = "discharge"
+
+                str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes."
 
                 # If the next slot isn't soon then just check that current status matches what we see:
                 if status["charge"]["active"]:
@@ -1233,12 +1243,37 @@ class PVOpt(hass.Hass):
                     self.log(str_log)
                     self.inverter.control_discharge(enable=False)
 
+                elif (
+                    direction == "charge"
+                    and self.charge_start_datetime > status["discharge"]["start"]
+                    and status["discharge"]["start"] != status["discharge"]["end"]
+                ):
+                    str_log += " but inverter is has a discharge slot before then. Disabling discharge."
+                    self.log(str_log)
+                    self.inverter.control_discharge(enable=False)
+
+                elif (
+                    direction == "discharge"
+                    and self.charge_start_datetime > status["charge"]["start"]
+                    and status["charge"]["start"] != status["charge"]["end"]
+                ):
+                    str_log += " but inverter is has a charge slot before then. Disabling charge."
+                    self.log(str_log)
+                    self.inverter.control_charge(enable=False)
+
                 else:
                     str_log += " Nothing to do."
                     self.log(str_log)
+                    did_something = False
 
-            status = self.inverter.status
-            self._log_inverter_status(status)
+            if did_something:
+                if self.inverter_type == "SOLIS_CORE_MODBUS":
+                    # Wait for the status to update
+                    self.log("Wating for Modbus Read cycle")
+                    time.sleep(60)
+
+                status = self.inverter.status
+                self._log_inverter_status(status)
 
             if status["charge"]["active"]:
                 self._status("Charging")

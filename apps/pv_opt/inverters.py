@@ -372,20 +372,19 @@ class InverterController:
         written = False
         hub = self.host.get_config("modbus_hub")
         slave = self.host.get_config("modbus_slave")
-        self.log(f">>> entity{entity_id}")
+        # self.log(f">>> entity{entity_id}")
         if entity_id is not None:
             old_value = int(self.host.get_state(entity_id=entity_id))
-            self.log(f">>>Old value: {old_value} Value: {value}")
+            # self.log(f">>>Old value: {old_value} Value: {value}")
             if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                 self.log(f"Inverter value already set to {value:d}.")
                 changed = False
 
         if changed:
             data = {"address": address, "slave": slave, "value": value, "hub": hub}
-            self.log(f">>>Writing to Modbus with data: {data}")
-            # self.host.call_service("modbus/write_register", data)
-            new_value = self.host.get_state(entity_id=entity_id)
-            written = isinstance(new_value, int) and new_value == value
+            # self.log(f">>>Writing to Modbus with data: {data}")
+            self.host.call_service("modbus/write_register", **data)
+            written = True
 
         return changed, written
 
@@ -405,7 +404,7 @@ class InverterController:
         address = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["registers"][
             f"timed_{direction}_{limit}_{unit}"
         ]
-        entity_id = self.host.get_config[f"id_timed_{direction}_{limit}_{unit}"]
+        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
 
         return self._solis_core_write_holding_register(
             address=address, value=value, entity_id=entity_id
