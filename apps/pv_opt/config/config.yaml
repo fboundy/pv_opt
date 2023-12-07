@@ -12,24 +12,10 @@ pv_opt:
   class: PVOpt
   log: pv_opt_log
   prefix: pvopt
+  # inverter_type: "SOLIS_SOLAX_MODBUS"
+  inverter_type: "SOLIS_CORE_MODBUS"
 
   # User configuration ---  EDIT AWAY! ---
-  # ========================================
-  # Octopus account parameters
-  # ========================================
-
-  # octopus_auto: True # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
-
-  # octopus_account: !secret octopus_account
-  # octopus_api_key: !secret octopus_api_key
-
-  # The following Can be omitted if either of the above options is working correctly:
-
-  # octopus_import_tariff_code: E-2R-VAR-22-10-01-G
-  # octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
-
-  # octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
-  # octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
 
   # ========================================
   # Plant parameters
@@ -47,27 +33,10 @@ pv_opt:
   # inverter_loss_watts: 100
   # battery_voltage: sensor.solis_battery_voltage
   
-  # id_battery_soc: sensor.solis_battery_soc
-  # id_timed_charge_start_hours: number.solis_timed_charge_start_hours
-  # id_timed_charge_start_minutes: number.solis_timed_charge_start_minutes
-  # id_timed_charge_end_hours: number.solis_timed_charge_end_hours
-  # id_timed_charge_end_minutes: number.solis_timed_charge_end_minutes
-  # id_timed_charge_current: number.solis_timed_charge_current
-
-  # id_timed_discharge_start_hours: number.solis_timed_discharge_start_hours
-  # id_timed_discharge_start_minutes: number.solis_timed_discharge_start_minutes
-  # id_timed_discharge_end_hours: number.solis_timed_discharge_end_hours
-  # id_timed_discharge_end_minutes: number.solis_timed_discharge_end_minutes
-  # id_timed_discharge_current: number.solis_timed_discharge_current
-
-  # id_timed_charge_discharge_button: button.solis_update_charge_discharge_times
-  # id_inverter_mode: select.solis_energy_storage_control_switch
-
   # ========================================
   # Solcast configuration
   # ========================================
   #
-  # solcast_integration: true
   # id_solcast_today: sensor.solcast_pv_forecast_forecast_today
   # id_solcast_tomorrow: sensor.solcast_pv_forecast_forecast_tomorrow
 
@@ -88,13 +57,54 @@ pv_opt:
   #   - Solcast
 
   # # consumption estimation
-  # id_consumption:
-  #   - sensor.solis_house_load
-  #   - sensor.solis_bypass_load
   # consumption_history_days:
   #   - 7
   # consumption_margin:
   #   - input_number.solar_opt_consumption_margin
   #  
+  # ========================================
+  # Octopus account parameters
+  # ========================================
+
+  # octopus_auto: True # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+
+  # octopus_account: !secret octopus_account
+  # octopus_api_key: !secret octopus_api_key
+
+  # The following Can be omitted if either of the above options is working correctly:
+
+  # octopus_import_tariff_code: E-2R-VAR-22-10-01-G
+  # octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+
+  # octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+  # octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
   
-  
+  # =======================================================
+  # Brand / Integration Specific Config: SOLIS_SOLAX_MODBUS
+  # =======================================================
+  #
+  # These are the default entities used with the Solis Solax Modbus integration. You can change them here and over-ride the defaults
+
+  # battery_voltage: sensor.solis_battery_voltage
+
+  # id_consumption:
+  #   - sensor.solis_house_load
+  #   - sensor.solis_bypass_load
+
+  # id_battery_soc: sensor.solis_battery_soc
+  # id_timed_charge_start_hours: number.solis_timed_charge_start_hours
+  # id_timed_charge_start_minutes: number.solis_timed_charge_start_minutes
+  # id_timed_charge_end_hours: number.solis_timed_charge_end_hours
+  # id_timed_charge_end_minutes: number.solis_timed_charge_end_minutes
+  # id_timed_charge_current: number.solis_timed_charge_current
+
+  # id_timed_discharge_start_hours: number.solis_timed_discharge_start_hours
+  # id_timed_discharge_start_minutes: number.solis_timed_discharge_start_minutes
+  # id_timed_discharge_end_hours: number.solis_timed_discharge_end_hours
+  # id_timed_discharge_end_minutes: number.solis_timed_discharge_end_minutes
+  # id_timed_discharge_current: number.solis_timed_discharge_current
+
+  # id_timed_charge_discharge_button: button.solis_update_charge_discharge_times
+  # id_inverter_mode: select.solis_energy_storage_control_switch
+
+

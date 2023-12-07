@@ -23,7 +23,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.1.0"
+VERSION = "3.2.0"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -74,9 +74,7 @@ DEFAULT_CONFIG = {
         },
         "domain": "number",
     },
-    "manual_tariff": {"default": False, "domain": "switch"},
     "octopus_auto": {"default": True, "domain": "switch"},
-    "solcast_integration": {"default": True, "domain": "switch"},
     "battery_capacity_Wh": {
         "default": 10000,
         "domain": "number",
@@ -131,22 +129,13 @@ DEFAULT_CONFIG = {
             "device_class": "power",
         },
     },
-    "battery_voltage": {
-        "default": 52,
-        "domain": "number",
-        "attributes": {
-            "min": 48,
-            "max": 55,
-            "step": 1,
-            "unit_of_measurement": "V",
-            "device_class": "voltage",
-        },
-    },
     "solar_forecast": {
         "default": "Solcast",
         "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90"]},
         "domain": "select",
     },
+    "id_solcast_today": {"default": "sensor.solcast_pv_forecast_forecast_today"},
+    "id_solcast_tomorrow": {"default": "sensor.solcast_pv_forecast_forecast_tomorrow"},
     "consumption_history_days": {
         "default": 7,
         "domain": "number",
@@ -162,55 +151,7 @@ DEFAULT_CONFIG = {
         "domain": "select",
         "attributes": {"options": ["mean", "median", "max"]},
     },
-    "alt_tariffs": {"default": [], "domain": "input_select"},
-    "id_solcast_today": {"default": "sensor.solcast_pv_forecast_forecast_today"},
-    "id_solcast_tomorrow": {"default": "sensor.solcast_pv_forecast_forecast_tomorrow"},
-}
-
-DEFAULT_CONFIG_BY_BRAND = {
-    "SOLIS_SOLAX_MODBUS": {
-        "maximum_dod_percent": {"default": "number.solis_battery_minimum_soc"},
-        "id_battery_soc": {"default": "sensor.solis_battery_soc"},
-        "id_consumption": {
-            "default": ["sensor.solis_house_load", "sensor.solis_bypass_load"]
-        },
-        "id_grid_import_power": {"default": "sensor.solis_grid_import_power"},
-        "id_grid_export_power": {"default": "sensor.solis_grid_export_power"},
-        "id_battery_charge_power": {"default": "sensor.solis_battery_input_energy"},
-        "id_inverter_ac_power": {"default": "sensor.solis_active_power"},
-        "id_timed_charge_start_hours": {
-            "default": "number.solis_timed_charge_start_hours"
-        },
-        "id_timed_charge_start_minutes": {
-            "default": "number.solis_timed_charge_start_minutes"
-        },
-        "id_timed_charge_end_hours": {
-            "default": "number.solis_timed_charge_end_hours",
-        },
-        "id_timed_charge_end_minutes": {
-            "default": "number.solis_timed_charge_end_minutes"
-        },
-        "id_timed_charge_current": {"default": "number.solis_timed_charge_current"},
-        "id_timed_discharge_start_hours": {
-            "default": "number.solis_timed_discharge_start_hours"
-        },
-        "id_timed_discharge_start_minutes": {
-            "default": "number.solis_timed_discharge_start_minutes"
-        },
-        "id_timed_discharge_end_hours": {
-            "default": "number.solis_timed_discharge_end_hours",
-        },
-        "id_timed_discharge_end_minutes": {
-            "default": "number.solis_timed_discharge_end_minutes"
-        },
-        "id_timed_discharge_current": {
-            "default": "number.solis_timed_discharge_current"
-        },
-        "id_timed_charge_discharge_button": {
-            "default": "button.solis_update_charge_discharge_times"
-        },
-        "id_inverter_mode": {"default": "select.solis_energy_storage_control_switch"},
-    }
+    # "alt_tariffs": {"default": [], "domain": "input_select"},
 }
 
 
@@ -233,14 +174,18 @@ class PVOpt(hass.Hass):
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
         self.adapi = self.get_ad_api()
-        self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
-        self.change_items = {}
-        self.cum_delta = {}
-        self.timer_handle = None
-        self.inverter_type = "SOLIS_SOLAX_MODBUS"
-        self.charging = False
-        self.handles = {}
         self.mqtt = self.get_plugin_api("MQTT")
+        self._load_tz()
+        self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
+
+        # self.log(self.args)
+        self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
+        self._load_inverter()
+
+        self.change_items = {}
+        self.timer_handle = None
+        self.handles = {}
+
         self.saving_events = {}
         self.contract = None
 
@@ -249,25 +194,9 @@ class PVOpt(hass.Hass):
         # if there are existing entities for the configs in HA then read those values
         # if not, set up entities using MQTT discovery and write the initial state to them
         self._load_args()
-        self._load_inverter()
+
         self._estimate_capacity()
-
-        self._status("Initialising PV Model")
-        self.inverter_model = pv.InverterModel(
-            inverter_efficiency=self.get_config("inverter_efficiency_percent") / 100,
-            inverter_power=self.get_config("inverter_power_watts"),
-            inverter_loss=self.get_config("inverter_loss_watts"),
-            charger_efficiency=self.get_config("charger_efficiency_percent") / 100,
-            charger_power=self.get_config("charger_power_watts"),
-        )
-        self.battery_model = pv.BatteryModel(
-            capacity=self.get_config("battery_capacity_Wh"),
-            max_dod=self.get_config("maximum_dod_percent") / 100,
-        )
-        self.pv_system = pv.PVsystemModel(
-            "PV_Opt", self.inverter_model, self.battery_model, host=self
-        )
-
+        self._load_pv_system_model()
         self._load_contract()
 
         if self.agile:
@@ -280,6 +209,10 @@ class PVOpt(hass.Hass):
             self.optimise_event,
             EVENT_TRIGGER,
         )
+
+        if not self.get_config("read_only"):
+            self.inverter.enable_timed_mode()
+
         if self.get_config("forced_charge"):
             self.log("")
             self.log("Running initial Optimisation:")
@@ -294,33 +227,64 @@ class PVOpt(hass.Hass):
                 )
 
     def _estimate_capacity(self):
-        df = pd.DataFrame(
-            self.hass2df(
-                entity_id=self.config["id_battery_charge_power"], days=7
-            ).astype(int, errors="ignore")
-        ).set_axis(["Power"], axis=1)
-        df["period"] = (df["Power"] > 200).diff().abs().cumsum()
-        df["dt"] = -df.index.diff(-1).total_seconds() / 3600
-        df["Energy"] = df["dt"] * df["Power"]
-        x = df.groupby("period").sum()
-        p = x[x["Energy"] == x["Energy"].max()].index[0]
-        start = df[df["period"] == p].index[0]
-        end = df[df["period"] == p].index[-1]
-        soc = (
-            self.hass2df(entity_id=self.config["id_battery_soc"], days=7)
-            .astype(int, errors="ignore")
-            .loc[start:end]
-        )
-        start = soc.index[0]
-        end = soc.index[-1]
-        energy = df.loc[start:end]["Energy"].sum()
-        dsoc = soc.iloc[-1] - soc.iloc[0]
+        if "id_battery_charge_power" in self.config:
+            df = pd.DataFrame(
+                self.hass2df(
+                    entity_id=self.config["id_battery_charge_power"], days=7
+                ).astype(int, errors="ignore")
+            ).set_axis(["Power"], axis=1)
 
-        return energy * 100 / dsoc
+            df["period"] = (df["Power"] > 200).diff().abs().cumsum()
+            df["dt"] = -df.index.diff(-1).total_seconds() / 3600
+            df["Energy"] = df["dt"] * df["Power"]
+            x = df.groupby("period").sum()
+            p = x[x["Energy"] == x["Energy"].max()].index[0]
+            start = df[df["period"] == p].index[0]
+            end = df[df["period"] == p].index[-1]
+            soc = (
+                self.hass2df(entity_id=self.config["id_battery_soc"], days=7)
+                .astype(int, errors="ignore")
+                .loc[start:end]
+            )
+            start = soc.index[0]
+            end = soc.index[-1]
+            energy = df.loc[start:end]["Energy"].sum()
+            dsoc = soc.iloc[-1] - soc.iloc[0]
+
+            return energy * 100 / dsoc
+        else:
+            return None
+
+    def _load_tz(self):
+        self.tz = self.args.pop("manual_tz", "GB")
+        self.log(f"Local timezone set to {self.tz}")
 
     def _load_inverter(self):
-        self.inverter = inv.InverterController(
-            inverter_type=self.inverter_type, host=self
+        if self.inverter_type in INVERTER_TYPES:
+            self.log(f"Inverter type: {self.inverter_type}")
+            self.inverter = inv.InverterController(
+                inverter_type=self.inverter_type, host=self
+            )
+        else:
+            e = f"Inverter type {self.inverter_type} is not yet supported. Only read-only mode with explicit config from the YAML will work."
+            self.log(e, level="ERROR")
+
+    def _load_pv_system_model(self):
+        self._status("Initialising PV Model")
+
+        self.inverter_model = pv.InverterModel(
+            inverter_efficiency=self.get_config("inverter_efficiency_percent") / 100,
+            inverter_power=self.get_config("inverter_power_watts"),
+            inverter_loss=self.get_config("inverter_loss_watts"),
+            charger_efficiency=self.get_config("charger_efficiency_percent") / 100,
+            charger_power=self.get_config("charger_power_watts"),
+        )
+        self.battery_model = pv.BatteryModel(
+            capacity=self.get_config("battery_capacity_Wh"),
+            max_dod=self.get_config("maximum_dod_percent") / 100,
+        )
+        self.pv_system = pv.PVsystemModel(
+            "PV_Opt", self.inverter_model, self.battery_model, host=self
         )
 
     def _setup_agile_schedule(self):
@@ -338,25 +302,42 @@ class PVOpt(hass.Hass):
             pd.Timestamp.now(tz="UTC"),
             freq="30T",
         )
-        grid = (
-            (
-                self.hass2df(self.config["id_grid_import_power"], days=1)
-                .astype(float)
-                .resample("30T")
-                .mean()
-                .reindex(index)
-                .fillna(0)
-                .reindex(index)
-            )
-            - (
-                self.hass2df(self.config["id_grid_export_power"], days=1)
-                .astype(float)
-                .resample("30T")
-                .mean()
-                .reindex(index)
-                .fillna(0)
-            )
-        ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+        if (
+            "id_grid_import_power" in self.config
+            and "id_grid_export_power" in self.config
+        ):
+            grid = (
+                (
+                    self.hass2df(self.config["id_grid_import_power"], days=1)
+                    .astype(float)
+                    .resample("30T")
+                    .mean()
+                    .reindex(index)
+                    .fillna(0)
+                    .reindex(index)
+                )
+                - (
+                    self.hass2df(self.config["id_grid_export_power"], days=1)
+                    .astype(float)
+                    .resample("30T")
+                    .mean()
+                    .reindex(index)
+                    .fillna(0)
+                )
+            ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+        elif "id_grid_power" in self.config:
+            grid = (
+                -(
+                    self.hass2df(self.config["id_grid_power"], days=1)
+                    .astype(float)
+                    .resample("30T")
+                    .mean()
+                    .reindex(index)
+                    .fillna(0)
+                    .reindex(index)
+                )
+            ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+
         # self.log(">>>")
         cost_today = self.contract.net_cost(grid_flow=grid).sum()
         # self.log(cost_today)
@@ -638,8 +619,10 @@ class PVOpt(hass.Hass):
     def get_default_config(self, item):
         if item in DEFAULT_CONFIG:
             return DEFAULT_CONFIG[item]["default"]
-        if item in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]:
-            return DEFAULT_CONFIG_BY_BRAND[self.inverter_type][item]["default"]
+        if item in self.inverter.config:
+            return self.inverter.config[item]
+        if item in self.inverter.brand_config:
+            return self.inverter.brand_config[item]
         else:
             return None
 
@@ -784,7 +767,10 @@ class PVOpt(hass.Hass):
                                 f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
                                 level="WARNING",
                             )
-                        elif item in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]:
+                        elif (
+                            item in self.inverter.config
+                            or item in self.inverter.brand_config
+                        ):
                             self.config[item] = self.get_default_config(item)
 
                             self.log(
@@ -853,11 +839,11 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("Checking config:")
         self.log("-----------------------")
-        items_not_defined = [i for i in DEFAULT_CONFIG if i not in self.config] + [
-            i
-            for i in DEFAULT_CONFIG_BY_BRAND[self.inverter_type]
-            if i not in self.config
-        ]
+        items_not_defined = (
+            [i for i in DEFAULT_CONFIG if i not in self.config]
+            + [i for i in self.inverter.config if i not in self.config]
+            + [i for i in self.inverter.brand_config if i not in self.config]
+        )
         if len(items_not_defined) > 0:
             for item in items_not_defined:
                 self.config[item] = self.get_default_config(item)
@@ -881,19 +867,11 @@ class PVOpt(hass.Hass):
             for entity_id in self.change_items:
                 if not "sensor" in entity_id:
                     self.log(
-                        f"           {entity_id:>50s} -> {self.change_items[entity_id]:40s}"
+                        f"        {entity_id:>42s} -> {self.change_items[entity_id]:40s}"
                     )
                     self.handles[entity_id] = self.listen_state(
                         callback=self.optimise_state_change, entity_id=entity_id
                     )
-                    self.cum_delta[entity_id] = 0
-
-        if "manual_tz" in self.config:
-            self.tz = self.params["manual_tz"]
-        else:
-            self.tz = "GB"
-
-        self.log(f"Local timezone set to {self.tz}")
 
     def _name_from_item(self, item):
         name = item.replace("_", " ")
@@ -909,7 +887,8 @@ class PVOpt(hass.Hass):
         return state
 
     def _expose_configs(self):
-        for defaults in [DEFAULT_CONFIG, DEFAULT_CONFIG_BY_BRAND[self.inverter_type]]:
+        # for defaults in [DEFAULT_CONFIG, self.inverter.config, self.inverter.brand_config]:
+        for defaults in [DEFAULT_CONFIG]:
             untracked_items = [
                 item
                 for item in defaults
@@ -935,6 +914,7 @@ class PVOpt(hass.Hass):
                         "command_topic": f"homeassistant/{domain}/{id}/set",
                         "name": self._name_from_item(item),
                         "optimistic": True,
+                        "unique_id": id,
                     }
 
                     if "attributes" in defaults[item]:
@@ -992,31 +972,19 @@ class PVOpt(hass.Hass):
         self.log(
             f"State change detected for {entity_id} [config item: {item}] from {old} to {new}:"
         )
-        delta = None
-        value = None
-        if (
-            "attributes" in DEFAULT_CONFIG[item]
-            and "step" in DEFAULT_CONFIG[item]["attributes"]
-        ):
-            delta = DEFAULT_CONFIG[item]["attributes"]["step"]
-        try:
-            self.cum_delta[entity_id] += float(new) - float(old)
-            if self.cum_delta[entity_id] >= delta:
-                self.log(
-                    f"Entity {entity_id} changed from {old} to {new}. Cumulative{self.cum_delta[entity_id]} vs {delta}"
-                )
-                value = self._value_from_state(new)
-                self.cum_delta[entity_id] = 0
-        except:
-            self.log(f"Entity {entity_id} changed from {old} to {new}. ")
-            value = self._value_from_state(new)
-
-        # if value is not None:
-        #     self.log(f"State resolved to {value} [with type{type(value)}")
-        #     self.config[item] = value
 
         if "forced" in item:
             self._setup_schedule()
+
+        if item in [
+            "inverter_efficiency_percent",
+            "inverter_power_watts",
+            "inverter_loss_watts",
+            "charger_efficiency_percent",
+            "battery_capacity_Wh",
+            "maximum_dod_percent",
+        ]:
+            self._pv_system_model()
 
         self.optimise()
 
@@ -1061,6 +1029,7 @@ class PVOpt(hass.Hass):
     def optimise(self):
         # initialse a DataFrame to cover today and tomorrow at 30 minute frequency
         self.log("")
+        self._load_saving_events()
 
         if self.get_config("forced_discharge"):
             discharge_enable = "enabled"
@@ -1209,6 +1178,8 @@ class PVOpt(hass.Hass):
                 self.charge_end_datetime - pd.Timestamp.now(self.tz)
             ).total_seconds() / 60
 
+            did_something = True
+
             if (time_to_slot_start > 0) and (
                 time_to_slot_start < self.get_config("optimise_frequency_minutes")
             ):
@@ -1222,6 +1193,8 @@ class PVOpt(hass.Hass):
                         end=self.charge_end_datetime,
                         power=self.charge_power,
                     )
+                    self.inverter.control_discharge(enable=False)
+
                 elif self.charge_power < 0:
                     self.inverter.control_discharge(
                         enable=True,
@@ -1229,6 +1202,7 @@ class PVOpt(hass.Hass):
                         end=self.charge_end_datetime,
                         power=self.charge_power,
                     )
+                    self.inverter.control_charge(enable=False)
 
             elif (time_to_slot_start <= 0) and (
                 time_to_slot_start < self.get_config("optimise_frequency_minutes")
@@ -1263,7 +1237,12 @@ class PVOpt(hass.Hass):
                     )
 
             else:
-                str_log = f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
+                if self.charge_power > 0:
+                    direction = "charge"
+                elif self.charge_power < 0:
+                    direction = "discharge"
+
+                str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes."
 
                 # If the next slot isn't soon then just check that current status matches what we see:
                 if status["charge"]["active"]:
@@ -1276,12 +1255,37 @@ class PVOpt(hass.Hass):
                     self.log(str_log)
                     self.inverter.control_discharge(enable=False)
 
+                elif (
+                    direction == "charge"
+                    and self.charge_start_datetime > status["discharge"]["start"]
+                    and status["discharge"]["start"] != status["discharge"]["end"]
+                ):
+                    str_log += " but inverter is has a discharge slot before then. Disabling discharge."
+                    self.log(str_log)
+                    self.inverter.control_discharge(enable=False)
+
+                elif (
+                    direction == "discharge"
+                    and self.charge_start_datetime > status["charge"]["start"]
+                    and status["charge"]["start"] != status["charge"]["end"]
+                ):
+                    str_log += " but inverter is has a charge slot before then. Disabling charge."
+                    self.log(str_log)
+                    self.inverter.control_charge(enable=False)
+
                 else:
                     str_log += " Nothing to do."
                     self.log(str_log)
+                    did_something = False
 
-            status = self.inverter.status
-            self._log_inverter_status(status)
+            if did_something:
+                if self.inverter_type == "SOLIS_CORE_MODBUS":
+                    # Wait for the status to update
+                    self.log("Wating for Modbus Read cycle")
+                    time.sleep(60)
+
+                status = self.inverter.status
+                self._log_inverter_status(status)
 
             if status["charge"]["active"]:
                 self._status("Charging")
