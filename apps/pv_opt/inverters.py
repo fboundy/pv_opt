@@ -392,7 +392,7 @@ class InverterController:
         address = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["registers"][
             f"timed_{direction}_current"
         ]
-        entity_id = self.host.get_config[f"id_timed_{direction}_current"]
+        entity_id = self.host.config[f"id_timed_{direction}_current"]
         return self._solis_core_write_holding_register(
             address=address,
             value=current * 10,

@@ -196,23 +196,7 @@ class PVOpt(hass.Hass):
         self._load_args()
 
         self._estimate_capacity()
-
-        self._status("Initialising PV Model")
-        self.inverter_model = pv.InverterModel(
-            inverter_efficiency=self.get_config("inverter_efficiency_percent") / 100,
-            inverter_power=self.get_config("inverter_power_watts"),
-            inverter_loss=self.get_config("inverter_loss_watts"),
-            charger_efficiency=self.get_config("charger_efficiency_percent") / 100,
-            charger_power=self.get_config("charger_power_watts"),
-        )
-        self.battery_model = pv.BatteryModel(
-            capacity=self.get_config("battery_capacity_Wh"),
-            max_dod=self.get_config("maximum_dod_percent") / 100,
-        )
-        self.pv_system = pv.PVsystemModel(
-            "PV_Opt", self.inverter_model, self.battery_model, host=self
-        )
-
+        self._load_pv_system_model()
         self._load_contract()
 
         if self.agile:
@@ -284,6 +268,24 @@ class PVOpt(hass.Hass):
         else:
             e = f"Inverter type {self.inverter_type} is not yet supported. Only read-only mode with explicit config from the YAML will work."
             self.log(e, level="ERROR")
+
+    def _load_pv_system_model(self):
+        self._status("Initialising PV Model")
+
+        self.inverter_model = pv.InverterModel(
+            inverter_efficiency=self.get_config("inverter_efficiency_percent") / 100,
+            inverter_power=self.get_config("inverter_power_watts"),
+            inverter_loss=self.get_config("inverter_loss_watts"),
+            charger_efficiency=self.get_config("charger_efficiency_percent") / 100,
+            charger_power=self.get_config("charger_power_watts"),
+        )
+        self.battery_model = pv.BatteryModel(
+            capacity=self.get_config("battery_capacity_Wh"),
+            max_dod=self.get_config("maximum_dod_percent") / 100,
+        )
+        self.pv_system = pv.PVsystemModel(
+            "PV_Opt", self.inverter_model, self.battery_model, host=self
+        )
 
     def _setup_agile_schedule(self):
         # start = (pd.Timestamp.now().round("1H") + pd.Timedelta("5T")).to_pydatetime()
@@ -973,6 +975,16 @@ class PVOpt(hass.Hass):
 
         if "forced" in item:
             self._setup_schedule()
+
+        if item in [
+            "inverter_efficiency_percent",
+            "inverter_power_watts",
+            "inverter_loss_watts",
+            "charger_efficiency_percent",
+            "battery_capacity_Wh",
+            "maximum_dod_percent",
+        ]:
+            self._pv_system_model()
 
         self.optimise()
 
