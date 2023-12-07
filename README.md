@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.1.0
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.2.0
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -55,7 +55,9 @@ This excellent integration will pull Octopus Price data in to Home Assistant. So
 
 <h3>5. Install the Integration to Control Your Inverter</h3>
 
-At present this app only works directly with Solis hybrid inverters using the Solax Modbus integration. Support for other inverters will  follow.
+At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus) or the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus. Support for other inverters will  follow.
+
+<h4>Solax Modbus:</h4>
 
 1. Install the integration via HACS: https://github.com/wills106/homeassistant-solax-modbus
 2. Add the Integration via Settings: http://homeassistant.local:8123/config/integrations/dashboard
@@ -69,6 +71,10 @@ At present this app only works directly with Solis hybrid inverters using the So
     |TCP Port| 502|
     |Protocol| Modbus TCP|
 4. Check that you have comms with the inverter and the various entities in the integration are populated with data
+
+<4>HA Core Modbus</h4>
+
+Follow the Github instructions here: https://github.com/fboundy/ha_solis_modbus
 
 <h3>6. Install the MQTT Integraion in Home Assistant</h3>
 
@@ -261,6 +267,10 @@ If you have the Solcast, Octopus and Solax integrations set up as specified abov
 | Battery Capacity| Wh| `number.pvopt_batter_capacity_wh` | 10000|
 | Inverter Power | W | `number.pvopt_inverter_power_watts` | 3600 |
 | Charger Power | W | `number.pvopt_charger_power_watts` | 3500 |
+
+If you are running a different integration or inverter brand you will need to edit the `config.yaml` file to select the correct `inverter_type`:
+
+    inverter_type: SOLIS_CORE_MODBUS
 
 There are then only a few things to control the optimisation process. 
 
