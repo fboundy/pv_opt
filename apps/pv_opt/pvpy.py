@@ -436,13 +436,24 @@ class Contract:
             str += f"{tariff.__str__()}\n"
         return str
 
-    def net_cost(self, grid_flow, grid_col="grid"):
+    def net_cost(self, grid_flow, **kwargs):
+        grid_import = kwargs.get("grid_import", "grid_import")
+        grid_export = kwargs.get("grid_export", "grid_export")
+        grid_col = kwargs.get("grid_col", "grid")
         start = grid_flow.index[0]
         end = grid_flow.index[-1]
-        if isinstance(grid_flow, pd.DataFrame):
-            grid_flow = grid_flow[grid_col]
-        grid_imp = grid_flow.clip(0)
-        grid_exp = grid_flow.clip(upper=0)
+        if (
+            isinstance(grid_flow, pd.DataFrame)
+            and (grid_export in grid_flow.columns)
+            and (grid_import in grid_flow.columns)
+        ):
+            grid_imp = grid_flow[grid_import]
+            grid_exp = grid_flow[grid_export]
+        else:
+            if isinstance(grid_flow, pd.DataFrame):
+                grid_flow = grid_flow[grid_col]
+            grid_imp = grid_flow.clip(0)
+            grid_exp = grid_flow.clip(upper=0)
 
         nc = self.imp.to_df(start, end)["fixed"]
         nc += self.imp.to_df(start, end)["unit"] * grid_imp / 2000
