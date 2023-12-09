@@ -303,28 +303,58 @@ class PVOpt(hass.Hass):
             freq="30T",
         )
         if (
+            "id_grid_import_today" in self.config
+            and "id_grid_export_today" in self.config
+        ):
+            grid = (
+                pd.concat(
+                    [
+                        self.hass2df(self.config["id_grid_import_total"], days=1)
+                        .astype(float)
+                        .resample("30T")
+                        .last()
+                        .reindex(index)
+                        .fillna(0)
+                        .reindex(index),
+                        self.hass2df(self.config["id_grid_export_total"], days=1)
+                        .astype(float)
+                        .resample("30T")
+                        .last()
+                        .reindex(index)
+                        .fillna(0),
+                    ],
+                    axis=1,
+                )
+                .set_axis(["grid_import", "grid_export"], axis=1)
+                .loc[pd.Timestamp.now(tz="UTC").normalize() :]
+            )
+
+        elif (
             "id_grid_import_power" in self.config
             and "id_grid_export_power" in self.config
         ):
             grid = (
-                (
-                    self.hass2df(self.config["id_grid_import_power"], days=1)
-                    .astype(float)
-                    .resample("30T")
-                    .mean()
-                    .reindex(index)
-                    .fillna(0)
-                    .reindex(index)
+                pd.concat(
+                    [
+                        self.hass2df(self.config["id_grid_import_power"], days=1)
+                        .astype(float)
+                        .resample("30T")
+                        .mean()
+                        .reindex(index)
+                        .fillna(0)
+                        .reindex(index),
+                        self.hass2df(self.config["id_grid_export_power"], days=1)
+                        .astype(float)
+                        .resample("30T")
+                        .mean()
+                        .reindex(index)
+                        .fillna(0),
+                    ],
+                    axis=1,
                 )
-                - (
-                    self.hass2df(self.config["id_grid_export_power"], days=1)
-                    .astype(float)
-                    .resample("30T")
-                    .mean()
-                    .reindex(index)
-                    .fillna(0)
-                )
-            ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+                .set_axis(["grid_import", "grid_export"], axis=1)
+                .loc[pd.Timestamp.now(tz="UTC").normalize() :]
+            )
         elif "id_grid_power" in self.config:
             grid = (
                 -(
@@ -338,7 +368,8 @@ class PVOpt(hass.Hass):
                 )
             ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
 
-        # self.log(">>>")
+        self.log(">>>")
+        self.log(grid)
         cost_today = self.contract.net_cost(grid_flow=grid).sum()
         # self.log(cost_today)
         return cost_today
