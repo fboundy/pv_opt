@@ -306,29 +306,27 @@ class PVOpt(hass.Hass):
             "id_grid_import_today" in self.config
             and "id_grid_export_today" in self.config
         ):
+            cols = ["grid_import", "grid_export"]
             grid = (
                 pd.concat(
                     [
-                        self.hass2df(self.config["id_grid_import_total"], days=1)
+                        self.hass2df(self.config[f"id_{col}_today"], days=1)
                         .astype(float)
                         .resample("30T")
-                        .last()
+                        .ffill()
                         .reindex(index)
-                        .fillna(0)
-                        .reindex(index),
-                        self.hass2df(self.config["id_grid_export_total"], days=1)
-                        .astype(float)
-                        .resample("30T")
-                        .last()
-                        .reindex(index)
-                        .fillna(0),
+                        .ffill()
+                        for col in cols
                     ],
                     axis=1,
                 )
-                .set_axis(["grid_import", "grid_export"], axis=1)
+                .set_axis(cols, axis=1)
                 .loc[pd.Timestamp.now(tz="UTC").normalize() :]
             )
+            # grid["dt"] = -grid.index.diff(-1).total_seconds() / 3600
 
+            grid = (-grid.diff(-1).clip(upper=0) * 2000).round(0)[:-1]
+            self.log(grid)
         elif (
             "id_grid_import_power" in self.config
             and "id_grid_export_power" in self.config
@@ -355,6 +353,7 @@ class PVOpt(hass.Hass):
                 .set_axis(["grid_import", "grid_export"], axis=1)
                 .loc[pd.Timestamp.now(tz="UTC").normalize() :]
             )
+
         elif "id_grid_power" in self.config:
             grid = (
                 -(
@@ -370,8 +369,9 @@ class PVOpt(hass.Hass):
 
         self.log(">>>")
         self.log(grid)
-        cost_today = self.contract.net_cost(grid_flow=grid).sum()
-        # self.log(cost_today)
+        # self.log(-grid.diff(-1).clip(upper=0) * 2000)
+        cost_today = self.contract.net_cost(grid_flow=grid)
+        self.log(cost_today)
         return cost_today
 
     @ad.app_lock
@@ -1354,6 +1354,7 @@ class PVOpt(hass.Hass):
             self.log(f"Couldn't write to entity {entity}: {e}")
 
     def write_cost(self, name, entity, cost, df):
+        # self.log(f">>>{cost.index[0]}")
         cost_today = self._cost_today()
         midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta("24H")
         # self.log(
@@ -1366,24 +1367,34 @@ class PVOpt(hass.Hass):
         )
         cols = ["soc", "forced", "import", "export", "grid", "consumption"]
 
+        cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1)
+        # cost = pd.DataFrame(cost.groupby(cost.index).sum())
+        cost["cumulative_cost"] = cost["cost"].cumsum()
+
+        for d in [df, cost]:
+            d["period_start"] = (
+                d.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
+                + ":00"
+            )
+
         self.write_to_hass(
             entity=entity,
-            state=round((cost.sum() + cost_today) / 100, 2),
+            state=round((cost["cost"].sum()) / 100, 2),
             attributes={
                 "friendly_name": name,
                 "unit_of_measurement": "GBP",
                 "cost_today": round(
-                    (cost.loc[: midnight - pd.Timedelta("30T")].sum() + cost_today)
-                    / 100,
+                    (cost["cost"].loc[: midnight - pd.Timedelta("30T")].sum()) / 100,
                     2,
                 ),
-                "cost_tomorrow": round((cost.loc[midnight:].sum()) / 100, 2),
+                "cost_tomorrow": round((cost["cost"].loc[midnight:].sum()) / 100, 2),
             }
             | {
                 col: df[["period_start", col]].to_dict("records")
                 for col in cols
                 if col in df.columns
-            },
+            }
+            | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")},
         )
 
     def _write_output(self):
