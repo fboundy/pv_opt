@@ -917,6 +917,7 @@ class PVOpt(hass.Hass):
             state = value
         return state
 
+
     def _expose_configs(self):
         # for defaults in [DEFAULT_CONFIG, self.inverter.config, self.inverter.brand_config]:
         for defaults in [DEFAULT_CONFIG]:
@@ -1344,6 +1345,21 @@ class PVOpt(hass.Hass):
         self.log("")
 
     def write_to_hass(self, entity, state, attributes):
+        if not self.entity_exists(entity_id=entity):
+            self.log(
+                f"Creating HA Entity {entity}"
+            )
+            id = entity.replace("sensor.", "")
+            conf = {
+                "state_topic": f"homeassistant/sensor/{id}/state",
+                "command_topic": f"homeassistant/domain/{id}/set",
+                "optimistic": True,
+                "unique_id": id,
+            }
+
+            conf_topic = f"homeassistant/self/{id}/config"
+            self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+
         try:
             self.my_entity = self.get_entity(entity)
             self.my_entity.set_state(state=state, attributes=attributes)
@@ -1445,6 +1461,20 @@ class PVOpt(hass.Hass):
                 "device_class": "current",
             },
         )
+
+        for offset in [1,4,8,12]:
+            loc = pd.Timestamp.now()+pd.Timedelta(f"{offset}H")
+            locs = [loc.floor("30T"), loc.ceil("30T")]
+            socs = [self.opt.loc[l]'soc' for l in locs]
+            soc = (loc-locs[0])/(locs[1]-locs[0]) * (socs[1]-socs[0])+socs[0]
+            entity_id = f"sensor.{self.prefic}_soc_h{offset}"
+            attributes={
+                "friendly_name": f"PV Opt Predicted SOC ({offset} hour delay)",
+                "unit_of_measurement": "%",
+                "state_class": "measurement",
+                "device_class": "battery",
+            }
+            self.write_to_hass(entity=entity_id, state=soc, attributes=attributes)
 
     def load_solcast(self):
         if self.debug:
