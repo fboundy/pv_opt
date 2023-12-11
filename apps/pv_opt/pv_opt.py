@@ -323,10 +323,8 @@ class PVOpt(hass.Hass):
                 .set_axis(cols, axis=1)
                 .loc[pd.Timestamp.now(tz="UTC").normalize() :]
             )
-            # grid["dt"] = -grid.index.diff(-1).total_seconds() / 3600
-
             grid = (-grid.diff(-1).clip(upper=0) * 2000).round(0)[:-1]
-            self.log(grid)
+
         elif (
             "id_grid_import_power" in self.config
             and "id_grid_export_power" in self.config
@@ -367,11 +365,7 @@ class PVOpt(hass.Hass):
                 )
             ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
 
-        self.log(">>>")
-        self.log(grid)
-        # self.log(-grid.diff(-1).clip(upper=0) * 2000)
         cost_today = self.contract.net_cost(grid_flow=grid)
-        self.log(cost_today)
         return cost_today
 
     @ad.app_lock
@@ -917,7 +911,6 @@ class PVOpt(hass.Hass):
             state = value
         return state
 
-
     def _expose_configs(self):
         # for defaults in [DEFAULT_CONFIG, self.inverter.config, self.inverter.brand_config]:
         for defaults in [DEFAULT_CONFIG]:
@@ -1184,11 +1177,15 @@ class PVOpt(hass.Hass):
             f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.opt_cost.sum():5.2f}"
         )
         self.log("")
-        self.log(
-            f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).total_seconds():0.2f} seconds"
+        optimiser_elapsed = round((pd.Timestamp.now() - self.t0).total_seconds(), 1)
+        self.log(f"Optimiser elapsed time {optimiser_elapsed:0.1f} seconds")
+        self.log("")
+        self.log("")
+        self.write_to_hass(
+            entity=f"sensor.{self.prefix}_optimiser_elapsed",
+            state=optimiser_elapsed,
+            attributes={"state_class": "measurement"},
         )
-        self.log("")
-        self.log("")
 
         self._status("Writing to HA")
         self._write_output()
@@ -1346,9 +1343,7 @@ class PVOpt(hass.Hass):
 
     def write_to_hass(self, entity, state, attributes):
         if not self.entity_exists(entity_id=entity):
-            self.log(
-                f"Creating HA Entity {entity}"
-            )
+            self.log(f"Creating HA Entity {entity}")
             id = entity.replace("sensor.", "")
             conf = {
                 "state_topic": f"homeassistant/sensor/{id}/state",
@@ -1370,12 +1365,8 @@ class PVOpt(hass.Hass):
             self.log(f"Couldn't write to entity {entity}: {e}")
 
     def write_cost(self, name, entity, cost, df):
-        # self.log(f">>>{cost.index[0]}")
         cost_today = self._cost_today()
         midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta("24H")
-        # self.log(
-        #     f">>> {cost.loc[:midnight].sum():0.0f} {cost.loc[midnight:].sum():0.0f}  {cost.sum():0.0f}  {cost.loc[midnight]:0.0f}"
-        # )
         df = df.fillna(0).round(2)
         df["period_start"] = (
             df.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
@@ -1384,7 +1375,6 @@ class PVOpt(hass.Hass):
         cols = ["soc", "forced", "import", "export", "grid", "consumption"]
 
         cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1)
-        # cost = pd.DataFrame(cost.groupby(cost.index).sum())
         cost["cumulative_cost"] = cost["cost"].cumsum()
 
         for d in [df, cost]:
@@ -1462,13 +1452,13 @@ class PVOpt(hass.Hass):
             },
         )
 
-        for offset in [1,4,8,12]:
-            loc = pd.Timestamp.now()+pd.Timedelta(f"{offset}H")
+        for offset in [1, 4, 8, 12]:
+            loc = pd.Timestamp.now(tz="UTC") + pd.Timedelta(f"{offset}H")
             locs = [loc.floor("30T"), loc.ceil("30T")]
-            socs = [self.opt.loc[l]'soc' for l in locs]
-            soc = (loc-locs[0])/(locs[1]-locs[0]) * (socs[1]-socs[0])+socs[0]
-            entity_id = f"sensor.{self.prefic}_soc_h{offset}"
-            attributes={
+            socs = [self.opt.loc[l]["soc"] for l in locs]
+            soc = (loc - locs[0]) / (locs[1] - locs[0]) * (socs[1] - socs[0]) + socs[0]
+            entity_id = f"sensor.{self.prefix}_soc_h{offset}"
+            attributes = {
                 "friendly_name": f"PV Opt Predicted SOC ({offset} hour delay)",
                 "unit_of_measurement": "%",
                 "state_class": "measurement",
