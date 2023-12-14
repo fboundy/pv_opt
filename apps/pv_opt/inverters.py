@@ -478,9 +478,9 @@ class InverterController:
         entity_id = self.host.config[f"id_timed_{direction}_current"]
         return self._solis_write_holding_register(
             address=address,
-            value=current * 10,
+            value=int(round(current * 10, 0)),
             entity_id=entity_id,
-            tolerance=tolerance * 10,
+            tolerance=int(round(tolerance * 10, 0)),
         )
 
     def _solis_write_time_register(self, direction, limit, unit, value):

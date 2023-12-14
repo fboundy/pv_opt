@@ -33,6 +33,7 @@ TIME_FORMAT = "%H:%M"
 EVENT_TRIGGER = "PV_OPT"
 DEBUG_TRIGGER = "PV_DEBUG"
 
+
 BOTTLECAP_DAVE = {
     "domain": "event",
     "tariff_code": "tariff_code",
@@ -378,6 +379,14 @@ class PVOpt(hass.Hass):
                 self.config[item]
             ):
                 return self.get_ha_value(self.config[item])
+            elif isinstance(self.config[item], list):
+                if min([isinstance(x, str)] for x in self.config[item]):
+                    if min([self.entity_exists(e) for e in self.config[item]]):
+                        l = [self.get_ha_value(e) for e in self.config[item]]
+                        try:
+                            return sum(l)
+                        except:
+                            return l
             else:
                 return self.config[item]
 
@@ -679,7 +688,7 @@ class PVOpt(hass.Hass):
             if values[0] is None:
                 self.config[item] = self.get_default_config(item)
                 self.log(
-                    f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Null entry found in YAML.",
+                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Null entry found in YAML.",
                     level="WARNING",
                 )
 
@@ -692,13 +701,13 @@ class PVOpt(hass.Hass):
                         self.config[item] = values
 
                     self.log(
-                        f"    {item:34s} = {str(self.config[item]):57s} Source: value(s) in YAML"
+                        f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value(s) in YAML"
                     )
 
                 elif self.entity_exists(self.get_default_config(item)):
-                    self.config = self.get_default_config(item)
+                    self.config[item] = self.get_default_config(item)
                     self.log(
-                        f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Entities listed in YAML {value} do not all exist in HA.",
+                        f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Entities listed in YAML {values} do not all exist in HA.",
                         level="WARNING",
                     )
                 else:
@@ -728,7 +737,7 @@ class PVOpt(hass.Hass):
                 ):
                     self.config[item] = values[0]
                     self.log(
-                        f"    {item:34s} = {str(self.config[item]):57s} Source: value in YAML"
+                        f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                     )
 
                 elif min(arg_types[str]):
@@ -749,9 +758,9 @@ class PVOpt(hass.Hass):
                     ]
 
                     if np.min(val_types[int] | val_types[float]):
-                        self.config[item] = sum(ha_values)
+                        self.config[item] = values
                         self.log(
-                            f"    {item:34s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
+                            f"    {item:34s} = {str(sum(ha_values)):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
                         )
                     # if any of list but the last one are strings and the default for the item is a string
                     # try getting values from all the entities
@@ -760,28 +769,28 @@ class PVOpt(hass.Hass):
                         if not "sensor" in valid_strings[0][1]:
                             self.change_items[valid_strings[0][1]] = item
                         self.log(
-                            f"    {item:34s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
+                            f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
                         )
 
                     elif len(values) > 1:
                         if self.same_type(values[-1], self.get_default_config(item)):
                             self.config[item] = values[-1]
                             self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
+                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
                             )
 
                         elif values[-1] in self.get_default_config(item):
                             self.log(values)
                             self.config[item] = values[-1]
                             self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
+                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
                             )
                     else:
                         if item in DEFAULT_CONFIG:
                             self.config[item] = self.get_default_config(item)
 
                             self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
+                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
                                 level="WARNING",
                             )
                         elif (
@@ -791,13 +800,13 @@ class PVOpt(hass.Hass):
                             self.config[item] = self.get_default_config(item)
 
                             self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} Source: inverter brand default. Unable to read from HA entities listed in YAML. No default in YAML.",
+                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: inverter brand default. Unable to read from HA entities listed in YAML. No default in YAML.",
                                 level="WARNING",
                             )
                         else:
                             self.config[item] = values[0]
                             self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} Source: YAML default value. No default defined."
+                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default value. No default defined."
                             )
 
                 elif len(values) == 1 and (
@@ -808,7 +817,7 @@ class PVOpt(hass.Hass):
 
                     self.config[item] = values[0]
                     self.log(
-                        f"    {item:34s} = {str(self.config[item]):57s} Source: value in YAML"
+                        f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                     )
 
                 elif (
@@ -833,7 +842,7 @@ class PVOpt(hass.Hass):
                     if np.min(val_types[int] | val_types[float]):
                         self.config[item] = sum(ha_values)
                         self.log(
-                            f"    {item:34s} = {str(self.config[item]):57s} Source: HA entities listed in YAML"
+                            f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
                         )
                         # If these change then we need to trigger automatically
                         for v in values[:-1]:
@@ -843,13 +852,13 @@ class PVOpt(hass.Hass):
                     else:
                         self.config[item] = values[-1]
                         self.log(
-                            f"    {item:34s} = {str(self.config[item]):57s} Source: YAML default. Unable to read from HA entities listed in YAML."
+                            f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
                         )
 
                 else:
                     self.config[item] = self.get_default_config(item)
                     self.log(
-                        f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Invalid arguments in YAML.",
+                        f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Invalid arguments in YAML.",
                         level="ERROR",
                     )
 
@@ -865,7 +874,7 @@ class PVOpt(hass.Hass):
             for item in items_not_defined:
                 self.config[item] = self.get_default_config(item)
                 self.log(
-                    f"    {item:34s} = {str(self.config[item]):57s} Source: system default. Not in YAML.",
+                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Not in YAML.",
                     level="WARNING",
                 )
         else:
@@ -894,7 +903,7 @@ class PVOpt(hass.Hass):
         name = item.replace("_", " ")
         for word in name.split():
             name = name.replace(word, word.title())
-        return f"{self.prefix} {name}"
+        return f"{self.prefix.title()} {name}"
 
     def _state_from_value(self, value):
         if isinstance(value, bool):
@@ -922,24 +931,23 @@ class PVOpt(hass.Hass):
                 domain = defaults[item]["domain"]
                 id = f"{self.prefix.lower()}_{item}"
                 entity_id = f"{domain}.{id}"
+                attributes = defaults[item].get("attributes", {})
 
                 if not self.entity_exists(entity_id=entity_id):
                     self.log(
                         f"Creating HA Entity {entity_id} for {item} using MQTT Discovery"
                     )
-                    conf = {
-                        "state_topic": f"homeassistant/{domain}/{id}/state",
-                        "command_topic": f"homeassistant/{domain}/{id}/set",
-                        "name": self._name_from_item(item),
-                        "optimistic": True,
-                        "unique_id": id,
-                    }
-
-                    if "attributes" in defaults[item]:
-                        conf = conf | defaults[item]["attributes"]
-
-                    if domain in MQTT_CONFIGS:
-                        conf = conf | MQTT_CONFIGS[domain]
+                    conf = (
+                        {
+                            "state_topic": f"homeassistant/{domain}/{id}/state",
+                            "command_topic": f"homeassistant/{domain}/{id}/set",
+                            "name": self._name_from_item(item),
+                            "optimistic": True,
+                            "unique_id": id,
+                        }
+                        | attributes
+                        | MQTT_CONFIGS.get(domain, {})
+                    )
 
                     conf_topic = f"homeassistant/{domain}/{id}/config"
                     self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
@@ -951,29 +959,34 @@ class PVOpt(hass.Hass):
                             self.log(f"Battery capacity estimated to be {capacity} Wh")
 
                     # Only set the state for entities that don't currently exist
-                    self.set_state(
-                        state=self._state_from_value(self.config[item]),
-                        entity_id=entity_id,
-                    )
+                    state = (self._state_from_value(self.config[item]),)
 
                 # Or entities where the sensor value is no use
-                if (
+                elif (
                     self.get_state(entity_id) == "unknown"
                     or self.get_state(entity_id) == "unavailable"
                 ):
                     if item == "battery_capacity_Wh":
                         capacity = self._estimate_capacity()
                         if capacity is not None:
-                            self.config[item] = round(capacity / 100, 0) * 100
+                            state = capacity
                             self.log(f"Battery capacity estimated to be {capacity} Wh")
+                        else:
+                            state = self._state_from_value(self.config[item])
 
-                    self.set_state(
-                        state=self._state_from_value(self.config[item]),
-                        entity_id=entity_id,
-                    )
+                else:
+                    state = self.get_state(entity_id)
+
+                self.set_state(
+                    state=state,
+                    entity_id=entity_id,
+                    attributes=attributes
+                    | {"friendly_name": self._name_from_item(item)},
+                )
 
                 # Now that we have published it, write the entity back to the config so we check the entity in future
                 self.config[item] = entity_id
+
                 if domain != "sensor":
                     self.change_items[entity_id] = item
 
@@ -1147,11 +1160,14 @@ class PVOpt(hass.Hass):
             )
 
             self.windows = pd.concat([windows, self.windows]).sort_values("start")
-
+            self.windows["forced"] = (
+                (self.windows["forced"] / 100).round(0) * 100
+            ).astype(int)
             for window in self.windows.iterrows():
                 self.log(
                     f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4.1f}% -> {window[1]['soc_end']:4.1f}%"
                 )
+
             self.charge_power = self.windows["forced"].iloc[0]
             self.charge_current = self.charge_power / self.get_config("battery_voltage")
             self.charge_start_datetime = self.windows["start"].iloc[0]
@@ -1335,11 +1351,6 @@ class PVOpt(hass.Hass):
         self.log("")
 
     def write_to_hass(self, entity, state, attributes={}):
-        # self.log(f">>> entity:{entity}")
-        # self.log(f">>> state:{state}")
-        # for k in attributes:
-        #     self.log(f">>>   {k}:{attributes[k]}")
-
         if not self.entity_exists(entity_id=entity):
             self.log(f"Creating HA Entity {entity}")
             id = entity.replace("sensor.", "")
