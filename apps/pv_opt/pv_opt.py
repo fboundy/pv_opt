@@ -323,7 +323,7 @@ class PVOpt(hass.Hass):
                 .set_axis(cols, axis=1)
                 .loc[pd.Timestamp.now(tz="UTC").normalize() :]
             )
-            grid = (-grid.diff(-1).clip(upper=0) * 2000).round(0)[:-1]
+            grid = (-grid.diff(-1).clip(upper=0) * 2000).round(0)[:-1].fillna(0)
 
         elif (
             "id_grid_import_power" in self.config
@@ -365,6 +365,7 @@ class PVOpt(hass.Hass):
                 )
             ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
 
+        # self.log(grid)
         cost_today = self.contract.net_cost(grid_flow=grid)
         return cost_today
 
