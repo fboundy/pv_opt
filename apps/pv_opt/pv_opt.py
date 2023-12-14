@@ -942,7 +942,7 @@ class PVOpt(hass.Hass):
                         conf = conf | MQTT_CONFIGS[domain]
 
                     conf_topic = f"homeassistant/{domain}/{id}/config"
-                    self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=False)
+                    self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
 
                     if item == "battery_capacity_Wh":
                         capacity = self._estimate_capacity()
@@ -1351,7 +1351,7 @@ class PVOpt(hass.Hass):
             }
 
             conf_topic = f"homeassistant/self/{id}/config"
-            self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=False)
+            self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
 
         try:
             self.set_state(state=state, entity_id=entity, attributes=attributes)
