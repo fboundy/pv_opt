@@ -213,10 +213,15 @@ class Tariff:
             df.name = "unit"
 
         if not self.export:
-            x = pd.DataFrame(self.fixed).set_index("valid_from")["value_inc_vat"]
+            x = (
+                pd.DataFrame(self.fixed)
+                .set_index("valid_from")["value_inc_vat"]
+                .sort_index()
+            )
             x.index = pd.to_datetime(x.index)
             newindex = pd.date_range(x.index[0], df.index[-1], freq="30T")
-            x = x.reindex(newindex).sort_index().ffill().loc[df.index[0] :]
+            x = x.reindex(newindex).sort_index()
+            x = x.ffill().loc[df.index[0] :]
             df = pd.concat([df, x], axis=1).set_axis(["unit", "fixed"], axis=1)
 
             mask = df.index.time != pd.Timestamp("00:00", tz="UTC").time()
@@ -460,7 +465,7 @@ class PVsystemModel:
             timed_slot_flows = pd.Series(index=df.index, data=0)
 
             for t, c in slots:
-                timed_slot_flows.loc[t] += c
+                timed_slot_flows.loc[t] += int(c)
 
             chg_mask = timed_slot_flows != 0
             battery_flows[chg_mask] = timed_slot_flows[chg_mask]
@@ -643,20 +648,20 @@ class PVsystemModel:
                     x = x[x["soc_end"] <= 97]
 
                     search_window = x.index
-                    str_log = f"{i:>2d} {available.sum():>2d} {max_slot.strftime(TIME_FORMAT)} costs {max_import_cost:5.2f}p. "
-                    str_log += f"Energy: {round_trip_energy_required:5.2f} kWh. "
+                    str_log = f"{max_slot.strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
                     if len(search_window) > 0:
-                        str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
+                        # str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
+                        pass
                     else:
-                        str_log = "No available window."
+                        # str_log = "No available window."
                         done = True
                     if len(x) > 0:
                         min_price = x["import"].min()
                         start_window = x[x["import"] == min_price].index[0]
 
                         cost_at_min_price = round_trip_energy_required * min_price
-                        str_log += f"Min price at {start_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh costing {cost_at_min_price:5.2f} "
-                        str_log += f"SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
+                        str_log += f"<==> {start_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
+                        str_log += f" SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
                         if pd.Timestamp.now() > start_window.tz_localize(None):
                             str_log += "* "
                             factor = (
@@ -701,7 +706,7 @@ class PVsystemModel:
                             )
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                             net_cost_opt = contract.net_cost(df).sum()
-                            str_log += f"Net: {net_cost_opt:5.1f}"
+                            str_log += f"Net: {net_cost_opt:6.1f}"
                             self.log(str_log)
                         else:
                             available[max_slot] = False

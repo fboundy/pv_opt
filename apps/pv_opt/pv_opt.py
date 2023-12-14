@@ -23,7 +23,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.2.1"
+VERSION = "3.2.2"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -924,6 +924,7 @@ class PVOpt(hass.Hass):
                 )
                 and ("id_" not in item)
                 and ("alt_" not in item)
+                and ("auto" not in item)
                 and "domain" in defaults[item]
             ]
             for item in untracked_items:
@@ -950,7 +951,7 @@ class PVOpt(hass.Hass):
                         conf = conf | MQTT_CONFIGS[domain]
 
                     conf_topic = f"homeassistant/{domain}/{id}/config"
-                    self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+                    self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=False)
 
                     if item == "battery_capacity_Wh":
                         capacity = self._estimate_capacity()
@@ -1342,7 +1343,12 @@ class PVOpt(hass.Hass):
                         self.log(f"    {x:16s}: {status[s][x]}")
         self.log("")
 
-    def write_to_hass(self, entity, state, attributes):
+    def write_to_hass(self, entity, state, attributes={}):
+        # self.log(f">>> entity:{entity}")
+        # self.log(f">>> state:{state}")
+        # for k in attributes:
+        #     self.log(f">>>   {k}:{attributes[k]}")
+
         if not self.entity_exists(entity_id=entity):
             self.log(f"Creating HA Entity {entity}")
             id = entity.replace("sensor.", "")
@@ -1354,13 +1360,11 @@ class PVOpt(hass.Hass):
             }
 
             conf_topic = f"homeassistant/self/{id}/config"
-            self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+            self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=False)
 
         try:
-            self.my_entity = self.get_entity(entity)
-            self.my_entity.set_state(state=state, attributes=attributes)
-            if self.debug:
-                self.log(f"Output written to {self.my_entity}")
+            self.set_state(state=state, entity_id=entity, attributes=attributes)
+            self.log(f"Output written to {entity}")
 
         except Exception as e:
             self.log(f"Couldn't write to entity {entity}: {e}")
@@ -1384,10 +1388,10 @@ class PVOpt(hass.Hass):
                 + ":00"
             )
 
-        self.write_to_hass(
-            entity=entity,
-            state=round((cost["cost"].sum()) / 100, 2),
-            attributes={
+        state = round((cost["cost"].sum()) / 100, 2)
+
+        attributes = (
+            {
                 "friendly_name": name,
                 "unit_of_measurement": "GBP",
                 "cost_today": round(
@@ -1401,7 +1405,13 @@ class PVOpt(hass.Hass):
                 for col in cols
                 if col in df.columns
             }
-            | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")},
+            | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")}
+        )
+
+        self.write_to_hass(
+            entity=entity,
+            state=state,
+            attributes=attributes,
         )
 
     def _write_output(self):
