@@ -110,6 +110,14 @@ INVERTER_DEFS = {
         },
     },
     "SOLIS_SOLARMAN": {
+        "modes": {
+            0x21: "Self Use",
+            0x22: "Optimized Revenue",
+            0x23: "Time of Use",
+            0x24: "Off-Grid Storage",
+            0x28: "Battery Wake-Up",
+            0x60: "Feed-In Priority",
+        },
         "bits": [
             "SelfUse",
             "Timed",
