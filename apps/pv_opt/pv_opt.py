@@ -33,15 +33,6 @@ TIME_FORMAT = "%H:%M"
 EVENT_TRIGGER = "PV_OPT"
 DEBUG_TRIGGER = "PV_DEBUG"
 
-OUTPUT_START_ENTITY = "sensor.solaropt_charge_start"
-OUTPUT_END_ENTITY = "sensor.solaropt_charge_end"
-OUTPUT_CURRENT_ENTITY = "sensor.solaropt_charge_current"
-
-OUTPUT_COST_ENTITY = "sensor.pvopt_base_cost"
-OUTPUT_BASE_COST_ENTITY = "sensor.solaropt_base_cost"
-OUTPUT_OPT_COST_ENTITY = "sensor.solaropt_optimised_cost"
-OUTPUT_ALT_OPT_ENTITY = "sensor.solaropt_alt"
-
 BOTTLECAP_DAVE = {
     "domain": "event",
     "tariff_code": "tariff_code",
