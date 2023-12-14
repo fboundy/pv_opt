@@ -160,28 +160,15 @@ class Tariff:
             if "AGILE" in self.name:
                 if self.day_ahead is not None and df.index[-1].day == end.day:
                     # reset the day ahead forecasts if we've got a forecast going into tomorrow
-                    # self.log(">>>Resetting day ahead prices")
                     self.day_ahead = None
 
                 if pd.Timestamp.now().hour > 11 and df.index[-1].day != end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
-                    # self.log(">>>Checking for day ahead prices")
                     if self.day_ahead is None:
                         self.day_ahead = self.get_day_ahead(df.index[0])
-                        # if self.day_ahead is not None:
-                        # str_log = f">>>Downloaded Day Ahead prices OK. "
-                        # str_log += f"Date range: {self.day_ahead.index[0].strftime(TIME_FORMAT)}"
-                        # str_log += (
-                        # f" - {self.day_ahead.index[-1].strftime(TIME_FORMAT)}"
-                        # )
-                        # self.log(str_log)
-                        # else:
-                        # self.log(">>>Failed to get Day Ahead prices OK")
 
                     if self.day_ahead is not None:
                         self.day_ahead = self.day_ahead.sort_index()
-                        # str_log = ">>>Predicting Agile prices from Day Ahead: "
-                        # str_log += f"End before: {df.index[-1].strftime(TIME_FORMAT)} "
                         mask = (self.day_ahead.index.hour >= 16) & (
                             self.day_ahead.index.hour < 19
                         )
@@ -196,27 +183,8 @@ class Tariff:
                             .loc[df.index[-1] :]
                             .iloc[1:]
                         )
-                        # agile = self.day_ahead.loc[df.index[-1:]].iloc[1:]
-
-                        # agile = self.day_ahead.loc[df.index[-1:]].iloc[1:].copy()
-                        # mask = (agile.index.hour >= 16) & (agile.index.hour < 19)
-                        # agile[mask] = agile[mask] * 0.186 + 16.5
-                        # agile[~mask] = agile[~mask] * 0.229 - 0.6
-
-                        # self.log(f">>{df.index}")
-                        # self.log(f">>>{agile.index}")
 
                         df = pd.concat([df, agile])
-                        # str_log += f"End after: {df.index[-1].strftime(TIME_FORMAT)} "
-                        # self.log(str_log)
-                # else:
-                #     # str_log = ">>> No Day Ahead checks: "
-                #     if self.day_ahead is None:
-                #         str_log += "self.day_ahead is NULL, "
-                #     if pd.Timestamp.now().hour > 11:
-                #         str_log += "hour > 11, "
-                #     str_log += f"Index end day: {df.index[-1].day}  End day: {end.day}"
-                #     self.log(str_log)
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (
@@ -313,7 +281,6 @@ class Tariff:
         price.index = price.index.tz_localize("CET")
         price.index = price.index.tz_convert("UTC")
         price = price[~price.index.duplicated()]
-        # self.log(f">>> Duplicates: {price.index.has_duplicates}")
         return price.resample("30T").ffill().loc[start:]
 
 
@@ -436,13 +403,25 @@ class Contract:
             str += f"{tariff.__str__()}\n"
         return str
 
-    def net_cost(self, grid_flow, grid_col="grid"):
+    def net_cost(self, grid_flow, **kwargs):
+        grid_import = kwargs.get("grid_import", "grid_import")
+        grid_export = kwargs.get("grid_export", "grid_export")
+        grid_col = kwargs.get("grid_col", "grid")
         start = grid_flow.index[0]
         end = grid_flow.index[-1]
-        if isinstance(grid_flow, pd.DataFrame):
-            grid_flow = grid_flow[grid_col]
-        grid_imp = grid_flow.clip(0)
-        grid_exp = grid_flow.clip(upper=0)
+        if (
+            isinstance(grid_flow, pd.DataFrame)
+            and (grid_export in grid_flow.columns)
+            and (grid_import in grid_flow.columns)
+        ):
+            grid_imp = grid_flow[grid_import]
+            grid_exp = grid_flow[grid_export]
+        else:
+            if isinstance(grid_flow, pd.DataFrame):
+                grid_flow = grid_flow[grid_col]
+
+            grid_imp = grid_flow.clip(0)
+            grid_exp = grid_flow.clip(upper=0)
 
         nc = self.imp.to_df(start, end)["fixed"]
         nc += self.imp.to_df(start, end)["unit"] * grid_imp / 2000
@@ -727,7 +706,6 @@ class PVsystemModel:
                         else:
                             available[max_slot] = False
                 else:
-                    # self.log(f">>>{str_log}")
                     done = True
             else:
                 done = True

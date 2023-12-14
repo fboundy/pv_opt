@@ -23,7 +23,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.2.0"
+VERSION = "3.2.1"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -303,28 +303,55 @@ class PVOpt(hass.Hass):
             freq="30T",
         )
         if (
+            "id_grid_import_today" in self.config
+            and "id_grid_export_today" in self.config
+        ):
+            cols = ["grid_import", "grid_export"]
+            grid = (
+                pd.concat(
+                    [
+                        self.hass2df(self.config[f"id_{col}_today"], days=1)
+                        .astype(float)
+                        .resample("30T")
+                        .ffill()
+                        .reindex(index)
+                        .ffill()
+                        for col in cols
+                    ],
+                    axis=1,
+                )
+                .set_axis(cols, axis=1)
+                .loc[pd.Timestamp.now(tz="UTC").normalize() :]
+            )
+            grid = (-grid.diff(-1).clip(upper=0) * 2000).round(0)[:-1].fillna(0)
+
+        elif (
             "id_grid_import_power" in self.config
             and "id_grid_export_power" in self.config
         ):
             grid = (
-                (
-                    self.hass2df(self.config["id_grid_import_power"], days=1)
-                    .astype(float)
-                    .resample("30T")
-                    .mean()
-                    .reindex(index)
-                    .fillna(0)
-                    .reindex(index)
+                pd.concat(
+                    [
+                        self.hass2df(self.config["id_grid_import_power"], days=1)
+                        .astype(float)
+                        .resample("30T")
+                        .mean()
+                        .reindex(index)
+                        .fillna(0)
+                        .reindex(index),
+                        self.hass2df(self.config["id_grid_export_power"], days=1)
+                        .astype(float)
+                        .resample("30T")
+                        .mean()
+                        .reindex(index)
+                        .fillna(0),
+                    ],
+                    axis=1,
                 )
-                - (
-                    self.hass2df(self.config["id_grid_export_power"], days=1)
-                    .astype(float)
-                    .resample("30T")
-                    .mean()
-                    .reindex(index)
-                    .fillna(0)
-                )
-            ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+                .set_axis(["grid_import", "grid_export"], axis=1)
+                .loc[pd.Timestamp.now(tz="UTC").normalize() :]
+            )
+
         elif "id_grid_power" in self.config:
             grid = (
                 -(
@@ -338,9 +365,8 @@ class PVOpt(hass.Hass):
                 )
             ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
 
-        # self.log(">>>")
-        cost_today = self.contract.net_cost(grid_flow=grid).sum()
-        # self.log(cost_today)
+        # self.log(grid)
+        cost_today = self.contract.net_cost(grid_flow=grid)
         return cost_today
 
     @ad.app_lock
@@ -1152,11 +1178,15 @@ class PVOpt(hass.Hass):
             f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.opt_cost.sum():5.2f}"
         )
         self.log("")
-        self.log(
-            f"Optimiser elapsed time {(pd.Timestamp.now()- self.t0).total_seconds():0.2f} seconds"
+        optimiser_elapsed = round((pd.Timestamp.now() - self.t0).total_seconds(), 1)
+        self.log(f"Optimiser elapsed time {optimiser_elapsed:0.1f} seconds")
+        self.log("")
+        self.log("")
+        self.write_to_hass(
+            entity=f"sensor.{self.prefix}_optimiser_elapsed",
+            state=optimiser_elapsed,
+            attributes={"state_class": "measurement"},
         )
-        self.log("")
-        self.log("")
 
         self._status("Writing to HA")
         self._write_output()
@@ -1313,6 +1343,19 @@ class PVOpt(hass.Hass):
         self.log("")
 
     def write_to_hass(self, entity, state, attributes):
+        if not self.entity_exists(entity_id=entity):
+            self.log(f"Creating HA Entity {entity}")
+            id = entity.replace("sensor.", "")
+            conf = {
+                "state_topic": f"homeassistant/sensor/{id}/state",
+                "command_topic": f"homeassistant/domain/{id}/set",
+                "optimistic": True,
+                "unique_id": id,
+            }
+
+            conf_topic = f"homeassistant/self/{id}/config"
+            self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+
         try:
             self.my_entity = self.get_entity(entity)
             self.my_entity.set_state(state=state, attributes=attributes)
@@ -1325,9 +1368,6 @@ class PVOpt(hass.Hass):
     def write_cost(self, name, entity, cost, df):
         cost_today = self._cost_today()
         midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta("24H")
-        # self.log(
-        #     f">>> {cost.loc[:midnight].sum():0.0f} {cost.loc[midnight:].sum():0.0f}  {cost.sum():0.0f}  {cost.loc[midnight]:0.0f}"
-        # )
         df = df.fillna(0).round(2)
         df["period_start"] = (
             df.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
@@ -1335,24 +1375,33 @@ class PVOpt(hass.Hass):
         )
         cols = ["soc", "forced", "import", "export", "grid", "consumption"]
 
+        cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1)
+        cost["cumulative_cost"] = cost["cost"].cumsum()
+
+        for d in [df, cost]:
+            d["period_start"] = (
+                d.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
+                + ":00"
+            )
+
         self.write_to_hass(
             entity=entity,
-            state=round((cost.sum() + cost_today) / 100, 2),
+            state=round((cost["cost"].sum()) / 100, 2),
             attributes={
                 "friendly_name": name,
                 "unit_of_measurement": "GBP",
                 "cost_today": round(
-                    (cost.loc[: midnight - pd.Timedelta("30T")].sum() + cost_today)
-                    / 100,
+                    (cost["cost"].loc[: midnight - pd.Timedelta("30T")].sum()) / 100,
                     2,
                 ),
-                "cost_tomorrow": round((cost.loc[midnight:].sum()) / 100, 2),
+                "cost_tomorrow": round((cost["cost"].loc[midnight:].sum()) / 100, 2),
             }
             | {
                 col: df[["period_start", col]].to_dict("records")
                 for col in cols
                 if col in df.columns
-            },
+            }
+            | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")},
         )
 
     def _write_output(self):
@@ -1403,6 +1452,20 @@ class PVOpt(hass.Hass):
                 "device_class": "current",
             },
         )
+
+        for offset in [1, 4, 8, 12]:
+            loc = pd.Timestamp.now(tz="UTC") + pd.Timedelta(f"{offset}H")
+            locs = [loc.floor("30T"), loc.ceil("30T")]
+            socs = [self.opt.loc[l]["soc"] for l in locs]
+            soc = (loc - locs[0]) / (locs[1] - locs[0]) * (socs[1] - socs[0]) + socs[0]
+            entity_id = f"sensor.{self.prefix}_soc_h{offset}"
+            attributes = {
+                "friendly_name": f"PV Opt Predicted SOC ({offset} hour delay)",
+                "unit_of_measurement": "%",
+                "state_class": "measurement",
+                "device_class": "battery",
+            }
+            self.write_to_hass(entity=entity_id, state=soc, attributes=attributes)
 
     def load_solcast(self):
         if self.debug:
