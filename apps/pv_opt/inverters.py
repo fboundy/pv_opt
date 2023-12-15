@@ -448,7 +448,12 @@ class InverterController:
         return status
 
     def _solis_write_holding_register(
-        self, address, value, entity_id=None, tolerance=0
+        self,
+        address,
+        value,
+        entity_id=None,
+        tolerance=0,
+        multiplier=1,
     ):
         changed = True
         written = False
@@ -457,19 +462,24 @@ class InverterController:
             slave = self.host.get_config("modbus_slave")
 
             if entity_id is not None:
-                old_value = int(self.host.get_state(entity_id=entity_id))
+                old_value = int(float(self.host.get_state(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                     self.log(f"Inverter value already set to {value:d}.")
                     changed = False
 
             if changed:
-                data = {"address": address, "slave": slave, "value": value, "hub": hub}
+                data = {
+                    "address": address,
+                    "slave": slave,
+                    "value": int(round(value * multiplier, 0)),
+                    "hub": hub,
+                }
                 self.host.call_service("modbus/write_register", **data)
                 written = True
 
         elif self.type == "SOLIS_SOLARMAN":
             if entity_id is not None and self.host.entity_exists(entity_id):
-                old_value = int(self.host.get_state(entity_id=entity_id))
+                old_value = int(float(self.host.get_state(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                     self.log(f"Inverter value already set to {value:d}.")
                     changed = False
@@ -486,9 +496,10 @@ class InverterController:
         entity_id = self.host.config[f"id_timed_{direction}_current"]
         return self._solis_write_holding_register(
             address=address,
-            value=int(round(current * 10, 0)),
+            value=current,
             entity_id=entity_id,
-            tolerance=int(round(tolerance * 10, 0)),
+            tolerance=tolerance,
+            multiplier=10,
         )
 
     def _solis_write_time_register(self, direction, limit, unit, value):

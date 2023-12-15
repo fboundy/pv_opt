@@ -23,7 +23,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.2.2"
+VERSION = "3.2.3"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -76,17 +76,30 @@ DEFAULT_CONFIG = {
             "step": 100,
             "unit_of_measurement": "Wh",
             "device_class": "energy",
+            "mode": "box",
         },
     },
     "inverter_efficiency_percent": {
         "default": 97,
         "domain": "number",
-        "attributes": {"min": 90, "max": 100, "step": 1, "unit_of_measurement": "%"},
+        "attributes": {
+            "min": 90,
+            "max": 100,
+            "step": 1,
+            "unit_of_measurement": "%",
+            "mode": "box",
+        },
     },
     "charger_efficiency_percent": {
         "default": 91,
         "domain": "number",
-        "attributes": {"min": 80, "max": 100, "step": 1, "unit_of_measurement": "%"},
+        "attributes": {
+            "min": 80,
+            "max": 100,
+            "step": 1,
+            "unit_of_measurement": "%",
+            "mode": "box",
+        },
     },
     "charger_power_watts": {
         "default": 3000,
@@ -97,6 +110,7 @@ DEFAULT_CONFIG = {
             "step": 100,
             "unit_of_measurement": "W",
             "device_class": "power",
+            "mode": "box",
         },
     },
     "inverter_power_watts": {
@@ -108,6 +122,7 @@ DEFAULT_CONFIG = {
             "step": 100,
             "unit_of_measurement": "W",
             "device_class": "power",
+            "mode": "box",
         },
     },
     "inverter_loss_watts": {
@@ -119,6 +134,7 @@ DEFAULT_CONFIG = {
             "step": 10,
             "unit_of_measurement": "W",
             "device_class": "power",
+            "mode": "box",
         },
     },
     "solar_forecast": {
@@ -131,12 +147,23 @@ DEFAULT_CONFIG = {
     "consumption_history_days": {
         "default": 7,
         "domain": "number",
-        "attributes": {"min": 1, "max": 28, "step": 1},
+        "attributes": {
+            "min": 1,
+            "max": 28,
+            "step": 1,
+            "mode": "box",
+        },
     },
     "consumption_margin": {
         "default": 10,
         "domain": "number",
-        "attributes": {"min": -50, "max": 100, "step": 5, "unit_of_measurement": "%"},
+        "attributes": {
+            "min": -50,
+            "max": 100,
+            "step": 5,
+            "unit_of_measurement": "%",
+            "mode": "box",
+        },
     },
     "consumption_grouping": {
         "default": "mean",
@@ -271,6 +298,7 @@ class PVOpt(hass.Hass):
             charger_efficiency=self.get_config("charger_efficiency_percent") / 100,
             charger_power=self.get_config("charger_power_watts"),
         )
+
         self.battery_model = pv.BatteryModel(
             capacity=self.get_config("battery_capacity_Wh"),
             max_dod=self.get_config("maximum_dod_percent") / 100,
@@ -378,7 +406,8 @@ class PVOpt(hass.Hass):
             if isinstance(self.config[item], str) and self.entity_exists(
                 self.config[item]
             ):
-                return self.get_ha_value(self.config[item])
+                x = self.get_ha_value(self.config[item])
+                return x
             elif isinstance(self.config[item], list):
                 if min([isinstance(x, str)] for x in self.config[item]):
                     if min([self.entity_exists(e) for e in self.config[item]]):
@@ -513,7 +542,7 @@ class PVOpt(hass.Hass):
                     and self.config["octopus_import_tariff_code"] is not None
                 ):
                     try:
-                        str = f"INFO Trying to load tariff codes: Import: {self.config['octopus_import_tariff_code']}"
+                        str = f"Trying to load tariff codes: Import: {self.config['octopus_import_tariff_code']}"
 
                         if "octopus_export_tariff_code" in self.config:
                             str += (
@@ -539,12 +568,19 @@ class PVOpt(hass.Hass):
                         self.log("Contract tariffs loaded OK from Tariff Codes")
                     except Exception as e:
                         self.log(f"Unable to load Tariff Codes {e}", level="ERROR")
-
-            if self.contract is None:
-                e = "Unable to load contract tariffs. Waiting 2 minutes to re-try"
+            i = 1
+            n = 5
+            if self.contract is None and i < n:
+                e = f"Unable to load contract tariffs. Waiting 2 minutes to re-try ({i}/{n})"
                 self.log(e, level="ERROR")
                 self._status(e)
-                time.sleep(120)
+                # time.sleep(120)
+                i += 1
+
+            if self.contract is None:
+                e = f"Failed to load contract in {n} attempts. FATAL ERROR"
+                self.log(e)
+                raise ValueError(e)
 
             else:
                 for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
@@ -626,8 +662,8 @@ class PVOpt(hass.Hass):
             # if the state is None return None
             if state is not None:
                 # if the state is 'on' or 'off' then it's a bool
-                if state.lower() in ["on", "off"]:
-                    value = state.lower() == "on"
+                if state.lower() in ["on", "off", "true", "false"]:
+                    value = state.lower() in ["on", "true"]
 
                 # see if we can coerce it into an int 1st and then a floar
                 for t in [int, float]:
@@ -908,6 +944,8 @@ class PVOpt(hass.Hass):
     def _state_from_value(self, value):
         if isinstance(value, bool):
             state = f"{value*'on'}{(1-value)*'off'}"
+        if isinstance(value, list):
+            state = value[0]
         else:
             state = value
         return state
@@ -958,14 +996,12 @@ class PVOpt(hass.Hass):
                             self.config[item] = round(capacity / 100, 0) * 100
                             self.log(f"Battery capacity estimated to be {capacity} Wh")
 
-                    # Only set the state for entities that don't currently exist
-                    state = (self._state_from_value(self.config[item]),)
-
+                    # Only set the state for entities that don't currently exists
+                    state = self._state_from_value(self.config[item])
                 # Or entities where the sensor value is no use
-                elif (
-                    self.get_state(entity_id) == "unknown"
-                    or self.get_state(entity_id) == "unavailable"
-                ):
+                elif isinstance(
+                    self.get_ha_value(entity_id), str
+                ) and self.get_ha_value(entity_id) not in attributes.get("options", {}):
                     if item == "battery_capacity_Wh":
                         capacity = self._estimate_capacity()
                         if capacity is not None:
@@ -973,9 +1009,12 @@ class PVOpt(hass.Hass):
                             self.log(f"Battery capacity estimated to be {capacity} Wh")
                         else:
                             state = self._state_from_value(self.config[item])
-
+                    else:
+                        self.log(
+                            f">>>{item} {self.get_ha_value(entity_id)} {type(self.get_ha_value(entity_id))}"
+                        )
                 else:
-                    state = self.get_state(entity_id)
+                    state = self.get_ha_value(entity_id)
 
                 self.set_state(
                     state=state,
@@ -1015,7 +1054,7 @@ class PVOpt(hass.Hass):
             "battery_capacity_Wh",
             "maximum_dod_percent",
         ]:
-            self._pv_system_model()
+            self._load_pv_system_model()
 
         self.optimise()
 
