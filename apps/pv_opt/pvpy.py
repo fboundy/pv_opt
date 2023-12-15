@@ -20,19 +20,22 @@ class Tariff:
         night=None,
         eco7=False,
         octopus=True,
-        eco7_start="01:00",  # UTC
+        eco7_start="01:00",
         host=None,
         **kwargs,
     ) -> None:
         self.name = name
+        self.host = host
+        if host is None:
+            self.log = print
+        else:
+            self.log = host.log
+
         self.export = export
         self.eco7 = eco7
         self.area = kwargs.get("area", None)
         self.day_ahead = None
-        if self.eco7:
-            self.eco7_start = pd.Timestamp(eco7_start)
-            if self.eco7_start.tzinfo is None:
-                self.eco7_start.tz_localize("UTC")
+        self.eco7_start = pd.Timestamp(eco7_start, tz="UTC")
 
         if octopus:
             self.get_octopus(**kwargs)
@@ -42,12 +45,6 @@ class Tariff:
             self.unit = unit
             self.day = day
             self.night = night
-
-        self.host = host
-        if host is None:
-            self.log = print
-        else:
-            self.log = host.log
 
     def _oct_time(self, d):
         # print(d)
@@ -72,8 +69,6 @@ class Tariff:
             if kwargs.get(k, None) is not None
         }
 
-        # print(params)
-
         if not self.export:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standing-charges/"
             self.fixed = [
@@ -84,6 +79,7 @@ class Tariff:
 
         if self.eco7:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/day-unit-rates/"
+
             self.day = [
                 x
                 for x in requests.get(url, params=params).json()["results"]
@@ -95,6 +91,7 @@ class Tariff:
                 for x in requests.get(url, params=params).json()["results"]
                 if x["payment_method"] == "DIRECT_DEBIT"
             ]
+            self.unit = self.day
 
         else:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standard-unit-rates/"
@@ -139,9 +136,10 @@ class Tariff:
                 axis=1,
             ).set_axis(["unit", "Night"], axis=1)
             df.index = pd.to_datetime(df.index)
+            df = df.sort_index()
             df = df.reindex(
                 index=pd.date_range(
-                    start,
+                    min([pd.Timestamp(x["valid_from"]) for x in self.day]),
                     end,
                     freq="30T",
                 )
@@ -150,7 +148,7 @@ class Tariff:
                 df.index.time < (self.eco7_start + pd.Timedelta("7H")).time()
             )
             df.loc[mask, "value_inc_vat"] = df.loc[mask, "Night"]
-            df = df["unit"]
+            df = df["unit"].loc[start:end]
 
         else:
             df = pd.DataFrame(self.unit).set_index("valid_from")["value_inc_vat"]
@@ -545,10 +543,9 @@ class PVsystemModel:
             )
 
         self.log(
-            f"  >>  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
+            f"  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
         )
 
-        # self.log(prices)
         prices = prices.set_axis(["import", "export"], axis=1)
 
         df = pd.concat(
