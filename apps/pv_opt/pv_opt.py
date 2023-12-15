@@ -23,7 +23,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.2.3"
+VERSION = "3.3.0"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -199,6 +199,7 @@ class PVOpt(hass.Hass):
 
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
+        self.device_name = self.args.pop("device_name", "solis")
         self._load_inverter()
 
         self.change_items = {}

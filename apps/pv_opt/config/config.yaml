@@ -12,8 +12,10 @@ pv_opt:
   class: PVOpt
   log: pv_opt_log
   prefix: pvopt
+
   # inverter_type: "SOLIS_SOLAX_MODBUS"
   inverter_type: "SOLIS_CORE_MODBUS"
+  device_name: solmod
 
   # User configuration ---  EDIT AWAY! ---
 
@@ -88,24 +90,24 @@ pv_opt:
   # battery_voltage: sensor.solis_battery_voltage
 
   # id_consumption:
-  #   - sensor.solis_house_load
-  #   - sensor.solis_bypass_load
+  #   - sensor.{device_name}_house_load
+  #   - sensor.{device_name}_bypass_load
 
-  # id_battery_soc: sensor.solis_battery_soc
-  # id_timed_charge_start_hours: number.solis_timed_charge_start_hours
-  # id_timed_charge_start_minutes: number.solis_timed_charge_start_minutes
-  # id_timed_charge_end_hours: number.solis_timed_charge_end_hours
-  # id_timed_charge_end_minutes: number.solis_timed_charge_end_minutes
-  # id_timed_charge_current: number.solis_timed_charge_current
+  # id_battery_soc: sensor.{device_name}_battery_soc
+  # id_timed_charge_start_hours: number.{device_name}_timed_charge_start_hours
+  # id_timed_charge_start_minutes: number.{device_name}_timed_charge_start_minutes
+  # id_timed_charge_end_hours: number.{device_name}_timed_charge_end_hours
+  # id_timed_charge_end_minutes: number.{device_name}_timed_charge_end_minutes
+  # id_timed_charge_current: number.{device_name}_timed_charge_current
 
-  # id_timed_discharge_start_hours: number.solis_timed_discharge_start_hours
-  # id_timed_discharge_start_minutes: number.solis_timed_discharge_start_minutes
-  # id_timed_discharge_end_hours: number.solis_timed_discharge_end_hours
-  # id_timed_discharge_end_minutes: number.solis_timed_discharge_end_minutes
-  # id_timed_discharge_current: number.solis_timed_discharge_current
+  # id_timed_discharge_start_hours: number.{device_name}_timed_discharge_start_hours
+  # id_timed_discharge_start_minutes: number.{device_name}_timed_discharge_start_minutes
+  # id_timed_discharge_end_hours: number.{device_name}_timed_discharge_end_hours
+  # id_timed_discharge_end_minutes: number.{device_name}_timed_discharge_end_minutes
+  # id_timed_discharge_current: number.{device_name}_timed_discharge_current
 
-  # id_timed_charge_discharge_button: button.solis_update_charge_discharge_times
-  # id_inverter_mode: select.solis_energy_storage_control_switch
+  # id_timed_charge_discharge_button: button.{device_name}_update_charge_discharge_times
+  # id_inverter_mode: select.{device_name}_energy_storage_control_switch
 
   # ==============================================================================================================
   # Brand / Integration Specific Config: SOLIS_CORE_MODBUS: https://github.com/fboundy/ha_solis_modbus
@@ -113,29 +115,59 @@ pv_opt:
   #
   # These are the default entities used with the Solis Core Modbus integration. You can change them here and over-ride the defaults
 
-  modbus_hub: solmod
+  modbus_hub: {device_name}
   modbus_slave: 1
-  battery_voltage: sensor.solmod_battery_voltage
-  maximum_dod_percent: sensor.solmod_overdischarge_soc
+  battery_voltage: sensor.{device_name}_battery_voltage
+  maximum_dod_percent: sensor.{device_name}_overdischarge_soc
   
   id_consumption:
-    - sensor.solmod_house_load_power
-    - sensor.solmod_backup_load_power
+    - sensor.{device_name}_house_load_power
+    - sensor.{device_name}_backup_load_power
 
-  id_grid_power: sensor.solmod_grid_active_power
-  id_inverter_ac_power": sensor.solmod_inverter_ac_power
-  id_battery_soc: sensor.solmod_battery_soc
+  id_grid_power: sensor.{device_name}_grid_active_power
+  id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
+  id_battery_soc: sensor.{device_name}_battery_soc
 
-  id_timed_charge_start_hours: sensor.solmod_timed_charge_start_hour
-  id_timed_charge_start_minutes: sensor.solmod_timed_charge_start_minute
-  id_timed_charge_end_hours: sensor.solmod_timed_charge_end_hour
-  id_timed_charge_end_minutes: sensor.solmod_timed_charge_end_minute
-  id_timed_charge_current: sensor.solmod_timed_charge_current_limit
+  id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
+  id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
+  id_timed_charge_end_hours: sensor.{device_name}_timed_charge_end_hour
+  id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
+  id_timed_charge_current: sensor.{device_name}_timed_charge_current_limit
 
-  id_timed_discharge_start_hours: sensor.solmod_timed_discharge_start_hour
-  id_timed_discharge_start_minutes: sensor.solmod_timed_discharge_start_minute
-  id_timed_discharge_end_hours: sensor.solmod_timed_discharge_end_hour
-  id_timed_discharge_end_minutes: sensor.solmod_timed_discharge_end_minute
-  id_timed_discharge_current: sensor.solmod_timed_discharge_current_limit
+  id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
+  id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute
+  id_timed_discharge_end_hours: sensor.{device_name}_timed_discharge_end_hour
+  id_timed_discharge_end_minutes: sensor.{device_name}_timed_discharge_end_minute
+  id_timed_discharge_current: sensor.{device_name}_timed_discharge_current_limit
 
-  id_inverter_mode: sensor.solmod_energy_storage_control_switch
+  id_inverter_mode: sensor.{device_name}_energy_storage_control_switch
+
+  # ==============================================================================================================
+  # Brand / Integration Specific Config: SOLIS_CORE_MODBUS: https://github.com/fboundy/ha_solis_modbus
+  # ==============================================================================================================
+  #
+  # These are the default entities used with the Solis Core Modbus integration. You can change them here and over-ride the defaults
+
+  # battery_voltage: sensor.{device_name}_battery_voltage
+  
+  # id_consumption:
+  #   - sensor.{device_name}_house_load_power
+  #   - sensor.{device_name}_backup_load_power
+
+  # id_grid_power: sensor.{device_name}_grid_active_power
+  # id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
+  # id_battery_soc: sensor.{device_name}_battery_soc
+
+  # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
+  # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
+  # id_timed_charge_end_hours: sensor.{device_name}_timed_charge_end_hour
+  # id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
+  # id_timed_charge_current: sensor.{device_name}_timed_charge_current_limit
+
+  # id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
+  # id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute
+  # id_timed_discharge_end_hours: sensor.{device_name}_timed_discharge_end_hour
+  # id_timed_discharge_end_minutes: sensor.{device_name}_timed_discharge_end_minute
+  # id_timed_discharge_current: sensor.{device_name}_timed_discharge_current_limit
+
+  # id_inverter_mode: sensor.{device_name}_energy_storage_control_switch

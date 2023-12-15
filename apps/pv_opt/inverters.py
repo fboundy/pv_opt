@@ -30,33 +30,36 @@ INVERTER_DEFS = {
         # file. They are required for the main PV_Opt module and if they cannot be found an ERROR will be
         # raised
         "default_config": {
-            "maximum_dod_percent": "number.solis_battery_minimum_soc",
-            "id_battery_soc": "sensor.solis_battery_soc",
-            "id_consumption": ["sensor.solis_house_load", "sensor.solis_bypass_load"],
-            "id_consumption_today": "sensor.solis_house_load_today",
-            "id_grid_import_today": "sensor.solis_grid_import_today",
-            "id_grid_export_today": "sensor.solis_grid_export_today",
-            "id_grid_import_power": "sensor.solis_grid_import_power",
-            "id_grid_export_power": "sensor.solis_grid_export_power",
-            "id_battery_charge_power": "sensor.solis_battery_input_energy",
-            "id_inverter_ac_power": "sensor.solis_active_power",
+            "maximum_dod_percent": "number.{device_name}_battery_minimum_soc",
+            "id_battery_soc": "sensor.{device_name}_battery_soc",
+            "id_consumption": [
+                "sensor.{device_name}_house_load",
+                "sensor.{device_name}_bypass_load",
+            ],
+            "id_consumption_today": "sensor.{device_name}_house_load_today",
+            "id_grid_import_today": "sensor.{device_name}_grid_import_today",
+            "id_grid_export_today": "sensor.{device_name}_grid_export_today",
+            "id_grid_import_power": "sensor.{device_name}_grid_import_power",
+            "id_grid_export_power": "sensor.{device_name}_grid_export_power",
+            "id_battery_charge_power": "sensor.{device_name}_battery_input_energy",
+            "id_inverter_ac_power": "sensor.{device_name}_active_power",
         },
         # Brand Conguration: Exposed as inverter.brand_config and can be over-written using arguments
         # from the config.yaml file but not rquired outside of this module
         "brand_config": {
-            "battery_voltage": "sensor.solis_battery_voltage",
-            "id_timed_charge_start_hours": "number.solis_timed_charge_start_hours",
-            "id_timed_charge_start_minutes": "number.solis_timed_charge_start_minutes",
-            "id_timed_charge_end_hours": "number.solis_timed_charge_end_hours",
-            "id_timed_charge_end_minutes": "number.solis_timed_charge_end_minutes",
-            "id_timed_charge_current": "number.solis_timed_charge_current",
-            "id_timed_discharge_start_hours": "number.solis_timed_discharge_start_hours",
-            "id_timed_discharge_start_minutes": "number.solis_timed_discharge_start_minutes",
-            "id_timed_discharge_end_hours": "number.solis_timed_discharge_end_hours",
-            "id_timed_discharge_end_minutes": "number.solis_timed_discharge_end_minutes",
-            "id_timed_discharge_current": "number.solis_timed_discharge_current",
-            "id_timed_charge_discharge_button": "button.solis_update_charge_discharge_times",
-            "id_inverter_mode": "select.solis_energy_storage_control_switch",
+            "battery_voltage": "sensor.{device_name}_battery_voltage",
+            "id_timed_charge_start_hours": "number.{device_name}_timed_charge_start_hours",
+            "id_timed_charge_start_minutes": "number.{device_name}_timed_charge_start_minutes",
+            "id_timed_charge_end_hours": "number.{device_name}_timed_charge_end_hours",
+            "id_timed_charge_end_minutes": "number.{device_name}_timed_charge_end_minutes",
+            "id_timed_charge_current": "number.{device_name}_timed_charge_current",
+            "id_timed_discharge_start_hours": "number.{device_name}_timed_discharge_start_hours",
+            "id_timed_discharge_start_minutes": "number.{device_name}_timed_discharge_start_minutes",
+            "id_timed_discharge_end_hours": "number.{device_name}_timed_discharge_end_hours",
+            "id_timed_discharge_end_minutes": "number.{device_name}_timed_discharge_end_minutes",
+            "id_timed_discharge_current": "number.{device_name}_timed_discharge_current",
+            "id_timed_charge_discharge_button": "button.{device_name}_update_charge_discharge_times",
+            "id_inverter_mode": "select.{device_name}_energy_storage_control_switch",
         },
     },
     "SOLIS_CORE_MODBUS": {
@@ -83,30 +86,30 @@ INVERTER_DEFS = {
             "storage_control_switch": 43110,
         },
         "default_config": {
-            "maximum_dod_percent": "sensor.solis_overdischarge_soc",
-            "id_battery_soc": "sensor.solis_battery_soc",
+            "maximum_dod_percent": "sensor.{device_name}_overdischarge_soc",
+            "id_battery_soc": "sensor.{device_name}_battery_soc",
             "id_consumption": [
-                "sensor.solis_house_load_power",
-                "sensor.solis_backup_load_power",
+                "sensor.{device_name}_house_load_power",
+                "sensor.{device_name}_backup_load_power",
             ],
-            "id_grid_power": "sensor.solis_grid_active_power",
-            "id_inverter_ac_power": "sensor.solis_inverter_ac_power",
+            "id_grid_power": "sensor.{device_name}_grid_active_power",
+            "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
         },
         "brand_config": {
             "modbus_hub": "solis",
             "modbus_slave": 1,
-            "battery_voltage": "sensor.solis_battery_voltage",
-            "id_timed_charge_start_hours": "sensor.solis_timed_charge_start_hour",
-            "id_timed_charge_start_minutes": "sensor.solis_timed_charge_start_minute",
-            "id_timed_charge_end_hours": "sensor.solis_timed_charge_end_hour",
-            "id_timed_charge_end_minutes": "sensor.solis_timed_charge_end_minute",
-            "id_timed_charge_current": "sensor.solis_timed_charge_current_limit",
-            "id_timed_discharge_start_hours": "sensor.solis_timed_discharge_start_hour",
-            "id_timed_discharge_start_minutes": "sensor.solis_timed_discharge_start_minute",
-            "id_timed_discharge_end_hours": "sensor.solis_timed_discharge_end_hour",
-            "id_timed_discharge_end_minutes": "sensor.solis_timed_discharge_end_minute",
-            "id_timed_discharge_current": "sensor.solis_timed_discharge_current_limit",
-            "id_inverter_mode": "sensor.solis_energy_storage_control_switch",
+            "battery_voltage": "sensor.{device_name}_battery_voltage",
+            "id_timed_charge_start_hours": "sensor.{device_name}_timed_charge_start_hour",
+            "id_timed_charge_start_minutes": "sensor.{device_name}_timed_charge_start_minute",
+            "id_timed_charge_end_hours": "sensor.{device_name}_timed_charge_end_hour",
+            "id_timed_charge_end_minutes": "sensor.{device_name}_timed_charge_end_minute",
+            "id_timed_charge_current": "sensor.{device_name}_timed_charge_current_limit",
+            "id_timed_discharge_start_hours": "sensor.{device_name}_timed_discharge_start_hour",
+            "id_timed_discharge_start_minutes": "sensor.{device_name}_timed_discharge_start_minute",
+            "id_timed_discharge_end_hours": "sensor.{device_name}_timed_discharge_end_hour",
+            "id_timed_discharge_end_minutes": "sensor.{device_name}_timed_discharge_end_minute",
+            "id_timed_discharge_current": "sensor.{device_name}_timed_discharge_current_limit",
+            "id_inverter_mode": "sensor.{device_name}_energy_storage_control_switch",
         },
     },
     "SOLIS_SOLARMAN": {
@@ -142,27 +145,27 @@ INVERTER_DEFS = {
         },
         "default_config": {
             "maximum_dod_percent": 15,
-            "id_battery_soc": "sensor.solis_battery_soc",
+            "id_battery_soc": "sensor.{device_name}_battery_soc",
             "id_consumption": [
-                "sensor.solis_house_load_power",
-                "sensor.solis_backup_load_power",
+                "sensor.{device_name}_house_load_power",
+                "sensor.{device_name}_backup_load_power",
             ],
-            "id_grid_power": "sensor.solis_grid_active_power",
-            "id_inverter_ac_power": "sensor.solis_inverter_ac_power",
+            "id_grid_power": "sensor.{device_name}_grid_active_power",
+            "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
         },
         "brand_config": {
-            "battery_voltage": "sensor.solis_battery_voltage",
-            "id_timed_charge_start_hours": "sensor.solis_timed_charge_start_hour",
-            "id_timed_charge_start_minutes": "sensor.solis_timed_charge_start_minute",
-            "id_timed_charge_end_hours": "sensor.solis_timed_charge_end_hour",
-            "id_timed_charge_end_minutes": "sensor.solis_timed_charge_end_minute",
-            "id_timed_charge_current": "sensor.solis_timed_charge_current_limit",
-            "id_timed_discharge_start_hours": "sensor.solis_timed_discharge_start_hour",
-            "id_timed_discharge_start_minutes": "sensor.solis_timed_discharge_start_minute",
-            "id_timed_discharge_end_hours": "sensor.solis_timed_discharge_end_hour",
-            "id_timed_discharge_end_minutes": "sensor.solis_timed_discharge_end_minute",
-            "id_timed_discharge_current": "sensor.solis_timed_discharge_current_limit",
-            "id_inverter_mode": "sensor.solis_energy_storage_control_switch",
+            "battery_voltage": "sensor.{device_name}_battery_voltage",
+            "id_timed_charge_start_hours": "sensor.{device_name}_timed_charge_start_hour",
+            "id_timed_charge_start_minutes": "sensor.{device_name}_timed_charge_start_minute",
+            "id_timed_charge_end_hours": "sensor.{device_name}_timed_charge_end_hour",
+            "id_timed_charge_end_minutes": "sensor.{device_name}_timed_charge_end_minute",
+            "id_timed_charge_current": "sensor.{device_name}_timed_charge_current_limit",
+            "id_timed_discharge_start_hours": "sensor.{device_name}_timed_discharge_start_hour",
+            "id_timed_discharge_start_minutes": "sensor.{device_name}_timed_discharge_start_minute",
+            "id_timed_discharge_end_hours": "sensor.{device_name}_timed_discharge_end_hour",
+            "id_timed_discharge_end_minutes": "sensor.{device_name}_timed_discharge_end_minute",
+            "id_timed_discharge_current": "sensor.{device_name}_timed_discharge_current_limit",
+            "id_inverter_mode": "sensor.{device_name}_energy_storage_control_switch",
         },
     },
 }
@@ -171,8 +174,18 @@ INVERTER_DEFS = {
 class InverterController:
     def __init__(self, inverter_type, host) -> None:
         self.type = inverter_type
-        self.config = INVERTER_DEFS[self.type]["default_config"]
-        self.brand_config = INVERTER_DEFS[self.type]["brand_config"]
+        self.config = {
+            item: INVERTER_DEFS[self.type]["default_config"].replace(
+                "{device_name}", self.host.device_name
+            )
+            for item in INVERTER_DEFS[self.type]["default_config"]
+        }
+        self.brand_config = {
+            item: INVERTER_DEFS[self.type]["brand_config"].replace(
+                "{device_name}", self.host.device_name
+            )
+            for item in INVERTER_DEFS[self.type]["brand_config"]
+        }
         self.host = host
         self.tz = self.host.tz
         if host is not None:
