@@ -157,6 +157,7 @@ pv_opt:
   # id_grid_power: sensor.{device_name}_meter_active_power
   # id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
   # id_battery_soc: sensor.{device_name}_battery_soc
+  # id_backup_mode_soc: 
 
   # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
   # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
