@@ -16,9 +16,9 @@ pv_opt:
 # User configuration ---  EDIT AWAY! ---
 
   # inverter_type: "SOLIS_SOLAX_MODBUS"
-  inverter_type: "SOLIS_CORE_MODBUS"
-  # inverter_type: SOLIS_SOLARMAN
-  device_name: solmod
+  # inverter_type: "SOLIS_CORE_MODBUS"
+  inverter_type: SOLIS_SOLARMAN
+  device_name: solis
 
   # ========================================
   # Plant parameters
@@ -114,18 +114,18 @@ pv_opt:
   #
   # These are the default entities used with the Solis Core Modbus integration. You can change them here and over-ride the defaults
 
-  modbus_hub: "{device_name}"
-  modbus_slave: 1
-  battery_voltage: sensor.{device_name}_battery_voltage
-  maximum_dod_percent: sensor.{device_name}_overdischarge_soc
+  # modbus_hub: "{device_name}"
+  # modbus_slave: 1
+  # battery_voltage: sensor.{device_name}_battery_voltage
+  # maximum_dod_percent: sensor.{device_name}_overdischarge_soc
   
-  id_consumption:
-    - sensor.{device_name}_house_load_power
-    - sensor.{device_name}_backup_load_power
+  # id_consumption:
+  #   - sensor.{device_name}_house_load_power
+  #   - sensor.{device_name}_backup_load_power
 
-  id_grid_power: sensor.{device_name}_grid_active_power
-  id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
-  id_battery_soc: sensor.{device_name}_battery_soc
+  # id_grid_power: sensor.{device_name}_grid_active_power
+  # id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
+  # id_battery_soc: sensor.{device_name}_battery_soc
 
   # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
   # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
@@ -133,13 +133,13 @@ pv_opt:
   # id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
   # id_timed_charge_current: sensor.{device_name}_timed_charge_current_limit
 
-  id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
-  id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute
-  id_timed_discharge_end_hours: sensor.{device_name}_timed_discharge_end_hour
-  id_timed_discharge_end_minutes: sensor.{device_name}_timed_discharge_end_minute
-  id_timed_discharge_current: sensor.{device_name}_timed_discharge_current_limit
+  # id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
+  # id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute
+  # id_timed_discharge_end_hours: sensor.{device_name}_timed_discharge_end_hour
+  # id_timed_discharge_end_minutes: sensor.{device_name}_timed_discharge_end_minute
+  # id_timed_discharge_current: sensor.{device_name}_timed_discharge_current_limit
 
-  id_inverter_mode: sensor.{device_name}_energy_storage_control_switch
+  # id_inverter_mode: sensor.{device_name}_energy_storage_control_switch
 
   # ==============================================================================================================
   # Brand / Integration Specific Config: SOLIS_SOLARMAN: https://github.com/StephanJoubert/home_assistant_solarman
