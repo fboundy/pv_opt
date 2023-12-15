@@ -115,7 +115,7 @@ pv_opt:
   #
   # These are the default entities used with the Solis Core Modbus integration. You can change them here and over-ride the defaults
 
-  modbus_hub: {device_name}
+  modbus_hub: "{device_name}"
   modbus_slave: 1
   battery_voltage: sensor.{device_name}_battery_voltage
   maximum_dod_percent: sensor.{device_name}_overdischarge_soc
@@ -128,11 +128,11 @@ pv_opt:
   id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
   id_battery_soc: sensor.{device_name}_battery_soc
 
-  id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
-  id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
-  id_timed_charge_end_hours: sensor.{device_name}_timed_charge_end_hour
-  id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
-  id_timed_charge_current: sensor.{device_name}_timed_charge_current_limit
+  # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
+  # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
+  # id_timed_charge_end_hours: sensor.{device_name}_timed_charge_end_hour
+  # id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
+  # id_timed_charge_current: sensor.{device_name}_timed_charge_current_limit
 
   id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
   id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute

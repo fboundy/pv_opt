@@ -173,23 +173,27 @@ INVERTER_DEFS = {
 
 class InverterController:
     def __init__(self, inverter_type, host) -> None:
-        self.type = inverter_type
-        self.config = {
-            item: INVERTER_DEFS[self.type]["default_config"].replace(
-                "{device_name}", self.host.device_name
-            )
-            for item in INVERTER_DEFS[self.type]["default_config"]
-        }
-        self.brand_config = {
-            item: INVERTER_DEFS[self.type]["brand_config"].replace(
-                "{device_name}", self.host.device_name
-            )
-            for item in INVERTER_DEFS[self.type]["brand_config"]
-        }
         self.host = host
         self.tz = self.host.tz
         if host is not None:
             self.log = host.log
+        self.type = inverter_type
+        self.config = {}
+        self.brand_config = {}
+        for defs, conf in zip(
+            [INVERTER_DEFS[self.type][x] for x in ["default_config", "brand_config"]],
+            [self.config, self.brand_config],
+        ):
+            for item in defs:
+                if isinstance(defs[item], str):
+                    conf[item] = defs[item].replace(
+                        "{device_name}", self.host.device_name
+                    )
+                if isinstance(defs[item], list):
+                    conf[item] = [
+                        z.replace("{device_name}", self.host.device_name)
+                        for z in defs[item]
+                    ]
 
     def enable_timed_mode(self):
         if (

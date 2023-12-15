@@ -720,7 +720,13 @@ class PVOpt(hass.Hass):
             # with"id_":
             if not isinstance(self.args[item], list):
                 self.args[item] = [self.args[item]]
-            values = self.args[item]
+
+            values = [
+                v.replace("{device_name}", self.device_name)
+                if isinstance(v, str)
+                else v
+                for v in self.args[item]
+            ]
 
             if values[0] is None:
                 self.config[item] = self.get_default_config(item)
