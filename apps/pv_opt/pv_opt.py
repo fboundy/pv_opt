@@ -787,70 +787,87 @@ class PVOpt(hass.Hass):
                     if self.debug:
                         self.log("\tFound a valid list of strings")
 
-                    ha_values = [self.get_ha_value(entity_id=v) for v in values]
-                    val_types = {
-                        t: np.array([isinstance(v, t) for v in ha_values])
-                        for t in [str, float, int, bool]
-                    }
-                    # if they are all float or int
-
-                    valid_strings = [
-                        j
-                        for j in [h for h in zip(ha_values[:-1], values[:-1]) if h[0]]
-                        if j[0] in DEFAULT_CONFIG[item]["options"]
-                    ]
-
-                    if np.min(val_types[int] | val_types[float]):
-                        self.config[item] = values
+                    if (
+                        isinstance(self.get_default_config(item), str)
+                        and len(values) == 1
+                    ):
+                        self.config[item] = values[0]
                         self.log(
-                            f"    {item:34s} = {str(sum(ha_values)):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
-                        )
-                    # if any of list but the last one are strings and the default for the item is a string
-                    # try getting values from all the entities
-                    elif valid_strings:
-                        self.config[item] = valid_strings[0][0]
-                        if not "sensor" in valid_strings[0][1]:
-                            self.change_items[valid_strings[0][1]] = item
-                        self.log(
-                            f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
+                            f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                         )
 
-                    elif len(values) > 1:
-                        if self.same_type(values[-1], self.get_default_config(item)):
-                            self.config[item] = values[-1]
-                            self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
-                            )
-
-                        elif values[-1] in self.get_default_config(item):
-                            self.log(values)
-                            self.config[item] = values[-1]
-                            self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
-                            )
                     else:
-                        if item in DEFAULT_CONFIG:
-                            self.config[item] = self.get_default_config(item)
+                        ha_values = [self.get_ha_value(entity_id=v) for v in values]
+                        val_types = {
+                            t: np.array([isinstance(v, t) for v in ha_values])
+                            for t in [str, float, int, bool]
+                        }
+                        # if they are all float or int
 
-                            self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
-                                level="WARNING",
-                            )
-                        elif (
-                            item in self.inverter.config
-                            or item in self.inverter.brand_config
-                        ):
-                            self.config[item] = self.get_default_config(item)
+                        valid_strings = [
+                            j
+                            for j in [
+                                h for h in zip(ha_values[:-1], values[:-1]) if h[0]
+                            ]
+                            if j[0] in DEFAULT_CONFIG[item]["options"]
+                        ]
 
+                        if self.debug:
+                            self.log(f">>> {DEFAULT_CONFIG[item]['options']}")
+
+                        if np.min(val_types[int] | val_types[float]):
+                            self.config[item] = values
                             self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: inverter brand default. Unable to read from HA entities listed in YAML. No default in YAML.",
-                                level="WARNING",
+                                f"    {item:34s} = {str(sum(ha_values)):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
                             )
+                        # if any of list but the last one are strings and the default for the item is a string
+                        # try getting values from all the entities
+                        elif valid_strings:
+                            self.config[item] = valid_strings[0][0]
+                            if not "sensor" in valid_strings[0][1]:
+                                self.change_items[valid_strings[0][1]] = item
+                            self.log(
+                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
+                            )
+
+                        elif len(values) > 1:
+                            if self.same_type(
+                                values[-1], self.get_default_config(item)
+                            ):
+                                self.config[item] = values[-1]
+                                self.log(
+                                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
+                                )
+
+                            elif values[-1] in self.get_default_config(item):
+                                self.log(values)
+                                self.config[item] = values[-1]
+                                self.log(
+                                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
+                                )
                         else:
-                            self.config[item] = values[0]
-                            self.log(
-                                f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default value. No default defined."
-                            )
+                            if item in DEFAULT_CONFIG:
+                                self.config[item] = self.get_default_config(item)
+
+                                self.log(
+                                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
+                                    level="WARNING",
+                                )
+                            elif (
+                                item in self.inverter.config
+                                or item in self.inverter.brand_config
+                            ):
+                                self.config[item] = self.get_default_config(item)
+
+                                self.log(
+                                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: inverter brand default. Unable to read from HA entities listed in YAML. No default in YAML.",
+                                    level="WARNING",
+                                )
+                            else:
+                                self.config[item] = values[0]
+                                self.log(
+                                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default value. No default defined."
+                                )
 
                 elif len(values) == 1 and (
                     arg_types[bool][0] or arg_types[int][0] or arg_types[float][0]

@@ -150,7 +150,7 @@ INVERTER_DEFS = {
                 "sensor.{device_name}_house_load_power",
                 "sensor.{device_name}_backup_load_power",
             ],
-            "id_grid_power": "sensor.{device_name}_grid_active_power",
+            "id_grid_power": "sensor.{device_name}_meter_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
         },
         "brand_config": {
@@ -165,7 +165,7 @@ INVERTER_DEFS = {
             "id_timed_discharge_end_hours": "sensor.{device_name}_timed_discharge_end_hour",
             "id_timed_discharge_end_minutes": "sensor.{device_name}_timed_discharge_end_minute",
             "id_timed_discharge_current": "sensor.{device_name}_timed_discharge_current_limit",
-            "id_inverter_mode": "sensor.{device_name}_energy_storage_control_switch",
+            "id_inverter_mode": "sensor.{device_name}_storage_control_mode",
         },
     },
 }
@@ -503,7 +503,10 @@ class InverterController:
 
             if changed:
                 data = {"register": address, "value": value}
-                self.host.call_service("solarman/write_holding_register", **data)
+                # self.host.call_service("solarman/write_holding_register", **data)
+                self.log(
+                    ">>> Writing {value} to inverter register {address} using Solarman"
+                )
                 written = True
 
         return changed, written
