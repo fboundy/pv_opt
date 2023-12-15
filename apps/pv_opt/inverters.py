@@ -481,7 +481,7 @@ class InverterController:
             if entity_id is not None:
                 old_value = int(float(self.host.get_state(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
-                    self.log(f"Inverter value already set to {value:d}.")
+                    self.log(f"Inverter value already set to {value}.")
                     changed = False
 
             if changed:
@@ -498,7 +498,7 @@ class InverterController:
             if entity_id is not None and self.host.entity_exists(entity_id):
                 old_value = int(float(self.host.get_state(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
-                    self.log(f"Inverter value already set to {value:d}.")
+                    self.log(f"Inverter value already set to {value}.")
                     changed = False
 
             if changed:
@@ -516,7 +516,7 @@ class InverterController:
         entity_id = self.host.config[f"id_timed_{direction}_current"]
         return self._solis_write_holding_register(
             address=address,
-            value=current,
+            value=round(current, 1),
             entity_id=entity_id,
             tolerance=tolerance,
             multiplier=10,
