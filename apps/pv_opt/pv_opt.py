@@ -32,6 +32,7 @@ TIME_FORMAT = "%H:%M"
 
 EVENT_TRIGGER = "PV_OPT"
 DEBUG_TRIGGER = "PV_DEBUG"
+HOLD_TOLERANCE = 3
 
 
 BOTTLECAP_DAVE = {
@@ -1433,12 +1434,17 @@ class PVOpt(hass.Hass):
                 (self.windows["forced"] / tolerance).round(0) * tolerance
             ).astype(int)
 
+            self.windows["hold_soc"] = ""
             if self.config["supports_hold_soc"]:
                 self.log("Checking for Hold SOC slots")
+                self.windows["hold_soc"].loc[
+                    (self.windows["soc_end"] - self.windows["soc"]).abs()
+                    < HOLD_TOLERANCE
+                ] = "<="
 
             for window in self.windows.iterrows():
                 self.log(
-                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4.1f}% -> {window[1]['soc_end']:4.1f}%"
+                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4.1f}% -> {window[1]['soc_end']:4.1f}%  {window[1]['hold_soc']}"
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
@@ -1561,7 +1567,14 @@ class PVOpt(hass.Hass):
                 "windows": [
                     {
                         k: window[1][k]
-                        for k in ["start", "end", "forced", "soc", "soc_end"]
+                        for k in [
+                            "start",
+                            "end",
+                            "forced",
+                            "soc",
+                            "soc_end",
+                            "hold_soc",
+                        ]
                     }
                     for window in self.windows.iterrows()
                 ],
