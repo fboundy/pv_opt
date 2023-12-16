@@ -1,12 +1,15 @@
 # %%
 import pandas as pd
 import requests
+from copy import copy
 
 # from scipy.stats import linregress
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 TIME_FORMAT = "%d/%m %H:%M"
+COST_DELTA_THRESHOLD = -4.0
+COST_DELTA_THRESHOLD_SLOT = -1.0
 
 
 class Tariff:
@@ -736,6 +739,9 @@ class PVsystemModel:
             self.log("Low Cost Charging")
             self.log("------------------")
             self.log("")
+            net_cost_pre = net_cost_opt
+            slots_pre = copy(slots)
+
             self.log(
                 f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh"
             )
@@ -807,7 +813,9 @@ class PVsystemModel:
 
                     net_cost = contract.net_cost(df).sum()
                     str_log += f"Net: {net_cost:5.1f} "
-                    if net_cost < net_cost_opt:
+                    if net_cost < net_cost_opt - self.host.get_config(
+                        "slot_threshold_p"
+                    ):
                         str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                         str_log += f"Max export: {-df['grid'].min():0.0f}W "
                         net_cost_opt = net_cost
@@ -830,10 +838,28 @@ class PVsystemModel:
                 else:
                     done = True
 
+            cost_delta = net_cost_opt - net_cost_pre
+            str_log = f"Charge net cost delta:{(cost_delta):5.1f}p"
+            if cost_delta > -self.host.get_config("pass_threshold_p"):
+                slots = slots_pre
+                slots_added = 0
+                net_cost_opt = net_cost_pre
+                str_log += f" - > threshold ({self.host.get_config('pass_threshold_p')}) => Excluded"
+            else:
+                str_log += f" - > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
+
+            self.log("")
+            self.log(str_log)
+
             # ---------------------
             # Discharging
             # ---------------------
             if discharge:
+                net_cost_pre = net_cost_opt
+                slots_pre = copy(slots)
+                slots_added_pre = slots_added
+                net_cost_pre = net_cost_opt
+
                 # Check how many slots which aren't full are at an export price less than any import price:
                 min_import_price = df["import"].min()
                 self.log("")
@@ -903,7 +929,9 @@ class PVsystemModel:
 
                         net_cost = contract.net_cost(df).sum()
                         str_log += f"Net: {net_cost:5.1f} "
-                        if net_cost < net_cost_opt:
+                        if net_cost < net_cost_opt - self.host.get_config(
+                            "slot_threshold_p"
+                        ):
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                             str_log += f"Max export: {-df['grid'].min():0.0f}W "
                             net_cost_opt = net_cost
@@ -925,9 +953,59 @@ class PVsystemModel:
                     else:
                         done = True
 
+                cost_delta = net_cost_opt - net_cost_pre
+                str_log = f"Discharge net cost delta:{(cost_delta):5.1f}p"
+                if cost_delta > -self.host.get_config("pass_threshold_p"):
+                    slots = slots_pre
+                    slots_added = slots_added_pre
+                    str_log += f" - > threshold ({self.host.get_config('pass_threshold_p')}) => Excluded"
+                    net_cost_opt = net_cost_pre
+                else:
+                    str_log += f" - > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
+
+                self.log("")
+                self.log(str_log)
+
             self.log(f"Iteration {j:2d}: Slots added: {slots_added:3d}")
 
         df.index = pd.to_datetime(df.index)
+
+        if not self.host.get_config("allow_cyclic"):
+            self.log("")
+            self.log("Removing cyclic charge/discharge")
+            a = df["forced"][df["forced"] != 0].to_dict()
+            new_slots = [(k, a[k]) for k in a]
+            revised_slots = []
+            skip_flag = False
+            for slot, next_slot in zip(new_slots[:-1], new_slots[1:]):
+                if (int(slot[1]) == self.inverter.charger_power) & (
+                    int(-next_slot[1]) == self.inverter.inverter_power
+                ):
+                    skip_flag = True
+                    self.log(
+                        f"  Skipping slots at {slot[0].strftime(TIME_FORMAT)} ({slot[1]}W) and {next_slot[0].strftime(TIME_FORMAT)} ({next_slot[1]}W)"
+                    )
+                elif skip_flag:
+                    skip_flag = False
+                else:
+                    revised_slots.append(slot)
+
+            df = pd.concat(
+                [
+                    prices,
+                    self.flows(
+                        initial_soc, static_flows, slots=revised_slots, **kwargs
+                    ),
+                ],
+                axis=1,
+            )
+            net_cost_opt_new = contract.net_cost(df).sum()
+            self.log(
+                f"  Net cost revised from {net_cost_opt:0.1f}p to {net_cost_opt_new:0.1f}p"
+            )
+            slots = revised_slots
+            df.index = pd.to_datetime(df.index)
+
         return df
 
 

@@ -57,12 +57,31 @@ DEFAULT_CONFIG = {
     "forced_charge": {"default": True, "domain": "switch"},
     "forced_discharge": {"default": True, "domain": "switch"},
     "read_only": {"default": True, "domain": "switch"},
+    "allow_cyclic": {"default": False, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
         "attributes": {
             "min": 5,
             "max": 60,
             "step": 5,
+        },
+        "domain": "number",
+    },
+    "slot_threshold_p": {
+        "default": 1.0,
+        "attributes": {
+            "min": 0.0,
+            "max": 3.0,
+            "step": 0.1,
+        },
+        "domain": "number",
+    },
+    "pass_threshold_p": {
+        "default": 4.0,
+        "attributes": {
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.5,
         },
         "domain": "number",
     },
@@ -171,7 +190,7 @@ DEFAULT_CONFIG = {
         "attributes": {"options": ["mean", "median", "max"]},
     },
     "forced_power_group_tolerance": {
-        "default": 300,
+        "default": 100,
         "domain": "number",
         "attributes": {
             "min": 0,
