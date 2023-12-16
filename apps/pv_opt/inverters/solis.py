@@ -197,11 +197,13 @@ class InverterController:
                     conf[item] = defs[item].replace(
                         "{device_name}", self.host.device_name
                     )
-                if isinstance(defs[item], list):
+                elif isinstance(defs[item], list):
                     conf[item] = [
                         z.replace("{device_name}", self.host.device_name)
                         for z in defs[item]
                     ]
+                else:
+                    conf[item] = defs[item]
 
     def enable_timed_mode(self):
         if (

@@ -10,6 +10,11 @@ inverters:
 pv_opt:
   module: pv_opt
   class: PVOpt
+  dependencies:
+    - pvpy
+    - inverters\solis
+
+
   log: pv_opt_log
   prefix: pvopt
 
@@ -67,7 +72,7 @@ pv_opt:
   # Octopus account parameters
   # ========================================
 
-  octopus_auto: True # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+  # octopus_auto: False # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
 
   # octopus_account: !secret octopus_account
   # octopus_api_key: !secret octopus_api_key
@@ -124,7 +129,7 @@ pv_opt:
     - sensor.{device_name}_backup_load_power
 
   id_grid_power: sensor.{device_name}_grid_active_power
-  id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
+  id_inverter_ac_power: sensor.{device_name}_inverter_ac_power
   id_battery_soc: sensor.{device_name}_battery_soc
 
   # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour

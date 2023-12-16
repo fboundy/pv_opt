@@ -23,7 +23,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.3.0"
+VERSION = "3.3.1"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -170,8 +170,29 @@ DEFAULT_CONFIG = {
         "domain": "select",
         "attributes": {"options": ["mean", "median", "max"]},
     },
+    "forced_power_group_tolerance": {
+        "default": 300,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 1000,
+            "step": 100,
+            "unit_of_measurement": "W",
+            "device_class": "power",
+            "mode": "box",
+        },
+    },
     # "alt_tariffs": {"default": [], "domain": "input_select"},
 }
+
+
+def importName(modulename, name):
+    """Import a named object from a module in the context of this function."""
+    try:
+        module = __import__(modulename, globals(), locals(), [name])
+    except ImportError:
+        return None
+    return vars(module)[name]
 
 
 class PVOpt(hass.Hass):
@@ -282,9 +303,15 @@ class PVOpt(hass.Hass):
     def _load_inverter(self):
         if self.inverter_type in INVERTER_TYPES:
             self.log(f"Inverter type: {self.inverter_type}")
-            self.inverter = inv.InverterController(
+            inverter_brand = self.inverter_type.split("_")[0].lower()
+            InverterController = importName(
+                f"inverters.{inverter_brand}", "InverterController"
+            )
+            self.log(f"inverters.{inverter_brand}")
+            self.inverter = InverterController(
                 inverter_type=self.inverter_type, host=self
             )
+
         else:
             e = f"Inverter type {self.inverter_type} is not yet supported. Only read-only mode with explicit config from the YAML will work."
             self.log(e, level="ERROR")
@@ -712,7 +739,9 @@ class PVOpt(hass.Hass):
 
         if items is None:
             items = [
-                i for i in self.args if i not in ["module", "class", "prefix", "log"]
+                i
+                for i in self.args
+                if i not in ["module", "class", "prefix", "log", "dependencies"]
             ]
 
         for item in items:
@@ -930,6 +959,7 @@ class PVOpt(hass.Hass):
             + [i for i in self.inverter.config if i not in self.config]
             + [i for i in self.inverter.brand_config if i not in self.config]
         )
+
         if len(items_not_defined) > 0:
             for item in items_not_defined:
                 self.config[item] = self.get_default_config(item)
@@ -1198,51 +1228,8 @@ class PVOpt(hass.Hass):
         self.opt["period"] = (self.opt["forced"].diff() > 0).cumsum()
 
         self.log("")
-        if (self.opt["forced"] != 0).sum() > 0:
-            self.log("Optimal forced charge/discharge slots:")
-            x = self.opt[self.opt["forced"] > 0].copy()
-            x["start"] = x.index
-            x["end"] = x.index + pd.Timedelta("30T")
-            windows = pd.concat(
-                [
-                    x.groupby("period").first()[["start", "soc", "forced"]],
-                    x.groupby("period").last()[["end", "soc_end"]],
-                ],
-                axis=1,
-            )
 
-            x = self.opt[self.opt["forced"] < 0].copy()
-            x["start"] = x.index
-            x["end"] = x.index + pd.Timedelta("30T")
-            self.windows = pd.concat(
-                [
-                    x.groupby("period").first()[["start", "soc", "forced"]],
-                    x.groupby("period").last()[["end", "soc_end"]],
-                ],
-                axis=1,
-            )
-
-            self.windows = pd.concat([windows, self.windows]).sort_values("start")
-            self.windows["forced"] = (
-                (self.windows["forced"] / 100).round(0) * 100
-            ).astype(int)
-            for window in self.windows.iterrows():
-                self.log(
-                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4.1f}% -> {window[1]['soc_end']:4.1f}%"
-                )
-
-            self.charge_power = self.windows["forced"].iloc[0]
-            self.charge_current = self.charge_power / self.get_config("battery_voltage")
-            self.charge_start_datetime = self.windows["start"].iloc[0]
-            self.charge_end_datetime = self.windows["end"].iloc[0]
-
-        else:
-            self.log(f"No charging slots")
-            self.charge_current = 0
-            self.charge_power = 0
-
-            self.charge_start_datetime = self.static.index[0]
-            self.charge_end_datetime = self.static.index[0]
+        self._create_windows()
 
         self.log("")
         self.log(
@@ -1394,6 +1381,59 @@ class PVOpt(hass.Hass):
                 self._status("Discharging")
             else:
                 self._status("Idle")
+
+    def _create_windows(self):
+        if (self.opt["forced"] != 0).sum() > 0:
+            self.log("Optimal forced charge/discharge slots:")
+            x = self.opt[self.opt["forced"] > 0].copy()
+            x["start"] = x.index
+            x["end"] = x.index + pd.Timedelta("30T")
+            windows = pd.concat(
+                [
+                    x.groupby("period").first()[["start", "soc", "forced"]],
+                    x.groupby("period").last()[["end", "soc_end"]],
+                ],
+                axis=1,
+            )
+
+            x = self.opt[self.opt["forced"] < 0].copy()
+            x["start"] = x.index
+            x["end"] = x.index + pd.Timedelta("30T")
+            self.windows = pd.concat(
+                [
+                    x.groupby("period").first()[["start", "soc", "forced"]],
+                    x.groupby("period").last()[["end", "soc_end"]],
+                ],
+                axis=1,
+            )
+
+            self.windows = pd.concat([windows, self.windows]).sort_values("start")
+            tolerance = self.get_config("forced_power_group_tolerance")
+            self.log(f">>>{tolerance}")
+            self.windows["forced"] = (
+                (self.windows["forced"] / tolerance).round(0) * tolerance
+            ).astype(int)
+
+            if self.config["supports_hold_soc"]:
+                self.log("Checking for Hold SOC slots")
+
+            for window in self.windows.iterrows():
+                self.log(
+                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4.1f}% -> {window[1]['soc_end']:4.1f}%"
+                )
+
+            self.charge_power = self.windows["forced"].iloc[0]
+            self.charge_current = self.charge_power / self.get_config("battery_voltage")
+            self.charge_start_datetime = self.windows["start"].iloc[0]
+            self.charge_end_datetime = self.windows["end"].iloc[0]
+
+        else:
+            self.log(f"No charging slots")
+            self.charge_current = 0
+            self.charge_power = 0
+
+            self.charge_start_datetime = self.static.index[0]
+            self.charge_end_datetime = self.static.index[0]
 
     def _log_inverter_status(self, status):
         self.log("")
