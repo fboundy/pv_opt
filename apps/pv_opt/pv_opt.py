@@ -11,7 +11,6 @@ import time
 # import requests
 # import datetime
 import pvpy as pv
-import inverters as inv
 import numpy as np
 from numpy import nan
 
@@ -87,7 +86,7 @@ DEFAULT_CONFIG = {
         "domain": "number",
     },
     "octopus_auto": {"default": True, "domain": "switch"},
-    "battery_capacity_Wh": {
+    "battery_capacity_wh": {
         "default": 10000,
         "domain": "number",
         "attributes": {
@@ -322,12 +321,11 @@ class PVOpt(hass.Hass):
 
     def _load_inverter(self):
         if self.inverter_type in INVERTER_TYPES:
-            self.log(f"Inverter type: {self.inverter_type}")
             inverter_brand = self.inverter_type.split("_")[0].lower()
-            InverterController = importName(
-                f"inverters.{inverter_brand}", "InverterController"
+            InverterController = importName(f"{inverter_brand}", "InverterController")
+            self.log(
+                f"Inverter type: {self.inverter_type}: inverter module: {inverter_brand}.py"
             )
-            self.log(f"inverters.{inverter_brand}")
             self.inverter = InverterController(
                 inverter_type=self.inverter_type, host=self
             )
@@ -348,7 +346,7 @@ class PVOpt(hass.Hass):
         )
 
         self.battery_model = pv.BatteryModel(
-            capacity=self.get_config("battery_capacity_Wh"),
+            capacity=self.get_config("battery_capacity_wh"),
             max_dod=self.get_config("maximum_dod_percent") / 100,
         )
         self.pv_system = pv.PVsystemModel(
@@ -777,6 +775,8 @@ class PVOpt(hass.Hass):
                 for v in self.args[item]
             ]
 
+            # self.log(f">>> {item} {values}")
+
             if values[0] is None:
                 self.config[item] = self.get_default_config(item)
                 self.log(
@@ -1064,7 +1064,7 @@ class PVOpt(hass.Hass):
                     conf_topic = f"homeassistant/{domain}/{id}/config"
                     self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
 
-                    if item == "battery_capacity_Wh":
+                    if item == "battery_capacity_wh":
                         capacity = self._estimate_capacity()
                         if capacity is not None:
                             self.config[item] = round(capacity / 100, 0) * 100
@@ -1076,7 +1076,7 @@ class PVOpt(hass.Hass):
                 elif isinstance(
                     self.get_ha_value(entity_id), str
                 ) and self.get_ha_value(entity_id) not in attributes.get("options", {}):
-                    if item == "battery_capacity_Wh":
+                    if item == "battery_capacity_wh":
                         capacity = self._estimate_capacity()
                         if capacity is not None:
                             state = capacity
@@ -1125,7 +1125,7 @@ class PVOpt(hass.Hass):
             "inverter_power_watts",
             "inverter_loss_watts",
             "charger_efficiency_percent",
-            "battery_capacity_Wh",
+            "battery_capacity_wh",
             "maximum_dod_percent",
         ]:
             self._load_pv_system_model()
@@ -1245,7 +1245,6 @@ class PVOpt(hass.Hass):
             discharge=self.get_config("forced_discharge"),
         )
         self.opt_cost = self.contract.net_cost(self.opt)
-        self.opt["period"] = (self.opt["forced"].diff() > 0).cumsum()
 
         self.log("")
 
@@ -1291,9 +1290,13 @@ class PVOpt(hass.Hass):
             if (time_to_slot_start > 0) and (
                 time_to_slot_start < self.get_config("optimise_frequency_minutes")
             ):
+                # Next slot starts before the next optimiser run. This implies we are not currently in
+                # a charge or discharge slot
+
                 self.log(
                     f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
                 )
+
                 if self.charge_power > 0:
                     self.inverter.control_charge(
                         enable=True,
@@ -1315,40 +1318,63 @@ class PVOpt(hass.Hass):
             elif (time_to_slot_start <= 0) and (
                 time_to_slot_start < self.get_config("optimise_frequency_minutes")
             ):
-                self.log(
-                    f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
-                )
+                # We are currently in a charge/discharge slot
 
-                if self.charge_power > 0:
-                    if not status["charge"]["active"]:
-                        start = pd.Timestamp.now()
+                # If the current slot is a Hold SOC slot and we aren't holding then we need to
+                # enable Hold SOC
+                if self.hold[0]["active"]:
+                    if (
+                        not status["hold_soc"]["active"]
+                        or status["hold_soc"]["soc"] != self.hold[0]["soc"]
+                    ):
+                        self.log(
+                            f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%"
+                        )
+                        self.inverter.hold_soc(self.hold[0]["soc"])
                     else:
-                        start = None
+                        self.log(
+                            f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%"
+                        )
 
-                    self.inverter.control_charge(
-                        enable=True,
-                        start=start,
-                        end=self.charge_end_datetime,
-                        power=self.charge_power,
+                else:
+                    self.log(
+                        f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
                     )
-                elif self.charge_power < 0:
-                    if not status["discharge"]["active"]:
-                        start = pd.Timestamp.now()
-                    else:
-                        start = None
 
-                    self.inverter.control_discharge(
-                        enable=True,
-                        start=start,
-                        end=self.charge_end_datetime,
-                        power=self.charge_power,
-                    )
+                    if self.charge_power > 0:
+                        if not status["charge"]["active"]:
+                            start = pd.Timestamp.now()
+                        else:
+                            start = None
+
+                        self.inverter.control_charge(
+                            enable=True,
+                            start=start,
+                            end=self.charge_end_datetime,
+                            power=self.charge_power,
+                        )
+
+                    elif self.charge_power < 0:
+                        if not status["discharge"]["active"]:
+                            start = pd.Timestamp.now()
+                        else:
+                            start = None
+
+                        self.inverter.control_discharge(
+                            enable=True,
+                            start=start,
+                            end=self.charge_end_datetime,
+                            power=self.charge_power,
+                        )
 
             else:
                 if self.charge_power > 0:
                     direction = "charge"
                 elif self.charge_power < 0:
                     direction = "discharge"
+
+                # We aren't in a charge/discharge slot and the next one doesn't start before the
+                # optimiser runs again
 
                 str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes."
 
@@ -1387,15 +1413,19 @@ class PVOpt(hass.Hass):
                     did_something = False
 
             if did_something:
-                if self.inverter_type == "SOLIS_CORE_MODBUS":
-                    # Wait for the status to update
-                    self.log("Wating for Modbus Read cycle")
-                    time.sleep(60)
+                i = int(self.get_config("update_cycle_seconds"))
+                self.log(f"Wating for Modbus Read cycle: {i} seconds")
+                while i > 0:
+                    self._status(f"Wating for Modbus Read cycle: {i}")
+                    time.sleep(1)
+                    i -= 1
 
                 status = self.inverter.status
                 self._log_inverter_status(status)
 
-            if status["charge"]["active"]:
+            if status["hold_soc"]["active"]:
+                self._status(f"Holding SOC at {status['hold_soc']['soc']:0.0f}%")
+            elif status["charge"]["active"]:
                 self._status("Charging")
             elif status["discharge"]["active"]:
                 self._status("Discharging")
@@ -1403,11 +1433,14 @@ class PVOpt(hass.Hass):
                 self._status("Idle")
 
     def _create_windows(self):
+        self.opt["period"] = (self.opt["forced"].diff() > 0).cumsum()
         if (self.opt["forced"] != 0).sum() > 0:
             self.log("Optimal forced charge/discharge slots:")
             x = self.opt[self.opt["forced"] > 0].copy()
             x["start"] = x.index
             x["end"] = x.index + pd.Timedelta("30T")
+            x["soc"] = x["soc"].round(0).astype(int)
+            x["soc_end"] = x["soc_end"].round(0).astype(int)
             windows = pd.concat(
                 [
                     x.groupby("period").first()[["start", "soc", "forced"]],
@@ -1429,10 +1462,12 @@ class PVOpt(hass.Hass):
 
             self.windows = pd.concat([windows, self.windows]).sort_values("start")
             tolerance = self.get_config("forced_power_group_tolerance")
-            self.log(f">>>{tolerance}")
             self.windows["forced"] = (
                 (self.windows["forced"] / tolerance).round(0) * tolerance
             ).astype(int)
+
+            self.windows["soc"] = self.windows["soc"].round(0).astype(int)
+            self.windows["soc_end"] = self.windows["soc_end"].round(0).astype(int)
 
             self.windows["hold_soc"] = ""
             if self.config["supports_hold_soc"]:
@@ -1444,21 +1479,28 @@ class PVOpt(hass.Hass):
 
             for window in self.windows.iterrows():
                 self.log(
-                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4.1f}% -> {window[1]['soc_end']:4.1f}%  {window[1]['hold_soc']}"
+                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
             self.charge_current = self.charge_power / self.get_config("battery_voltage")
             self.charge_start_datetime = self.windows["start"].iloc[0]
             self.charge_end_datetime = self.windows["end"].iloc[0]
+            self.hold = [
+                {
+                    "active": self.windows["hold_soc"].iloc[i] == "<=",
+                    "soc": self.windows["soc_end"].iloc[i],
+                }
+                for i in [0, 1]
+            ]
 
         else:
             self.log(f"No charging slots")
             self.charge_current = 0
             self.charge_power = 0
-
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
+            self.hold = []
 
     def _log_inverter_status(self, status):
         self.log("")
