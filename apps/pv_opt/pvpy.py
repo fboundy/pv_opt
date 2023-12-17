@@ -147,10 +147,11 @@ class Tariff:
                     freq="30T",
                 )
             ).ffill()
+            self.log(f">>>{df}")
             mask = (df.index.time >= self.eco7_start.time()) & (
                 df.index.time < (self.eco7_start + pd.Timedelta("7H")).time()
             )
-            df.loc[mask, "value_inc_vat"] = df.loc[mask, "Night"]
+            df.loc[mask, "unit"] = df.loc[mask, "Night"]
             df = df["unit"].loc[start:end]
 
         else:
@@ -550,6 +551,7 @@ class PVsystemModel:
         )
 
         prices = prices.set_axis(["import", "export"], axis=1)
+        self.log(f">>>{prices}")
 
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
