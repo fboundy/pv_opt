@@ -51,6 +51,9 @@ MQTT_CONFIGS = {
         "state_on": "ON",
         "state_off": "OFF",
     },
+    "number": {
+        "mode": "slider",
+    },
 }
 
 DEFAULT_CONFIG = {
@@ -64,6 +67,7 @@ DEFAULT_CONFIG = {
             "min": 5,
             "max": 60,
             "step": 5,
+            "mode": "slider",
         },
         "domain": "number",
     },
@@ -73,6 +77,7 @@ DEFAULT_CONFIG = {
             "min": 0.0,
             "max": 3.0,
             "step": 0.1,
+            "mode": "slider",
         },
         "domain": "number",
     },
@@ -82,6 +87,7 @@ DEFAULT_CONFIG = {
             "min": 0.0,
             "max": 10.0,
             "step": 0.5,
+            "mode": "slider",
         },
         "domain": "number",
     },
@@ -95,7 +101,7 @@ DEFAULT_CONFIG = {
             "step": 100,
             "unit_of_measurement": "Wh",
             "device_class": "energy",
-            "mode": "box",
+            "mode": "slider",
         },
     },
     "inverter_efficiency_percent": {
@@ -106,7 +112,7 @@ DEFAULT_CONFIG = {
             "max": 100,
             "step": 1,
             "unit_of_measurement": "%",
-            "mode": "box",
+            "mode": "slider",
         },
     },
     "charger_efficiency_percent": {
@@ -117,7 +123,7 @@ DEFAULT_CONFIG = {
             "max": 100,
             "step": 1,
             "unit_of_measurement": "%",
-            "mode": "box",
+            "mode": "slider",
         },
     },
     "charger_power_watts": {
@@ -129,7 +135,7 @@ DEFAULT_CONFIG = {
             "step": 100,
             "unit_of_measurement": "W",
             "device_class": "power",
-            "mode": "box",
+            "mode": "slider",
         },
     },
     "inverter_power_watts": {
@@ -141,7 +147,7 @@ DEFAULT_CONFIG = {
             "step": 100,
             "unit_of_measurement": "W",
             "device_class": "power",
-            "mode": "box",
+            "mode": "slider",
         },
     },
     "inverter_loss_watts": {
@@ -153,7 +159,7 @@ DEFAULT_CONFIG = {
             "step": 10,
             "unit_of_measurement": "W",
             "device_class": "power",
-            "mode": "box",
+            "mode": "slider",
         },
     },
     "solar_forecast": {
@@ -170,7 +176,7 @@ DEFAULT_CONFIG = {
             "min": 1,
             "max": 28,
             "step": 1,
-            "mode": "box",
+            "mode": "slider",
         },
     },
     "consumption_margin": {
@@ -181,7 +187,7 @@ DEFAULT_CONFIG = {
             "max": 100,
             "step": 5,
             "unit_of_measurement": "%",
-            "mode": "box",
+            "mode": "slider",
         },
     },
     "consumption_grouping": {
@@ -198,7 +204,7 @@ DEFAULT_CONFIG = {
             "step": 100,
             "unit_of_measurement": "W",
             "device_class": "power",
-            "mode": "box",
+            "mode": "slider",
         },
     },
     # "alt_tariffs": {"default": [], "domain": "input_select"},
@@ -490,7 +496,7 @@ class PVOpt(hass.Hass):
     def _load_contract(self):
         self.log("")
         self.log("Loading Contract:")
-        self._status("Loading Contract")
+        self._status("Loading Tariffs")
         self.log("-----------------")
         self.tariff_codes = {}
         self.agile = False
@@ -1017,8 +1023,11 @@ class PVOpt(hass.Hass):
 
     def _state_from_value(self, value):
         if isinstance(value, bool):
-            state = f"{value*'on'}{(1-value)*'off'}"
-        if isinstance(value, list):
+            if value:
+                state = "on"
+            else:
+                state = "off"
+        elif isinstance(value, list):
             state = value[0]
         else:
             state = value
@@ -1026,6 +1035,7 @@ class PVOpt(hass.Hass):
 
     def _expose_configs(self):
         # for defaults in [DEFAULT_CONFIG, self.inverter.config, self.inverter.brand_config]:
+
         for defaults in [DEFAULT_CONFIG]:
             untracked_items = [
                 item
@@ -1045,37 +1055,38 @@ class PVOpt(hass.Hass):
                 entity_id = f"{domain}.{id}"
                 attributes = defaults[item].get("attributes", {})
 
-                if not self.entity_exists(entity_id=entity_id):
-                    self.log(
-                        f"Creating HA Entity {entity_id} for {item} using MQTT Discovery"
-                    )
-                    conf = (
-                        {
-                            "state_topic": f"homeassistant/{domain}/{id}/state",
-                            "command_topic": f"homeassistant/{domain}/{id}/set",
-                            "name": self._name_from_item(item),
-                            "optimistic": True,
-                            "unique_id": id,
-                        }
-                        | attributes
-                        | MQTT_CONFIGS.get(domain, {})
-                    )
+                # if not self.entity_exists(entity_id=entity_id):
+                self.log(
+                    # f"Creating HA Entity {entity_id} for {item} using MQTT Discovery"
+                    f"Configuring HA Entity {entity_id} for {item} using MQTT Discovery"
+                )
+                conf = (
+                    {
+                        "state_topic": f"homeassistant/{domain}/{id}/state",
+                        "command_topic": f"homeassistant/{domain}/{id}/set",
+                        "name": self._name_from_item(item),
+                        "optimistic": False,
+                        "unique_id": id,
+                    }
+                    | attributes
+                    | MQTT_CONFIGS.get(domain, {})
+                )
 
-                    conf_topic = f"homeassistant/{domain}/{id}/config"
-                    self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+                conf_topic = f"homeassistant/{domain}/{id}/config"
+                self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
 
-                    if item == "battery_capacity_wh":
-                        capacity = self._estimate_capacity()
-                        if capacity is not None:
-                            self.config[item] = round(capacity / 100, 0) * 100
-                            self.log(f"Battery capacity estimated to be {capacity} Wh")
+                if item == "battery_capacity_wh":
+                    capacity = self._estimate_capacity()
+                    if capacity is not None:
+                        self.config[item] = round(capacity / 100, 0) * 100
+                        self.log(f"Battery capacity estimated to be {capacity} Wh")
 
-                    # Only set the state for entities that don't currently exists
-                    state = self._state_from_value(self.config[item])
+                # Only set the state for entities that don't currently exists
+                state = self._state_from_value(self.config[item])
                 # Or entities where the sensor value is no use
-                elif isinstance(
-                    self.get_ha_value(entity_id), str
-                ) and self.get_ha_value(entity_id) not in attributes.get("options", {}):
+                if isinstance(self.get_ha_value(entity_id), str) and self.get_ha_value(
+                    entity_id
+                ) not in attributes.get("options", {}):
                     if item == "battery_capacity_wh":
                         capacity = self._estimate_capacity()
                         if capacity is not None:
@@ -1091,7 +1102,7 @@ class PVOpt(hass.Hass):
                     state = self.get_ha_value(entity_id)
 
                 self.set_state(
-                    state=state,
+                    state=self._state_from_value(state),
                     entity_id=entity_id,
                     attributes=attributes
                     | {"friendly_name": self._name_from_item(item)},
@@ -1527,7 +1538,7 @@ class PVOpt(hass.Hass):
             conf = {
                 "state_topic": f"homeassistant/sensor/{id}/state",
                 "command_topic": f"homeassistant/domain/{id}/set",
-                "optimistic": True,
+                "optimistic": False,
                 "unique_id": id,
             }
 
