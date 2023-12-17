@@ -147,7 +147,6 @@ class Tariff:
                     freq="30T",
                 )
             ).ffill()
-            self.log(f">>>{df}")
             mask = (df.index.time >= self.eco7_start.time()) & (
                 df.index.time < (self.eco7_start + pd.Timedelta("7H")).time()
             )
@@ -551,7 +550,6 @@ class PVsystemModel:
         )
 
         prices = prices.set_axis(["import", "export"], axis=1)
-        self.log(f">>>{prices}")
 
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
@@ -566,8 +564,8 @@ class PVsystemModel:
         # Add any slots where the price is negative:
         if neg:
             self.log("")
-            self.log("Negative Import Slots")
-            self.log("---------------------")
+            self.log("Negative Price Import Slots")
+            self.log("---------------------------")
             self.log("")
 
             neg_slots = (
@@ -601,7 +599,7 @@ class PVsystemModel:
         # --------------------------------------------------------------------------------------------
         self.log("")
         self.log("High Cost Usage Swaps")
-        self.log("------------------")
+        self.log("---------------------")
         self.log("")
 
         done = False
@@ -659,42 +657,52 @@ class PVsystemModel:
                         done = True
                     if len(x) > 0:
                         min_price = x["import"].min()
-                        start_window = x[x["import"] == min_price].index[0]
+                        window = x[x["import"] == min_price].index
+                        start_window = window[0]
 
                         cost_at_min_price = round_trip_energy_required * min_price
                         str_log += f"<==> {start_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
                         str_log += f" SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
-                        if pd.Timestamp.now() > start_window.tz_localize(None):
-                            str_log += "* "
-                            factor = (
-                                (start_window.tz_localize(None) + pd.Timedelta("30T"))
-                                - pd.Timestamp.now()
-                            ).total_seconds() / 1800
-                        else:
-                            str_log += "  "
-                            factor = 1
+                        factors = []
+                        for slot in window:
+                            if pd.Timestamp.now() > slot.tz_localize(None):
+                                factors.append(
+                                    (
+                                        (slot.tz_localize(None) + pd.Timedelta("30T"))
+                                        - pd.Timestamp.now()
+                                    ).total_seconds()
+                                    / 1800
+                                )
+                            else:
+                                factors.append(1)
+
+                        factors = [f / sum(factors) for f in factors]
+                        self.log(f">>>{factors}")
 
                         if cost_at_min_price < max_import_cost:
-                            slots.append(
-                                (
-                                    start_window,
-                                    round(
-                                        min(
-                                            round_trip_energy_required * 2000 * factor,
-                                            self.inverter.charger_power
-                                            - x["forced"].loc[start_window],
-                                            (
-                                                (100 - x["soc_end"].loc[start_window])
-                                                / 100
-                                                * self.battery.capacity
-                                            )
-                                            * 2
-                                            * factor,
+                            for slot, factor in zip(window, factors):
+                                slots.append(
+                                    (
+                                        slot,
+                                        round(
+                                            min(
+                                                round_trip_energy_required
+                                                * 2000
+                                                * factor,
+                                                self.inverter.charger_power
+                                                - x["forced"].loc[slot],
+                                                (
+                                                    (100 - x["soc_end"].loc[slot])
+                                                    / 100
+                                                    * self.battery.capacity
+                                                )
+                                                * 2
+                                                * factor,
+                                            ),
+                                            0,
                                         ),
-                                        0,
-                                    ),
+                                    )
                                 )
-                            )
 
                             df = pd.concat(
                                 [

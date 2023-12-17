@@ -781,8 +781,6 @@ class PVOpt(hass.Hass):
                 for v in self.args[item]
             ]
 
-            # self.log(f">>> {item} {values}")
-
             if values[0] is None:
                 self.config[item] = self.get_default_config(item)
                 self.log(
@@ -1502,7 +1500,7 @@ class PVOpt(hass.Hass):
                     "active": self.windows["hold_soc"].iloc[i] == "<=",
                     "soc": self.windows["soc_end"].iloc[i],
                 }
-                for i in [0, 1]
+                for i in range(0, min(len(self.windows), 1))
             ]
 
         else:
