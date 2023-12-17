@@ -268,10 +268,12 @@ Once downloaded AppDaemon should see the app and attempt to load it using the de
 
 If you have the Solcast, Octopus and Solax integrations set up as specified above, there should be minimal configuration required. 
 
-If you are running a different integration or inverter brand you will need to edit the `config.yaml` file to select the correct `inverter_type`:
+If you are running a different integration or inverter brand you will need to edit the `config.yaml` file to select the correct `inverter_type`. You may also need to change the `device_name`. This is the name given to your inverter by your integration. The default is `solis` but this can also be changed in `config.yaml`.
 
     inverter_type: SOLIS_CORE_MODBUS
+    device_name: solis
 
+The `config.yaml` file also includes all the other configuration used by PV Opt. If you are using the default setup you shouldn't need to change this but you can edit anything by un-commenting the relevant line in the file. The configuration is grouped by inverter/integration and should be self-explanatory
 
 <b><i>PV_Opt</b></i> needs to know the size of your battery and the power of your inverter: both when inverting battery to AC power and when chargingh tha battery. It will attempt to work these out from the data it has loaded (WIP) but you should check the following enitities in Home Assistant:
 
@@ -320,3 +322,94 @@ If `Optimise Charging` is enabled, an optimsised charging plan is calculated and
 The easiest way to control and visualise this is through the `pvopt_dashboard.yaml` Lovelace yaml file included in this repo. Note that you will need to manually paste this into a dashboard and edit the charts to use the correct Octopus Energy sensors:
 
 ![Alt text](image-1.png)
+
+<h2>Development - Adding Additional Inverters: the PV Opt API</h2>
+
+PV Opt is designed to be <i>pluggable</i>. A simple API is used to control inverters. This is defined as follows:
+
+<h3>Inverter Type</h3>
+
+Each inverter type is defined by a string in the config.yaml file. This should be of the format: `BRAND_INTEGRATION` for example `SOLIS_SOLAX_MODBUS`. 
+
+<h3>Inverter Module</h3>
+
+PV Opt expects one module per inverter brand named `brand.py` which includes drives for all integrations/models associated with that brand. For example `solis.py` includes the drivers for `SOLIS_SOLAX_MODBUS`, `SOLIS_CORE_MODBUS` and `SOLIS_SOLARMAN`
+
+Each module exposes the following:
+
+<h4>Classes</h4>
+
+The module exposes a single class `InverterController(inverter_type, host)`. The two required initialisation parameters are:
+
+| Parameter | Type | Description |
+| :--| :--: | :--|
+|`inverter_type`| `str` | The `inverter_type` string from the `config.yaml` file
+|`host` | `PVOpt` | The instance of `PV Opt` that has instantiated the inverter class. This allows the class to, for instance, write to the main log file simply be setting `self.log=host.log` and then calling `self.log()`
+
+<h4>Class Attributes</h4>
+
+The `InverterController` class must expose the following:
+
+| Attribute | Key | Type | Description | Example from `SOLIS_SOLAX_MODBUS`|
+|:--| :--:|:--:|:--|:--|
+|`.config`| | `dict`| This dict contains all the names of all the entities that PV Opt requires to run plus a few other parameters that are common to all inverters. Some entries must be an `entity_id`: keys for these itesms start with `id_`. Others may be `enitity_id`s or numbers. `entity_id`s should ideally include `{device_name}` to allow for the subsititution of a defined device name where appropriate. |
+||`maximum_dod_percent` | `str` / `int`| Maximum depth of discharge - nay be an entity_id or a number | `number.{device_name}_battery_minimum_soc`|
+||`update_cycle_seconds` |`int`| Time in seconds between HA updates | 15|
+||`supports_hold_soc` |`bool`| Flags whether the integration supports holding a fixed SOC | `true`|
+||`id_battery_soc` | `str`|`entity_id` of Battery State of Charge | `number.{device_name}_battery_soc`|
+||`id_consumption` | `str` or `list` of `str`s|`entity_id` of House Load. May also be a list of `entity_id`s in which case the load from these will be summed to give total load | `[sensor.{device_name}_house_load_power , sensor.{device_name}_bypass_load_power]`|
+|Either:|
+||`id_grid_import_today`| `str`|`entity_id` of Daily Grid Import Total  | `sensor.{device_name}_grid_import_today`|
+||`id_grid_export_today`| `str`|`entity_id` of Daily Grid Export Total  | `sensor.{device_name}_grid_export_today`|
+|Or:|
+||`id_grid_import_power`| `str`|`entity_id` of Grid Import Power  | `sensor.{device_name}_grid_import_power`|
+||`id_grid_export_power`| `str`|`entity_id` of Grid Export Power  | `sensor.{device_name}_grid_export_power`|
+|Or:|
+||`id_grid_power`| `str`|`entity_id` of Grid Power (+ve import, -ve export) | `sensor.{device_name}_meter_active_power`|
+|`.brand_config`| | `dict`| This dict contains all the names of all the entities that this brand/integration requires. These are only exposed for logging purposes and to allow the plug-in to use methods from the main app that use query `entity_id`s such as `.get_config(entity_id)` . A limited number of examples are given as this will vary for each plug-in.|
+||`battery_voltage` | `str` / `int`| Battery voltage for converting power to current - nay be an entity_id or a number | `sensor.{device_name}_battery_voltage`|
+||`id_timed_charge_start_hours` | `str`|`entity_id` of Timed Charge Start Hours | `number.{device_name}_timed_charge_start_hours`|
+||`id_timed_charge_start_minutes` | `str`|`entity_id` of Timed Charge Start Minutes | `number.{device_name}_timed_charge_start_minutes`|
+||`id_timed_charge_end_hours` | `str`|`entity_id` of Timed Charge End Hours | `number.{device_name}_timed_charge_end_hours`|
+||`id_timed_charge_end_minutes` | `str`|`entity_id` of Timed Charge End Minutes | `number.{device_name}_timed_charge_end_minutes`|
+||`id_timed_charge_current` | `str`|`entity_id` of Timed Charge Current | `number.{device_name}_timed_charge_current`|
+|`.status`| |`dict`| This dict reports the current status of the inverter ||
+||`charge`|`dict`| Dict of the Timed Charge Status with the following keys: `active: bool, start: datetime, end: datetime, power: float`|
+||`discharge`|`dict`| Dict of the Timed Discharge Status with the following keys: `active: bool, start: datetime, end: datetime, power: float`|
+||`hold_soc`|`dict`| Dict of the Hold_SOC Status with the following keys: `active: bool, soc: int`|
+
+
+<h4>Methods</h4>
+
+The `InverterController` class must expose the following:
+
+|Method | Parameters | Returns | Description |
+|:--| :-- | :--: | :--|
+|`.enable_timed_mode()` | - | `None` | Switches the inverter mode to support timed changing and discharging |
+|`.control_charge()` | `enable: bool` | `None` | Enable or disable timed charging |
+| | `start: datetime, optional` |  | Start time of timed slot (default = don't set start) |
+| | `end: datetime, optional` |  | End time of timed slot (default = don't set end) |
+| | `power: float, optional` |  | Maximum power of timed slot (default = don't set power) |
+|`.control_discharge()` | `enable: bool` | `None` | Enable or disable timed discharging |
+| | `start: datetime, optional` |  | Start time of timed slot (default = don't set start) |
+| | `end: datetime, optional` |  | End time of timed slot (default = don't set end) |
+| | `power: float, optional` |  | Maximum power of timed slot (default = don't set power) |
+|`.hold_soc()` | `soc` | `None` | Switch inverter mode to hold specified SOC (if supported) |
+
+
+<h4>PV Opt Methods Available to the Inverter</h4>
+
+The following methods may be useful for the inverter to call. If `self.host` is initialised to `host` they can be called using `self.host.method()`. As PV Opt is a sub-class of `hass.HASS` it includes all the AppDAemon methods listed here: https://appdaemon.readthedocs.io/en/latest/AD_API_REFERENCE.html 
+
+|Method | Parameters | Returns / Decsription | 
+|:--| :-- | :-- |
+| `self.host.log`| `string`| Write `string` to the log file.
+||`level: str, optional`| Optionally set the error level (default = `INFO`) |
+| `self.host.get_state()`| `entity_id` | Home Assitant state of the entity |
+|| `attributes: str, optional`| If attributes is set the attribute rather than the state is returned. If attribute is set to all a `dict` of all attributes is returned.
+| `self.host.set_state()`| `state` | Set the Home Assitant state of the entity and optionally the attributes. Returns a `dict` of the new state|
+||`entity_id: str`|
+|| `attributes: dict, optional`|
+| `self.host.entity_exists()` | `entity_id: str` | `bool` that confirms whether an entity exists in Home Assistant |
+| `self.host.call_service()` | `service: str` | Call `service` in Home Assistant|
+||`data: dict, optional`| Data to be supplied to the service e.g. for writing to the Solis Modbus registers: `data={"hub": "solis", "slave": 1, "address": 43011, "value": 15}`

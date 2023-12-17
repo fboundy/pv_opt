@@ -44,7 +44,7 @@ INVERTER_DEFS = {
             "id_battery_charge_power": "sensor.{device_name}_battery_input_energy",
             "id_inverter_ac_power": "sensor.{device_name}_active_power",
             "supports_hold_soc": True,
-            "update_cyle_seconds": 15,
+            "update_cycle_seconds": 15,
         },
         # Brand Conguration: Exposed as inverter.brand_config and can be over-written using arguments
         # from the config.yaml file but not rquired outside of this module
@@ -99,7 +99,7 @@ INVERTER_DEFS = {
             "id_grid_power": "sensor.{device_name}_grid_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
-            "update_cyle_seconds": 60,
+            "update_cycle_seconds": 60,
         },
         "brand_config": {
             "modbus_hub": "solis",
@@ -161,7 +161,7 @@ INVERTER_DEFS = {
             "id_grid_power": "sensor.{device_name}_meter_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
-            "update_cyle_seconds": 60,
+            "update_cycle_seconds": 60,
         },
         "brand_config": {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
