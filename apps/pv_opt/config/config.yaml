@@ -10,15 +10,19 @@ inverters:
 pv_opt:
   module: pv_opt
   class: PVOpt
+  dependencies:
+    - pvpy
+    - solis
+
   log: pv_opt_log
   prefix: pvopt
 
 # User configuration ---  EDIT AWAY! ---
 
-  # inverter_type: "SOLIS_SOLAX_MODBUS"
-  inverter_type: "SOLIS_CORE_MODBUS"
+  inverter_type: "SOLIS_SOLAX_MODBUS"
+  # inverter_type: "SOLIS_CORE_MODBUS"
   # inverter_type: SOLIS_SOLARMAN
-  device_name: solmod
+  device_name: solis
 
   # ========================================
   # Plant parameters
@@ -27,7 +31,7 @@ pv_opt:
   # All parameters can be a number or point to an entity UNLESS they start with 'id_'. All of
   # these are required but will be defaulted if not specified
 
-  # battery_capacity_Wh: 10000
+  # battery_capacity_wh: 10000
   # inverter_efficiency_percent: 97 # Default: 97
   # charger_efficiency_percent: 91 # Default: 91
   # maximum_dod_percent: 15
@@ -67,7 +71,7 @@ pv_opt:
   # Octopus account parameters
   # ========================================
 
-  octopus_auto: True # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+  # octopus_auto: False # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
 
   # octopus_account: !secret octopus_account
   # octopus_api_key: !secret octopus_api_key
@@ -87,7 +91,8 @@ pv_opt:
   # These are the default entities used with the Solis Solax Modbus integration. You can change them here and over-ride the defaults
 
   # battery_voltage: sensor.solis_battery_voltage
-
+  # update_cycle_seconds: 15
+  
   # id_consumption:
   #   - sensor.{device_name}_house_load
   #   - sensor.{device_name}_bypass_load
@@ -114,18 +119,19 @@ pv_opt:
   #
   # These are the default entities used with the Solis Core Modbus integration. You can change them here and over-ride the defaults
 
-  modbus_hub: "{device_name}"
-  modbus_slave: 1
-  battery_voltage: sensor.{device_name}_battery_voltage
-  maximum_dod_percent: sensor.{device_name}_overdischarge_soc
+  # modbus_hub: "{device_name}"
+  # modbus_slave: 1
+  # battery_voltage: sensor.{device_name}_battery_voltage
+  # maximum_dod_percent: sensor.{device_name}_overdischarge_soc
+  # update_cycle_seconds: 60
   
-  id_consumption:
-    - sensor.{device_name}_house_load_power
-    - sensor.{device_name}_backup_load_power
+  # id_consumption:
+  #   - sensor.{device_name}_house_load_power
+  #   - sensor.{device_name}_backup_load_power
 
-  id_grid_power: sensor.{device_name}_grid_active_power
-  id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
-  id_battery_soc: sensor.{device_name}_battery_soc
+  # id_grid_power: sensor.{device_name}_grid_active_power
+  # id_inverter_ac_power: sensor.{device_name}_inverter_ac_power
+  # id_battery_soc: sensor.{device_name}_battery_soc
 
   # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
   # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
@@ -133,13 +139,13 @@ pv_opt:
   # id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
   # id_timed_charge_current: sensor.{device_name}_timed_charge_current_limit
 
-  id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
-  id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute
-  id_timed_discharge_end_hours: sensor.{device_name}_timed_discharge_end_hour
-  id_timed_discharge_end_minutes: sensor.{device_name}_timed_discharge_end_minute
-  id_timed_discharge_current: sensor.{device_name}_timed_discharge_current_limit
+  # id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
+  # id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute
+  # id_timed_discharge_end_hours: sensor.{device_name}_timed_discharge_end_hour
+  # id_timed_discharge_end_minutes: sensor.{device_name}_timed_discharge_end_minute
+  # id_timed_discharge_current: sensor.{device_name}_timed_discharge_current_limit
 
-  id_inverter_mode: sensor.{device_name}_energy_storage_control_switch
+  # id_inverter_mode: sensor.{device_name}_energy_storage_control_switch
 
   # ==============================================================================================================
   # Brand / Integration Specific Config: SOLIS_SOLARMAN: https://github.com/StephanJoubert/home_assistant_solarman
@@ -149,6 +155,7 @@ pv_opt:
 
   # battery_voltage: sensor.{device_name}_battery_voltage
   # maximum_dod_percent: 15
+  # update_cycle_seconds: 60
   
   # id_consumption:
   #   - sensor.{device_name}_house_load_power
@@ -157,6 +164,7 @@ pv_opt:
   # id_grid_power: sensor.{device_name}_meter_active_power
   # id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
   # id_battery_soc: sensor.{device_name}_battery_soc
+  # id_backup_mode_soc: 
 
   # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
   # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute

@@ -43,6 +43,8 @@ INVERTER_DEFS = {
             "id_grid_export_power": "sensor.{device_name}_grid_export_power",
             "id_battery_charge_power": "sensor.{device_name}_battery_input_energy",
             "id_inverter_ac_power": "sensor.{device_name}_active_power",
+            "supports_hold_soc": True,
+            "update_cyle_seconds": 15,
         },
         # Brand Conguration: Exposed as inverter.brand_config and can be over-written using arguments
         # from the config.yaml file but not rquired outside of this module
@@ -60,6 +62,7 @@ INVERTER_DEFS = {
             "id_timed_discharge_current": "number.{device_name}_timed_discharge_current",
             "id_timed_charge_discharge_button": "button.{device_name}_update_charge_discharge_times",
             "id_inverter_mode": "select.{device_name}_energy_storage_control_switch",
+            "id_backup_mode_soc": "number.{device_name}_backup_mode_soc",
         },
     },
     "SOLIS_CORE_MODBUS": {
@@ -84,6 +87,7 @@ INVERTER_DEFS = {
             "timed_discharge_end_hours": 43149,
             "timed_discharge_end_minutes": 43150,
             "storage_control_switch": 43110,
+            "backup_mode_soc": 43024,
         },
         "default_config": {
             "maximum_dod_percent": "sensor.{device_name}_overdischarge_soc",
@@ -94,6 +98,8 @@ INVERTER_DEFS = {
             ],
             "id_grid_power": "sensor.{device_name}_grid_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
+            "supports_hold_soc": True,
+            "update_cyle_seconds": 60,
         },
         "brand_config": {
             "modbus_hub": "solis",
@@ -110,6 +116,7 @@ INVERTER_DEFS = {
             "id_timed_discharge_end_minutes": "sensor.{device_name}_timed_discharge_end_minute",
             "id_timed_discharge_current": "sensor.{device_name}_timed_discharge_current_limit",
             "id_inverter_mode": "sensor.{device_name}_energy_storage_control_switch",
+            "id_backup_mode_soc": "sensor.{device_name}_backup_mode_soc",
         },
     },
     "SOLIS_SOLARMAN": {
@@ -142,6 +149,7 @@ INVERTER_DEFS = {
             "timed_discharge_end_hours": 43149,
             "timed_discharge_end_minutes": 43150,
             "storage_control_switch": 43110,
+            "backup_mode_soc": 43024,
         },
         "default_config": {
             "maximum_dod_percent": 15,
@@ -152,6 +160,8 @@ INVERTER_DEFS = {
             ],
             "id_grid_power": "sensor.{device_name}_meter_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
+            "supports_hold_soc": True,
+            "update_cyle_seconds": 60,
         },
         "brand_config": {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
@@ -166,6 +176,7 @@ INVERTER_DEFS = {
             "id_timed_discharge_end_minutes": "sensor.{device_name}_timed_discharge_end_minute",
             "id_timed_discharge_current": "sensor.{device_name}_timed_discharge_current_limit",
             "id_inverter_mode": "sensor.{device_name}_storage_control_mode",
+            "id_backup_mode_soc": "sensor.{device_name}_backup_mode_soc",
         },
     },
 }
@@ -189,11 +200,13 @@ class InverterController:
                     conf[item] = defs[item].replace(
                         "{device_name}", self.host.device_name
                     )
-                if isinstance(defs[item], list):
+                elif isinstance(defs[item], list):
                     conf[item] = [
                         z.replace("{device_name}", self.host.device_name)
                         for z in defs[item]
                     ]
+                else:
+                    conf[item] = defs[item]
 
     def enable_timed_mode(self):
         if (
@@ -201,7 +214,9 @@ class InverterController:
             or self.type == "SOLIS_CORE_MODBUS"
             or self.type == "SOLIS_SOLARMAN"
         ):
-            self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True)
+            self._solis_set_mode_switch(
+                SelfUse=True, Timed=True, GridCharge=True, Backup=False
+            )
 
     def control_charge(self, enable, **kwargs):
         self.enable_timed_mode()
@@ -211,8 +226,33 @@ class InverterController:
         self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
-    def hold_soc(self, soc, end=None):
-        pass
+    def hold_soc(self, soc):
+        if (
+            self.type == "SOLIS_SOLAX_MODBUS"
+            or self.type == "SOLIS_CORE_MODBUS"
+            or self.type == "SOLIS_SOLARMAN"
+        ):
+            self._solis_set_mode_switch(
+                SelfUse=True, Timed=False, GridCharge=True, Backup=True
+            )
+
+            entity_id = self.host.config["id_backup_mode_soc"]
+
+            self.log(f"Setting Backup SOC to {soc}%")
+            if self.type == "SOLIS_SOLAX_MODBUS":
+                changed, written = self._write_and_poll_value(
+                    entity_id=entity_id, value=soc
+                )
+            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+                changed, written = self.solis_write_holding_register(
+                    address=INVERTER_DEFS(self.type)["registers"]["backup_mode_soc"],
+                    value=soc,
+                    entity_id=entity_id,
+                )
+            else:
+                e = "Unknown inverter type"
+                self.log(e, level="ERROR")
+                raise Exception(e)
 
     @property
     def status(self):
@@ -271,6 +311,9 @@ class InverterController:
         }
         power = kwargs.get("power")
 
+        if times["start"] is not None:
+            times["start"] = times["start"].floor("1T")
+
         if not enable:
             self.log(f"Disabling inverter timed {direction}")
 
@@ -281,7 +324,7 @@ class InverterController:
 
         # Disable by setting the times the same
         if (enable is not None) and (not enable):
-            times["start"] = pd.Timestamp.now()
+            times["start"] = pd.Timestamp.now().floor("1T")
             times["end"] = times["start"]
 
         # Don't span midnight
@@ -386,7 +429,7 @@ class InverterController:
 
     def _solis_set_mode_switch(self, **kwargs):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN":
-            status = self._solis_solax_mode_switch()
+            status = self._solis_solax_solarman_mode_switch()
 
         elif self.type == "SOLIS_CORE_MODBUS":
             status = self._solis_core_mode_switch()
@@ -462,6 +505,13 @@ class InverterController:
                 and status["switches"]["Timed"]
                 and status["switches"]["GridCharge"]
             )
+
+        status["hold_soc"] = {"active": status["switches"]["Backup"]}
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS":
+            status["hold_soc"]["soc"] = self.host.get_config("id_backup_mode_soc")
+        else:
+            status["hold_soc"]["soc"] = None
+
         return status
 
     def _solis_write_holding_register(
