@@ -1,8 +1,14 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.3.0
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.3.1
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
-The application will integrate fully with Solis inverters which are controlled using the [Home Assistant Solax Modbus Integration](https://github.com/wills106/homeassistant-solax-modbus) and once installed should require miminal configuratuon. Other inverters/integrations can be added if required or can be controlled indirectly using auytomations.
+The application will integrate fully with Solis inverters which are controlled using any of:
+
+- [Home Assistant Solax Modbus Integration](https://github.com/wills106/homeassistant-solax-modbus) 
+- [Home Assistant Core Modbus Integration](https://github.com/fboundy/ha_solis_modbus) 
+- [Home Assistant Solarman Integration](https://github.com/StephanJoubert/home_assistant_solarman) 
+
+Once installed it should require miminal configuratuon. Other inverters/integrations can be added if required or can be controlled indirectly using auytomations.
 
 It has been tested primarily with Octopus tariffs but other tariffs can be manually implemented.
 
@@ -260,29 +266,50 @@ Once downloaded AppDaemon should see the app and attempt to load it using the de
 
 <h2>Configuration</h2>
 
-If you have the Solcast, Octopus and Solax integrations set up as specified above, there should be minimal configuration required. <b><i>PV_Opt</b></i> needs to know the size of your battery and the power of your inverter: both when inverting battery to AC power and when chargingh tha battery. It will attempt to work these out from the data it has loaded (WIP) but you should check the following enitities in Home Assistant:
+If you have the Solcast, Octopus and Solax integrations set up as specified above, there should be minimal configuration required. 
+
+If you are running a different integration or inverter brand you will need to edit the `config.yaml` file to select the correct `inverter_type`:
+
+    inverter_type: SOLIS_CORE_MODBUS
+
+
+<b><i>PV_Opt</b></i> needs to know the size of your battery and the power of your inverter: both when inverting battery to AC power and when chargingh tha battery. It will attempt to work these out from the data it has loaded (WIP) but you should check the following enitities in Home Assistant:
+
+<h3>System Parameters</h3>
 
 | Parameter | Units | Entity | Default Value |
 | :-- | :--: | :--| :--:|
 | Battery Capacity| Wh| `number.pvopt_batter_capacity_wh` | 10000|
 | Inverter Power | W | `number.pvopt_inverter_power_watts` | 3600 |
 | Charger Power | W | `number.pvopt_charger_power_watts` | 3500 |
+| Inverter Efficiency | % | `number.pvopt_inverter_efficiency` | 97% |
+| Charger Efficiency | % | `number.pvopt_charger_efficiency` | 91% |
 
-If you are running a different integration or inverter brand you will need to edit the `config.yaml` file to select the correct `inverter_type`:
+There are then only a few things to control the optimisation process.  These have been grouped as follows:
 
-    inverter_type: SOLIS_CORE_MODBUS
-
-There are then only a few things to control the optimisation process. 
+<h3>Control Parameters</h3>
+These are the main parameters that will control how PV Opt runs:
 
 | Parameter | Units | Entity | Default | Description |
 |:--|:--:| :-- | :--:|:--|
 | Read Only Mode | `on`/`off` | `switch.pvopt_read_only` | On | Controls whether the app will actually control the inverter. Start with this on until you are happy the charge/discharge plan makes sense.
 | Optimise Charging | `on`/`off` | `switch.pvopt_forced_charge` | On | Controls whether the app will calculate an Optimised plan. If `off` only the Base forecast will be updated.
 | Optimise Discharging | `on`/`off` | `switch.pvopt_forced_discharge` | On | Controls whether the app will allow for forced discharge as well as charge
-| Solar Forecast | `select`| `select.pvopt_solar_forecast` | Solcast | Selects which Solcast to use (Most Likely, 10% or 90%)
+| Allow Cyclic | `on`/`off` | `switch.pvopt_allow_cyclic` | On | Controls whether the app will allow cycles of alternating charge/discharge |
+| Solar Forecast | `select`| `select.pvopt_solar_forecast` | Solcast | Selects which Solcast to use (Most Likely, 10% or 90%)|
 | Optimser Frequency | minutes | `number.pvopt_optimise_frequency_minutes` | 10 | Frequency of Optimiser calculation |
+
+<h3>Tuning Parameters</h3>
+These parameters will tweak how PV Opt runs:
+
+| Parameter | Units | Entity | Default | Description |
+|:--|:--:| :-- | :--:|:--|
 | Load History Days | days | `number.pvopt_consumption_history_days` | 7 | Number of daya of consumption history to use when predicting future load |
 | Load Margin | % | `number.pvopt_consumption_margin` | 10% | Margin to add to historic load for forecast (safety factor) |
+| Pass threshold | % | `number.pvopt_pass_throshold_p` | 4p | The incremental cost saving that each iteration of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
+| Slot threshold | % | `number.pvopt_slop_throshold_p` | 1p | The incremental cost saving that each 30 minute slot of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
+| Power Resolution | W | `number.pvopt_forced_power_group_tolerance` | 100 | The resolution at which forced charging / discharging is reported. Changing this will change the reporting of the charge plan but not the actual detail of it. |
+
 
 <h2>Output</h2>
 
@@ -292,4 +319,4 @@ If `Optimise Charging` is enabled, an optimsised charging plan is calculated and
 
 The easiest way to control and visualise this is through the `pvopt_dashboard.yaml` Lovelace yaml file included in this repo. Note that you will need to manually paste this into a dashboard and edit the charts to use the correct Octopus Energy sensors:
 
-![Alt text](image.png)
+![Alt text](image-1.png)
