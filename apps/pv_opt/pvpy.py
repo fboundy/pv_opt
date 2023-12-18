@@ -613,6 +613,8 @@ class PVsystemModel:
             axis=1,
         )
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
+        net_cost = [base_cost]
+        slot_count = [0]
         while not done:
             i += 1
             if (i > 96) or (available.sum() == 0):
@@ -677,9 +679,8 @@ class PVsystemModel:
                                 factors.append(1)
 
                         factors = [f / sum(factors) for f in factors]
-                        self.log(f">>>{factors}")
 
-                        if cost_at_min_price < max_import_cost:
+                        if round(cost_at_min_price, 1) < round(max_import_cost, 1):
                             for slot, factor in zip(window, factors):
                                 slots.append(
                                     (
@@ -714,8 +715,10 @@ class PVsystemModel:
                                 ],
                                 axis=1,
                             )
+                            net_cost.append(round(contract.net_cost(df).sum(), 1))
+                            slot_count.append(len(factors))
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
-                            net_cost_opt = contract.net_cost(df).sum()
+                            net_cost_opt = net_cost[-1]
                             str_log += f"Net: {net_cost_opt:6.1f}"
                             self.log(str_log)
                         else:
@@ -724,6 +727,12 @@ class PVsystemModel:
                     done = True
             else:
                 done = True
+
+        z = pd.DataFrame(data={"net_cost": net_cost, "slot_count": slot_count})
+        z["slot_total"] = z["slot_count"].cumsum()
+        z["delta"] = z["net_cost"].diff()
+
+        self.log(f">>>{z.iloc[1:]}")
 
         df = pd.concat(
             [
@@ -849,14 +858,14 @@ class PVsystemModel:
                     done = True
 
             cost_delta = net_cost_opt - net_cost_pre
-            str_log = f"Charge net cost delta:{(cost_delta):5.1f}p"
+            str_log = f"Charge net cost delta:{(-cost_delta):5.1f}p"
             if cost_delta > -self.host.get_config("pass_threshold_p"):
                 slots = slots_pre
                 slots_added = 0
                 net_cost_opt = net_cost_pre
-                str_log += f" - > threshold ({self.host.get_config('pass_threshold_p')}) => Excluded"
+                str_log += f": < threshold ({self.host.get_config('pass_threshold_p')}) => Excluded"
             else:
-                str_log += f" - > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
+                str_log += f": > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
 
             self.log("")
             self.log(str_log)
@@ -964,14 +973,14 @@ class PVsystemModel:
                         done = True
 
                 cost_delta = net_cost_opt - net_cost_pre
-                str_log = f"Discharge net cost delta:{(cost_delta):5.1f}p"
+                str_log = f"Discharge net cost delta:{(-cost_delta):5.1f}p"
                 if cost_delta > -self.host.get_config("pass_threshold_p"):
                     slots = slots_pre
                     slots_added = slots_added_pre
-                    str_log += f" - > threshold ({self.host.get_config('pass_threshold_p')}) => Excluded"
+                    str_log += f": < threshold ({self.host.get_config('pass_threshold_p')}) => Excluded"
                     net_cost_opt = net_cost_pre
                 else:
-                    str_log += f" - > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
+                    str_log += f": > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
 
                 self.log("")
                 self.log(str_log)
