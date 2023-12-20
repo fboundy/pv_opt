@@ -90,8 +90,9 @@ pv_opt:
   #
   # These are the default entities used with the Solis Solax Modbus integration. You can change them here and over-ride the defaults
 
-  # battery_voltage: sensor.solis_battery_voltage
+  # battery_voltage: sensor.{device_name}_battery_voltage
   # update_cycle_seconds: 15
+  # maximum_dod_percent: number.{device_name}_battery_minimum_soc 
   
   # id_consumption:
   #   - sensor.{device_name}_house_load
