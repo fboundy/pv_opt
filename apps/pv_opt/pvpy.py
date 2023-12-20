@@ -731,8 +731,10 @@ class PVsystemModel:
         z = pd.DataFrame(data={"net_cost": net_cost, "slot_count": slot_count})
         z["slot_total"] = z["slot_count"].cumsum()
         z["delta"] = z["net_cost"].diff()
-
-        self.log(f">>>{z.iloc[1:]}")
+        max_delta = z["net_cost"].diff().iloc[1:].max()
+        self.log("")
+        self.log(f"Maximum 1st pass slot delta is {max_delta:0.1f}p")
+        self.log("")
 
         df = pd.concat(
             [
@@ -863,16 +865,16 @@ class PVsystemModel:
                 slots = slots_pre
                 slots_added = 0
                 net_cost_opt = net_cost_pre
-                str_log += f": < threshold ({self.host.get_config('pass_threshold_p')}) => Excluded"
+                str_log += f": < threshold {self.host.get_config('pass_threshold_p')} => Excluded"
             else:
-                str_log += f": > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
+                str_log += f": > threshold {self.host.get_config('pass_threshold_p')} => Included"
 
             self.log("")
             self.log(str_log)
 
-            # ---------------------
+            # -----------
             # Discharging
-            # ---------------------
+            # -----------
             if discharge:
                 net_cost_pre = net_cost_opt
                 slots_pre = copy(slots)

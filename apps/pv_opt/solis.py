@@ -226,15 +226,21 @@ class InverterController:
         self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
-    def hold_soc(self, soc):
+    def hold_soc(self, enable, soc=None):
         if (
             self.type == "SOLIS_SOLAX_MODBUS"
             or self.type == "SOLIS_CORE_MODBUS"
             or self.type == "SOLIS_SOLARMAN"
         ):
-            self._solis_set_mode_switch(
-                SelfUse=True, Timed=False, GridCharge=True, Backup=True
-            )
+            if enable:
+                self._solis_set_mode_switch(
+                    SelfUse=True, Timed=False, GridCharge=True, Backup=True
+                )
+            else:
+                self.enable_timed_mode()
+
+            if soc is None:
+                soc = self.host.get_config("maximum_dod_percent")
 
             entity_id = self.host.config["id_backup_mode_soc"]
 

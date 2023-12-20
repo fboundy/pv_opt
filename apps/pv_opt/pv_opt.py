@@ -22,7 +22,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.3.2"
+VERSION = "3.4.0"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -40,7 +40,7 @@ BOTTLECAP_DAVE = {
     "rates": "current_day_rates",
 }
 
-INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS"]
+INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN"]
 
 IMPEXP = ["import", "export"]
 
@@ -65,7 +65,7 @@ DEFAULT_CONFIG = {
         "default": 10,
         "attributes": {
             "min": 5,
-            "max": 60,
+            "max": 30,
             "step": 5,
             "mode": "slider",
         },
@@ -76,6 +76,16 @@ DEFAULT_CONFIG = {
         "attributes": {
             "min": 0.0,
             "max": 3.0,
+            "step": 0.1,
+            "mode": "slider",
+        },
+        "domain": "number",
+    },
+    "day_of_week_weighting": {
+        "default": 0.5,
+        "attributes": {
+            "min": 0.0,
+            "max": 1.0,
             "step": 0.1,
             "mode": "slider",
         },
@@ -249,8 +259,10 @@ class PVOpt(hass.Hass):
         self._load_inverter()
 
         self.change_items = {}
+        self.config_state = {}
         self.timer_handle = None
         self.handles = {}
+        self.mqtt_handles = {}
 
         self.saving_events = {}
         self.contract = None
@@ -454,6 +466,9 @@ class PVOpt(hass.Hass):
             self._load_contract()
 
     def get_config(self, item):
+        if item in self.config_state:
+            return self._value_from_state(self.config_state[item])
+
         if item in self.config:
             if isinstance(self.config[item], str) and self.entity_exists(
                 self.config[item]
@@ -491,7 +506,7 @@ class PVOpt(hass.Hass):
             if self.timer_handle and self.timer_running(self.timer_handle):
                 self.cancel_timer(self.timer_handle)
                 self.log("Optimer Schedule Disabled")
-                self._set_status("Disabled")
+                self._status("Disabled")
 
     def _load_contract(self):
         self.log("")
@@ -1001,19 +1016,6 @@ class PVOpt(hass.Hass):
         self.log("----------------------------------")
         self._expose_configs()
 
-        if self.change_items:
-            self.log("")
-            self.log("State change entities:")
-            self.log("----------------------")
-            for entity_id in self.change_items:
-                if not "sensor" in entity_id:
-                    self.log(
-                        f"        {entity_id:>42s} -> {self.change_items[entity_id]:40s}"
-                    )
-                    self.handles[entity_id] = self.listen_state(
-                        callback=self.optimise_state_change, entity_id=entity_id
-                    )
-
     def _name_from_item(self, item):
         name = item.replace("_", " ")
         for word in name.split():
@@ -1033,108 +1035,129 @@ class PVOpt(hass.Hass):
         return state
 
     def _expose_configs(self):
-        for defaults in [DEFAULT_CONFIG]:
-            mqtt_items = [
-                item
-                for item in defaults
-                if (
-                    item
-                    not in [self.change_items[entity] for entity in self.change_items]
-                )
-                and ("id_" not in item)
-                and ("alt_" not in item)
-                and ("auto" not in item)
-                and "domain" in defaults[item]
-            ]
+        mqtt_items = [
+            item
+            for item in DEFAULT_CONFIG
+            if (item not in [self.change_items[entity] for entity in self.change_items])
+            and ("id_" not in item)
+            and ("alt_" not in item)
+            and ("auto" not in item)
+            and "domain" in DEFAULT_CONFIG[item]
+        ]
 
-            for item in mqtt_items:
-                # state = None
-                domain = defaults[item]["domain"]
-                id = f"{self.prefix.lower()}_{item}"
-                entity_id = f"{domain}.{id}"
-                attributes = defaults[item].get("attributes", {})
+        for item in mqtt_items:
+            state = None
+            domain = DEFAULT_CONFIG[item]["domain"]
+            id = f"{self.prefix.lower()}_{item}"
+            entity_id = f"{domain}.{id}"
+            attributes = DEFAULT_CONFIG[item].get("attributes", {})
 
-                command_topic = f"homeassistant/{domain}/{id}/set"
-                state_topic = f"homeassistant/{domain}/{id}/state"
+            command_topic = f"homeassistant/{domain}/{id}/set"
+            state_topic = f"homeassistant/{domain}/{id}/state"
+
+            if not self.entity_exists(entity_id=entity_id):
                 self.log(
-                    f">>>{item} {entity_id} {self.config[item]} {self.get_state(entity_id=entity_id)}"
+                    f"  - Creating HA Entity {entity_id} for {item} using MQTT Discovery"
+                )
+                conf = (
+                    {
+                        "state_topic": state_topic,
+                        "command_topic": command_topic,
+                        "name": self._name_from_item(item),
+                        "optimistic": True,
+                        "object_id": id,
+                        "unique_id": id,
+                    }
+                    | attributes
+                    | MQTT_CONFIGS.get(domain, {})
                 )
 
-                if not self.entity_exists(entity_id=entity_id):
-                    self.log(
-                        f"Creating HA Entity {entity_id} for {item} using MQTT Discovery"
-                        f"Configuring HA Entity {entity_id} for {item} using MQTT Discovery"
-                    )
-                    conf = (
-                        {
-                            "state_topic": state_topic,
-                            "command_topic": command_topic,
-                            "name": self._name_from_item(item),
-                            "optimistic": True,
-                            "unique_id": id,
-                        }
-                        | attributes
-                        | MQTT_CONFIGS.get(domain, {})
-                    )
-
-                    conf_topic = f"homeassistant/{domain}/{id}/config"
-                    self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
-                    state = self._state_from_value(self.config[item])
-                    self.mqtt.mqtt_publish(command_topic, state)
-
-                if isinstance(self.get_ha_value(entity_id), str) and self.get_ha_value(
-                    entity_id
-                ) not in attributes.get("options", {}):
-                    self.log(
-                        f">>Found unexpected str for {entity_id} reverting to default of {self.config[item]}"
-                    )
-
-                    state = self._state_from_value(self.config[item])
-                    self.log(f">>>   {state}")
+                conf_topic = f"homeassistant/{domain}/{id}/config"
+                self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+                state = self._state_from_value(self.config[item])
+                if domain == "switch":
+                    self.mqtt.mqtt_publish(command_topic, state.upper(), retain=True)
+                    self.mqtt.mqtt_publish(state_topic, state.upper(), retain=True)
+                else:
                     self.mqtt.mqtt_publish(state_topic, state, retain=True)
-                    self.log(f">>>   {self.get_state(entity_id=entity_id)}")
-                #     if item == "battery_capacity_wh":
-                #         capacity = round(self._estimate_capacity() / 100, 0) * 100
-                #         if capacity is not None:
-                #             self.config[item] = capacity
-                #             self.log(f"Battery capacity estimated to be {capacity} Wh")
+                    self.mqtt.mqtt_publish(command_topic, state, retain=True)
 
-                #     # Only set the state for entities that don't currently exists
-                #     state = self._state_from_value(self.config[item])
+                self.mqtt.mqtt_subscribe(state_topic)
 
-                # self.log(f">>>*>> {state}")
-                # # Or entities where the sensor value is no use
-                # if isinstance(self.get_ha_value(entity_id), str) and self.get_ha_value(
-                #     entity_id
-                # ) not in attributes.get("options", {}):
-                #     self.log(f">>Found unexpected str for {entity_id}")
-                #     if item == "battery_capacity_wh":
-                #         capacity = round(self._estimate_capacity() / 100, 0) * 100
-                #         if capacity is not None:
-                #             state = capacity
-                #             self.log(f"Battery capacity estimated to be {capacity} Wh")
-                #         else:
-                #             state = self._state_from_value(self.config[item])
-                #     else:
-                #         state = self._state_from_value(self.config[item])
-                #         self.log(
-                #             f"Can't resolve HA entity {entity_id} to correct type. Using YAML default value of {state}"
-                #         )
-                # elif state is None:
-                #     state = self.get_ha_value(entity_id)
 
-                # self.set_state(
-                #     state=self._state_from_value(state),
-                #     entity_id=entity_id,
-                #     attributes=attributes
-                #     | {"friendly_name": self._name_from_item(item)},
-                # )
+            elif isinstance(self.get_ha_value(entity_id), str) and self.get_ha_value(
+                entity_id
+            ) not in attributes.get("options", {}):
+                state = self._state_from_value(self.get_default_config(item))
 
-                # Now that we have published it, write the entity back to the config so we check the entity in future
-                self.config[item] = entity_id
+                self.log(
+                    f"  - Found unexpected str for {entity_id} reverting to default of {state}"
+                )
 
-                # if domain != "sensor":
-                self.change_items[entity_id] = item
+                self.set_state(state=state, entity_id=entity_id)
+
+            #     if item == "battery_capacity_wh":
+            #         capacity = round(self._estimate_capacity() / 100, 0) * 100
+            #         if capacity is not None:
+            #             self.config[item] = capacity
+            #             self.log(f"Battery capacity estimated to be {capacity} Wh")
+
+            #     # Only set the state for entities that don't currently exists
+            #     state = self._state_from_value(self.config[item])
+
+            # self.log(f">>>*>> {state}")
+            # # Or entities where the sensor value is no use
+            # if isinstance(self.get_ha_value(entity_id), str) and self.get_ha_value(
+            #     entity_id
+            # ) not in attributes.get("options", {}):
+            #     self.log(f">>Found unexpected str for {entity_id}")
+            #     if item == "battery_capacity_wh":
+            #         capacity = round(self._estimate_capacity() / 100, 0) * 100
+            #         if capacity is not None:
+            #             state = capacity
+            #             self.log(f"Battery capacity estimated to be {capacity} Wh")
+            #         else:
+            #             state = self._state_from_value(self.config[item])
+            #     else:
+            #         state = self._state_from_value(self.config[item])
+            #         self.log(
+            #             f"Can't resolve HA entity {entity_id} to correct type. Using YAML default value of {state}"
+            #         )
+            # elif state is None:
+            #     state = self.get_ha_value(entity_id)
+
+            # self.set_state(
+            #     state=self._state_from_value(state),
+            #     entity_id=entity_id,
+            #     attributes=attributes
+            #     | {"friendly_name": self._name_from_item(item)},
+            # )
+
+            # Now that we have published it, write the entity back to the config so we check the entity in future
+            else:
+                state = self.get_state(entity_id)
+
+            self.config[item] = entity_id
+            self.change_items[entity_id] = item
+            self.config_state[item] = state
+
+        if self.change_items:
+            self.log("")
+            self.log(f"  {'Config Item':40s}  {'HA Entity':42s}  Current State")
+            self.log(f"  {'-----------':40s}  {'---------':42s}  -------------")
+
+            for entity_id in self.change_items:
+                if not "sensor" in entity_id:
+                    self.log(
+                        f"  {self.change_items[entity_id]:40s}  {entity_id:42s}  {self.config_state[self.change_items[entity_id]]}"
+                    )
+                    self.handles[entity_id] = self.listen_state(
+                        callback=self.optimise_state_change, entity_id=entity_id
+                    )
+
+        self.mqtt.listen_state(
+            callback=self.optimise_state_change,
+        )
 
     def _status(self, status):
         entity_id = f"sensor.{self.prefix.lower()}_status"
@@ -1149,6 +1172,8 @@ class PVOpt(hass.Hass):
         self.log(
             f"State change detected for {entity_id} [config item: {item}] from {old} to {new}:"
         )
+
+        self.config_state[item] = new
 
         if "forced" in item:
             self._setup_schedule()
@@ -1228,10 +1253,11 @@ class PVOpt(hass.Hass):
 
         # Load Solcast
         self.load_solcast()
-        self.load_consumption()
 
         self.time_now = pd.Timestamp.utcnow()
+
         self.static = self.static[self.time_now.floor("30T") :].fillna(0)
+        self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
 
         # if self.config["alt_tariffs"] is None:
@@ -1363,7 +1389,7 @@ class PVOpt(hass.Hass):
                         self.log(
                             f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%"
                         )
-                        self.inverter.hold_soc(self.hold[0]["soc"])
+                        self.inverter.hold_soc(enabled=True, soc=self.hold[0]["soc"])
                     else:
                         self.log(
                             f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%"
@@ -1439,6 +1465,11 @@ class PVOpt(hass.Hass):
                     str_log += " but inverter is has a charge slot before then. Disabling charge."
                     self.log(str_log)
                     self.inverter.control_charge(enable=False)
+
+                elif status["hold_soc"]["active"]:
+                    self.inverter.hold_soc(enabled=False)
+                    str_log += " but inverter is holding SOC. Disabling."
+                    self.log(str_log)
 
                 else:
                     str_log += " Nothing to do."
@@ -1555,19 +1586,6 @@ class PVOpt(hass.Hass):
         self.log("")
 
     def write_to_hass(self, entity, state, attributes={}):
-        if not self.entity_exists(entity_id=entity):
-            self.log(f"Creating HA Entity {entity}")
-            id = entity.replace("sensor.", "")
-            conf = {
-                "state_topic": f"homeassistant/sensor/{id}/state",
-                "command_topic": f"homeassistant/domain/{id}/set",
-                "optimistic": True,
-                "unique_id": id,
-            }
-
-            conf_topic = f"homeassistant/self/{id}/config"
-            self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
-
         try:
             self.set_state(state=state, entity_id=entity, attributes=attributes)
             self.log(f"Output written to {entity}")
@@ -1672,7 +1690,11 @@ class PVOpt(hass.Hass):
                 "friendly_name": "PV Opt Charging Current",
                 "unit_of_measurement": "A",
                 "state_class": "measurement",
-                "device_class": "current",
+                "device_class": "current",                elif status["hold_soc"]["active"]:
+                    self.inverter.enable_timed_mode()
+                    str_log += " but inverter is holding SOC. Disabling."
+                    self.log(str_log)
+
             },
         )
 
@@ -1744,35 +1766,33 @@ class PVOpt(hass.Hass):
                 )
                 return False
 
-            try:
-                df.index = pd.to_datetime(df.index)
-                df = (
-                    pd.to_numeric(df, errors="coerce")
-                    .dropna()
-                    .resample("30T")
-                    .mean()
-                    .fillna(0)
-                )
-                df = df * (1 + self.get_config("consumption_margin") / 100)
+            df.index = pd.to_datetime(df.index)
+            df = (
+                pd.to_numeric(df, errors="coerce")
+                .dropna()
+                .resample("30T")
+                .mean()
+                .fillna(0)
+            )
 
-                # Group by time and take the mean
-                df = df.groupby(df.index.time).aggregate(
-                    self.get_config("consumption_grouping")
-                )
-                df.name = "consumption"
+            df = df * (1 + self.get_config("consumption_margin") / 100)
+            dfx = pd.Series(index=df.index, data=df.to_list())
+            # Group by time and take the mean
+            df = df.groupby(df.index.time).aggregate(
+                self.get_config("consumption_grouping")
+            )
+            df.name = "consumption"
 
-                temp = self.static.copy()
-                temp["time"] = temp.index.time
-                temp = temp.merge(df, "left", left_on="time", right_index=True)
-                # self.log(temp["consumption"].sum())
-                consumption += temp["consumption"]
-                self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
+            temp = self.static.copy()
+            temp["time"] = temp.index.time
+            temp = temp.merge(df, "left", left_on="time", right_index=True)[
+                "consumption"
+            ] * (1 - self.get_config("day_of_week_weighting"))
 
-            # self.log(temp)
-
-            except Exception as e:
-                self.log(f"Error loading consumption data: {e}")
-                return False
+            y = self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
+            x = temp.to_numpy() + y.to_numpy()
+            consumption += pd.Series(x, index=temp.index)
+            self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
 
         self.static["consumption"] = consumption
         return True
