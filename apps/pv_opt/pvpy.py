@@ -585,9 +585,6 @@ class PVsystemModel:
                         axis=1,
                     )
                     net_cost.append(contract.net_cost(df).sum())
-                    self.log(
-                        f"{idx.strftime[TIME_FORMAT]}: {df.loc[idx]['import']:6.2f}p/kWh"
-                    )
                 net_cost_opt = min(net_cost)
                 opt_neg_slots = net_cost.index(net_cost_opt)
                 slots = slots[: opt_neg_slots + 1]
