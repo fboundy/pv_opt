@@ -325,6 +325,24 @@ The easiest way to control and visualise this is through the `pvopt_dashboard.ya
 
 ![Alt text](image-1.png)
 
+This dashboards uses a couple of template sensors which will need adding to `configuration.yaml`:
+
+    - name: "Solis Grid Export Power"
+      unique_id: solis_grid_export_power
+      unit_of_measurement: W
+      device_class: power
+      state_class: measurement
+      state: >-
+        {{max(states('sensor.solis_meter_active_power') | float(0),0)}}    
+
+    - name: "Solis Grid Import Power"
+      unique_id: solis_grid_import_power
+      unit_of_measurement: W
+      device_class: power
+      state_class: measurement
+      state: >-
+        {{max(-(states('sensor.solis_meter_active_power') | float(0)),0)}}    
+
 <h2>Development - Adding Additional Inverters: the PV Opt API</h2>
 
 PV Opt is designed to be <i>pluggable</i>. A simple API is used to control inverters. This is defined as follows:
