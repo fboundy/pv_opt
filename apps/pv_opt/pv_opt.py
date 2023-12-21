@@ -1812,21 +1812,29 @@ class PVOpt(hass.Hass):
     def _compare_tariffs(self):
         self.log("")
         self.log("Comparing yesterday's tariffs")
-        solar = self._get_solar_yesterday()
+        end = pd.Timestamp.now(tz="UTC").normalize()
+        start = end - pd.Timedelta("24H")
+        solar = self._get_solar(start, end)
+        consumption = self.load_consumption(start, end)
+        static = pd.concat([solar, consumption], axis=1).set_axis(
+            ["solar", "consumption"], axis=1
+        )
+        self.log(static)
 
-    def _get_solar_yesterday(self):
+    def _get_solar(self, start, end):
         self.log("  - Getting yesterday's solar generation")
         entity_id = self.config["id_daily_solar"]
         if entity_id is None or not self.entity_exists(entity_id):
             return
 
         dt = pd.date_range(
-            pd.Timestamp.now(tz="UTC").normalize() - pd.Timedelta("24H"),
-            periods=49,
+            start,
+            end,
             freq="30T",
         )
 
-        df = self.hass2df(entity_id, days=2).astype(float).resample("30T").ffill()
+        days = (pd.Timestamp.now(tz="UTC") - start).days + 1
+        df = self.hass2df(entity_id, days=days).astype(float).resample("30T").ffill()
         df.index = pd.to_datetime(df.index)
         df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
         return df
