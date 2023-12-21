@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.4.0
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.4.1
 
 
 
@@ -324,6 +324,24 @@ If `Optimise Charging` is enabled, an optimsised charging plan is calculated and
 The easiest way to control and visualise this is through the `pvopt_dashboard.yaml` Lovelace yaml file included in this repo. Note that you will need to manually paste this into a dashboard and edit the charts to use the correct Octopus Energy sensors:
 
 ![Alt text](image-1.png)
+
+This dashboards uses a couple of template sensors which will need adding to `configuration.yaml`:
+
+    - name: "Solis Grid Export Power"
+      unique_id: solis_grid_export_power
+      unit_of_measurement: W
+      device_class: power
+      state_class: measurement
+      state: >-
+        {{max(states('sensor.solis_meter_active_power') | float(0),0)}}    
+
+    - name: "Solis Grid Import Power"
+      unique_id: solis_grid_import_power
+      unit_of_measurement: W
+      device_class: power
+      state_class: measurement
+      state: >-
+        {{max(-(states('sensor.solis_meter_active_power') | float(0)),0)}}    
 
 <h2>Development - Adding Additional Inverters: the PV Opt API</h2>
 
