@@ -1260,9 +1260,12 @@ class PVOpt(hass.Hass):
 
         # Load Solcast
         solcast = self.load_solcast()
-        consumption = self.load_consumption()
+        consumption = self.load_consumption(
+            pd.Timestamp.utcnow().normalize(),
+            pd.Timestamp.utcnow().normalize() + pd.Timedelta(days=2),
+        )
 
-        self.static = pd.concat([self.load_solcast(), self.load_consumption()], axis=1)
+        self.static = pd.concat([solcast, consumption], axis=1)
         self.time_now = pd.Timestamp.utcnow()
 
         self.static = self.static[self.time_now.floor("30T") :].fillna(0)
@@ -1753,10 +1756,15 @@ class PVOpt(hass.Hass):
             self.log(f"Error loading Solcast: {e}", level="ERROR")
             return
 
-    def load_consumption(self):
+    def load_consumption(self, start, end):
         self.log("Getting expected consumption data")
-
-        consumption = pd.Series(index=self.static.index, data=0)
+        index = pd.date_range(
+            start,
+            end,
+            freq="30T",
+            inclusive="left",
+        )
+        consumption = pd.DataFrame(index=index, data={"consumption": 0})
         for entity_id in self.config["id_consumption"]:
             try:
                 df = self.hass2df(
@@ -1788,7 +1796,7 @@ class PVOpt(hass.Hass):
             )
             df.name = "consumption"
 
-            temp = self.static.copy()
+            temp = pd.DataFrame(index=index)
             temp["time"] = temp.index.time
             temp = temp.merge(df, "left", left_on="time", right_index=True)[
                 "consumption"
@@ -1796,11 +1804,10 @@ class PVOpt(hass.Hass):
 
             y = self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
             x = temp.to_numpy() + y.to_numpy()
-            consumption += pd.Series(x, index=temp.index)
+            consumption["consumption"] += pd.Series(x, index=temp.index)
             self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
 
-        # self.static["consumption"] = consumption
-        return pd.DataFrame(consumption).set_axis(["consumption"], axis=1)
+        return consumption
 
     def _compare_tariffs(self):
         self.log("")

@@ -573,11 +573,10 @@ class PVsystemModel:
             self.log("---------------------------")
             self.log("")
 
-            neg_slots = (
-                df[df["import"] <= 0].sort_values("import", ascending=True).index
-            )
-            if len(neg_slots) > 0:
-                for idx in neg_slots:
+            neg_slots = df[df["import"] <= 0].sort_values("import", ascending=True)
+
+            if len(neg_slots.index) > 0:
+                for idx in neg_slots.index:
                     slots.append((idx, self.inverter.charger_power))
                     df = pd.concat(
                         [
@@ -590,6 +589,10 @@ class PVsystemModel:
                         axis=1,
                     )
                     net_cost.append(contract.net_cost(df).sum())
+                    str_log = f" {df['import'].loc[idx]:5.2f}p/kWh at {idx.strftime(TIME_FORMAT)} {df.loc[idx]['forced']:4.0f}W "
+                    str_log += f" SOC: {df.loc[idx]['soc']:5.1f}%->{df.loc[idx]['soc_end']:5.1f}% "
+                    str_log += f"Net: {net_cost[-1]:6.1f}"
+                    self.log(str_log)
                 net_cost_opt = min(net_cost)
                 opt_neg_slots = net_cost.index(net_cost_opt)
                 slots = slots[: opt_neg_slots + 1]
@@ -666,7 +669,7 @@ class PVsystemModel:
 
                         cost_at_min_price = round_trip_energy_required * min_price
                         str_log += f"<==> {start_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
-                        str_log += f" SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
+                        str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
                         factors = []
                         for slot in window:
                             if pd.Timestamp.now() > slot.tz_localize(None):
