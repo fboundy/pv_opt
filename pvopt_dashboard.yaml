@@ -142,6 +142,8 @@ views:
                 name: Load History Days
               - entity: number.pvopt_consumption_margin
                 name: Load Margin
+              - entity: number.pvopt_day_of_week_weighting
+                name: Weekday Weighting                
           - type: markdown
             content: System Parameters
           - type: entities

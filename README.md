@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.4.1
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.4.3
 
 
 
@@ -10,7 +10,7 @@ The application will integrate fully with Solis inverters which are controlled u
 - [Home Assistant Core Modbus Integration](https://github.com/fboundy/ha_solis_modbus) 
 - [Home Assistant Solarman Integration](https://github.com/StephanJoubert/home_assistant_solarman) 
 
-Once installed it should require miminal configuratuon. Other inverters/integrations can be added if required or can be controlled indirectly using auytomations.
+Once installed it should require miminal configuration. Other inverters/integrations can be added if required or can be controlled indirectly using automations.
 
 It has been tested primarily with Octopus tariffs but other tariffs can be manually implemented.
 
@@ -25,20 +25,18 @@ This app is not stand-alone it requires the following:
 | <b><u>Add-ons</b></u>|
 |HACS| Required| Home Assistant Community Store - used to distribute the app and updates 
 |AppDaemon | Required | Python execution environment
-| Mosquitto MQTT Broker | Optional | Used to create Home Assistant Entities using MQTT Discovery . <b><i>PV Opt</b></i> will run without this but you will have less control.
+| Mosquitto MQTT Broker | Required | Used to create Home Assistant Entities using MQTT Discovery . 
 | File Editor| Required | Used to edit the `appdaemon.yaml` and `config.yaml` files. Alternatively you could use `Samba Share` or `Studio Code Server`
 | Samba Share| Alternative| Alternative to using File Editor to edit config files. Not convered in this guide.
 | Studio Code Server| Alternative|Alternative to using `File Editor` to edit config files. Not convered in this guide.
 | <u><b>Integrations</b></u> | | |
 |Solcast PV Solar Integration | Required | Retrieves solar forecast from Solcast into Home Assistant |
 |Octopus Energy | Optional | Used to retrieve tariff information and Octopus Saving Session details|
-|Solax Modbus | Optional | Used to control Solis inverter directly. Support for other integrations and inverter brands is possible.
+|Solax Modbus | Optional | Used to control Solis inverter directly. Support for two other integrations is now available (see below). Support inverter brands is possible using the API described below.
 
 <h2>Step by Step Installation Guide</h2>
 
 <h3>1. Get a Solcast Hobby Account</h3>
-
-![Alt text](image-3.png)
 
 <b>PV_Opt</b> relies on solar forecasts data from Solcast. You can sign up for a Private User account [here](https://solcast.com/free-rooftop-solar-forecasting?gclid=CjwKCAiAr4GgBhBFEiwAgwORrQp6co5Qw8zNjEgUhBee7Hfa39_baEWG-rB-GB3FFpiaIA5eAPHhahoC3vAQAvD_BwE). This licence gives you 10 (it used to be 50 🙁) API calls a day.
 
@@ -63,7 +61,7 @@ This excellent integration will pull Octopus Price data in to Home Assistant. So
 
 <h3>5. Install the Integration to Control Your Inverter</h3>
 
-At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus) or the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus. Support for other inverters will  follow.
+At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus) or the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus. Support for the Solarman integration (https://github.com/StephanJoubert/home_assistant_solarman) is in test. At the moment writing to the inverter is disabled pending further testing by Solarman users.
 
 <h4>Solax Modbus:</h4>
 
@@ -80,9 +78,13 @@ At present this app only works directly with Solis hybrid inverters using either
     |Protocol| Modbus TCP|
 4. Check that you have comms with the inverter and the various entities in the integration are populated with data
 
-<4>HA Core Modbus</h4>
+<h4>HA Core Modbus</h4>
 
 Follow the Github instructions here: https://github.com/fboundy/ha_solis_modbus
+
+<h4>Solarman</h4>
+
+Follow the Github instructions here: https://github.com/StephanJoubert/home_assistant_solarman 
 
 <h3>6. Install the MQTT Integraion in Home Assistant</h3>
 
@@ -313,6 +315,7 @@ These parameters will tweak how PV Opt runs:
 | Pass threshold | % | `number.pvopt_pass_throshold_p` | 4p | The incremental cost saving that each iteration of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
 | Slot threshold | % | `number.pvopt_slop_throshold_p` | 1p | The incremental cost saving that each 30 minute slot of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
 | Power Resolution | W | `number.pvopt_forced_power_group_tolerance` | 100 | The resolution at which forced charging / discharging is reported. Changing this will change the reporting of the charge plan but not the actual detail of it. |
+| Weekday Weighting| fraction | `number.pvopt_day_of_week_weighting` | 0.5 | Defines how much weighting to give to the day of the week when averaging the load. 0.0 will use the simple average of the last `n` days based on `load_history_days` and 1.0 will just used the same day of the week within that window. Values inbetween will weight the estimate accordingly. If every day is the same use a low number. If your usage varies daily use a high number.
 
 
 <h2>Output</h2>
