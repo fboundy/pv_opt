@@ -19,7 +19,8 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.4.4"
+VERSION = "3.4.5-alpha"
+DEBUG = True
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -229,18 +230,28 @@ def importName(modulename, name):
 
 class PVOpt(hass.Hass):
     def hass2df(self, entity_id, days=2, log=False):
-        hist = self.get_history(entity_id=entity_id, days=days)
         if log:
-            self.log(hist)
+            self.log(f">>> Getting {days} history for {entity_id}")
+            self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
+        hist = self.get_history(entity_id=entity_id, days=days)
+
+        if log:
+            self.log(f">>> {hist})
         df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
         df.index = pd.to_datetime(df.index, format="ISO8601")
+
+        if log:
+            self.log(f">>> {df}")
+        
         df = df.sort_index()
         df = df[df != "unavailable"]
         df = df[df != "unknown"]
+        if log:
+            self.log(f">>> {df}")
         return df
 
     def initialize(self):
-        self.debug = False
+        self.debug = DEBUG
         self.config = {}
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
@@ -305,7 +316,7 @@ class PVOpt(hass.Hass):
         if "id_battery_charge_power" in self.config:
             df = pd.DataFrame(
                 self.hass2df(
-                    entity_id=self.config["id_battery_charge_power"], days=7
+                    entity_id=self.config["id_battery_charge_power"], days=7, log=self.debug
                 ).astype(int, errors="ignore")
             ).set_axis(["Power"], axis=1)
 
@@ -391,7 +402,7 @@ class PVOpt(hass.Hass):
             grid = (
                 pd.concat(
                     [
-                        self.hass2df(self.config[f"id_{col}_today"], days=1)
+                        self.hass2df(self.config[f"id_{col}_today"], days=1,log=self.debug)
                         .astype(float)
                         .resample("30T")
                         .ffill()
@@ -413,14 +424,14 @@ class PVOpt(hass.Hass):
             grid = (
                 pd.concat(
                     [
-                        self.hass2df(self.config["id_grid_import_power"], days=1)
+                        self.hass2df(self.config["id_grid_import_power"], days=1,log=self.debug)
                         .astype(float)
                         .resample("30T")
                         .mean()
                         .reindex(index)
                         .fillna(0)
                         .reindex(index),
-                        self.hass2df(self.config["id_grid_export_power"], days=1)
+                        self.hass2df(self.config["id_grid_export_power"], days=1, log=self.debug)
                         .astype(float)
                         .resample("30T")
                         .mean()
@@ -429,14 +440,14 @@ class PVOpt(hass.Hass):
                     ],
                     axis=1,
                 )
-                .set_axis(["grid_import", "grid_export"], axis=1)
+                .set_axis(["grid_import", "grid_export"], axis=1, log=self.debug)
                 .loc[pd.Timestamp.now(tz="UTC").normalize() :]
             )
 
         elif "id_grid_power" in self.config:
             grid = (
                 -(
-                    self.hass2df(self.config["id_grid_power"], days=1)
+                    self.hass2df(self.config["id_grid_power"], days=1, log=self.debug)
                     .astype(float)
                     .resample("30T")
                     .mean()
@@ -1263,7 +1274,7 @@ class PVOpt(hass.Hass):
 
         x = self.hass2df(
             self.config["id_battery_soc"],
-            days=1,
+            days=1, log=self.debug
         ).astype(float)
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
         x = pd.concat(
@@ -1749,6 +1760,7 @@ class PVOpt(hass.Hass):
                 df = self.hass2df(
                     entity_id,
                     days=int(self.get_config("consumption_history_days")),
+                    log=self.debug,
                 )
 
             except Exception as e:
