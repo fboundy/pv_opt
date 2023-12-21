@@ -19,7 +19,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.4.3"
+VERSION = "3.4.4"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -270,7 +270,7 @@ class PVOpt(hass.Hass):
         # if not, set up entities using MQTT discovery and write the initial state to them
         self._load_args()
 
-        self._estimate_capacity()
+        # self._estimate_capacity()
         self._load_pv_system_model()
         self._load_contract()
 
