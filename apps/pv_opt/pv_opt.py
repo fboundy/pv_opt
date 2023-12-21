@@ -1084,7 +1084,6 @@ class PVOpt(hass.Hass):
 
                 self.mqtt.mqtt_subscribe(state_topic)
 
-
             elif isinstance(self.get_ha_value(entity_id), str) and self.get_ha_value(
                 entity_id
             ) not in attributes.get("options", {}):
@@ -1690,11 +1689,7 @@ class PVOpt(hass.Hass):
                 "friendly_name": "PV Opt Charging Current",
                 "unit_of_measurement": "A",
                 "state_class": "measurement",
-                "device_class": "current",                elif status["hold_soc"]["active"]:
-                    self.inverter.enable_timed_mode()
-                    str_log += " but inverter is holding SOC. Disabling."
-                    self.log(str_log)
-
+                "device_class": "current",
             },
         )
 
