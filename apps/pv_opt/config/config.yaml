@@ -183,12 +183,12 @@ pv_opt:
 
 
 # Tariff comparison
-id_daily_solar: sensor.{device_name}_power_generation_today
-alt_tariffs:
-  - name: Eco7_Flux
-    octopus_import_tariff_code: E-2R-VAR-22-11-01-G
-    octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+  id_daily_solar: sensor.{device_name}_power_generation_today
+  alt_tariffs:
+    - name: Eco7_Flux
+      octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+      octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
 
-  - name: Flux
-    octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
-    octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
+    - name: Flux
+      octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+      octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G

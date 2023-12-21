@@ -272,6 +272,9 @@ class PVOpt(hass.Hass):
 
         self._estimate_capacity()
         self._load_pv_system_model()
+        if self.get_config("alt_tariffs") is not None:
+            self._compare_tariffs()
+
         self._load_contract()
 
         if self.agile:
@@ -473,13 +476,15 @@ class PVOpt(hass.Hass):
                 x = self.get_ha_value(self.config[item])
                 return x
             elif isinstance(self.config[item], list):
-                if min([isinstance(x, str)] for x in self.config[item]):
+                if min([isinstance(x, str)] for x in self.config[item])[0]:
                     if min([self.entity_exists(e) for e in self.config[item]]):
                         l = [self.get_ha_value(e) for e in self.config[item]]
                         try:
                             return sum(l)
                         except:
                             return l
+                else:
+                    return self.config[item]
             else:
                 return self.config[item]
 
@@ -802,6 +807,12 @@ class PVOpt(hass.Hass):
                 )
 
             # if the item starts with 'id_' then it must be an entity that exists:
+            elif item == "alt_tariffs":
+                self.config[item] = values
+                self.log(
+                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value(s) in YAML"
+                )
+
             elif "id_" in item:
                 if min([self.entity_exists(v) for v in values]):
                     if len(values) == 1:
@@ -1248,12 +1259,14 @@ class PVOpt(hass.Hass):
         )
 
         # Load Solcast
-        self.load_solcast()
+        solcast = self.load_solcast()
+        consumption = self.load_consumption()
 
+        self.static = pd.concat([self.load_solcast(), self.load_consumption()], axis=1)
         self.time_now = pd.Timestamp.utcnow()
 
         self.static = self.static[self.time_now.floor("30T") :].fillna(0)
-        self.load_consumption()
+        # self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
 
         # if self.config["alt_tariffs"] is None:
@@ -1717,7 +1730,7 @@ class PVOpt(hass.Hass):
 
         except Exception as e:
             self.log(f"Failed to get solcast attributes: {e}")
-            return False
+            return
 
         try:
             # Convert to timestamps
@@ -1729,16 +1742,15 @@ class PVOpt(hass.Hass):
             df.index = pd.to_datetime(df.index, utc=True)
             df = df.set_axis(["Solcast", "Solcast_p10", "Solcast_p90"], axis=1)
 
-            # Convert from kWh/30min period to W
             df *= 1000
-
-            self.static = pd.concat([self.static, df.fillna(0)], axis=1)
+            df = df.fillna(0)
+            # self.static = pd.concat([self.static, df], axis=1)
             self.log("Solcast forecast loaded OK")
-            return True
+            return df
 
         except Exception as e:
             self.log(f"Error loading Solcast: {e}", level="ERROR")
-            return False
+            return
 
     def load_consumption(self):
         self.log("Getting expected consumption data")
@@ -1756,7 +1768,7 @@ class PVOpt(hass.Hass):
                     f"Unable to get historical consumption from {entity_id}. {e}",
                     level="ERROR",
                 )
-                return False
+                return
 
             df.index = pd.to_datetime(df.index)
             df = (
@@ -1786,8 +1798,27 @@ class PVOpt(hass.Hass):
             consumption += pd.Series(x, index=temp.index)
             self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
 
-        self.static["consumption"] = consumption
-        return True
+        # self.static["consumption"] = consumption
+        return pd.DataFrame(consumption).set_axis(["consumption"], axis=1)
 
+    def _compare_tariffs(self):
+        self.log("")
+        self.log("Comparing yesterday's tariffs")
+        solar = self._get_solar_yesterday()
 
-# %%
+    def _get_solar_yesterday(self):
+        self.log("  - Getting yesterday's solar generation")
+        entity_id = self.config["id_daily_solar"]
+        if entity_id is None or not self.entity_exists(entity_id):
+            return
+
+        dt = pd.date_range(
+            pd.Timestamp.now(tz="UTC").normalize() - pd.Timedelta("24H"),
+            periods=49,
+            freq="30T",
+        )
+
+        df = self.hass2df(entity_id, days=2).astype(float).resample("30T").ffill()
+        df.index = pd.to_datetime(df.index)
+        df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
+        return df
