@@ -511,6 +511,9 @@ class PVsystemModel:
 
         df["chg"] = chg[:-1]
         df["chg"] = df["chg"].ffill()
+        df["chg_end"] = chg[1:]
+        df["chg_end"] = df["chg_end"].ffill()
+
         df["battery"] = (pd.Series(chg).diff(-1) / freq)[:-1].to_list()
         df.loc[df["battery"] > 0, "battery"] = (
             df["battery"] * self.inverter.inverter_efficiency
@@ -521,7 +524,8 @@ class PVsystemModel:
         df["grid"] = -(solar - consumption + df["battery"]).round(0)
         df["forced"] = forced_charge
         df["soc"] = (df["chg"] / self.battery.capacity) * 100
-        df["soc_end"] = df["soc"].shift(-1)
+        df["soc_end"] = (df["chg_end"] / self.battery.capacity) * 100
+        # df["soc_end"] = df["soc"].shift(-1)
 
         return df
 
@@ -532,6 +536,7 @@ class PVsystemModel:
 
         neg = kwargs.pop("neg", True)
         discharge = kwargs.pop("discharge", False)
+        max_iters = kwargs.pop("max_iters", 3)
 
         prices = pd.DataFrame()
         for tariff in [contract.imp, contract.exp]:
@@ -744,12 +749,12 @@ class PVsystemModel:
         slots_added = 999
         j = 0
 
-        while (slots_added > 0) and (j < 3):
+        while (slots_added > 0) and (j < max_iters):
             slots_added = 0
             j += 1
             # No need to iterate if this is charge only
             if not discharge:
-                j += 3
+                j += max_iters
 
             # Check how many slots which aren't full are at an import price less than any export price:
             max_export_price = df[df["forced"] <= 0]["export"].max()

@@ -29,7 +29,7 @@ TIME_FORMAT = "%H:%M"
 EVENT_TRIGGER = "PV_OPT"
 DEBUG_TRIGGER = "PV_DEBUG"
 HOLD_TOLERANCE = 3
-
+MAX_ITERS = 10
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -1231,7 +1231,7 @@ class PVOpt(hass.Hass):
 
     @ad.app_lock
     def optimise_time(self, cb_args):
-        self.log(f"Optimser triggered by Scheduler ")
+        self.log(f"Optimiser triggered by Scheduler ")
         self.optimise()
 
     @ad.app_lock
@@ -1311,6 +1311,7 @@ class PVOpt(hass.Hass):
             self.contract,
             solar=self.get_config("solar_forecast"),
             discharge=self.get_config("forced_discharge"),
+            max_iters=MAX_ITERS,
         )
         self.opt_cost = self.contract.net_cost(self.opt)
 
