@@ -236,13 +236,13 @@ class PVOpt(hass.Hass):
         hist = self.get_history(entity_id=entity_id, days=days)
 
         if log:
-            self.log(f">>> {hist})
+            self.log(f">>> {hist}")
         df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
         df.index = pd.to_datetime(df.index, format="ISO8601")
 
         if log:
             self.log(f">>> {df}")
-        
+
         df = df.sort_index()
         df = df[df != "unavailable"]
         df = df[df != "unknown"]
@@ -316,7 +316,9 @@ class PVOpt(hass.Hass):
         if "id_battery_charge_power" in self.config:
             df = pd.DataFrame(
                 self.hass2df(
-                    entity_id=self.config["id_battery_charge_power"], days=7, log=self.debug
+                    entity_id=self.config["id_battery_charge_power"],
+                    days=7,
+                    log=self.debug,
                 ).astype(int, errors="ignore")
             ).set_axis(["Power"], axis=1)
 
@@ -402,7 +404,9 @@ class PVOpt(hass.Hass):
             grid = (
                 pd.concat(
                     [
-                        self.hass2df(self.config[f"id_{col}_today"], days=1,log=self.debug)
+                        self.hass2df(
+                            self.config[f"id_{col}_today"], days=1, log=self.debug
+                        )
                         .astype(float)
                         .resample("30T")
                         .ffill()
@@ -424,14 +428,18 @@ class PVOpt(hass.Hass):
             grid = (
                 pd.concat(
                     [
-                        self.hass2df(self.config["id_grid_import_power"], days=1,log=self.debug)
+                        self.hass2df(
+                            self.config["id_grid_import_power"], days=1, log=self.debug
+                        )
                         .astype(float)
                         .resample("30T")
                         .mean()
                         .reindex(index)
                         .fillna(0)
                         .reindex(index),
-                        self.hass2df(self.config["id_grid_export_power"], days=1, log=self.debug)
+                        self.hass2df(
+                            self.config["id_grid_export_power"], days=1, log=self.debug
+                        )
                         .astype(float)
                         .resample("30T")
                         .mean()
@@ -1272,10 +1280,9 @@ class PVOpt(hass.Hass):
         # else:
         #     self.tariffs = self.config["alt_tariffs"] + [None]
 
-        x = self.hass2df(
-            self.config["id_battery_soc"],
-            days=1, log=self.debug
-        ).astype(float)
+        x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug).astype(
+            float
+        )
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
         x = pd.concat(
             [
