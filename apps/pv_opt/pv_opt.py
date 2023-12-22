@@ -1426,6 +1426,11 @@ class PVOpt(hass.Hass):
                             power=self.charge_power,
                         )
 
+                        if status["discharge"]["active"]:
+                            self.inverter.control_discharge(
+                                enable=False,
+                            )
+
                     elif self.charge_power < 0:
                         if not status["discharge"]["active"]:
                             start = pd.Timestamp.now()
@@ -1438,6 +1443,11 @@ class PVOpt(hass.Hass):
                             end=self.charge_end_datetime,
                             power=self.charge_power,
                         )
+
+                        if status["charge"]["active"]:
+                            self.inverter.control_charge(
+                                enable=False,
+                            )
 
             else:
                 if self.charge_power > 0:
