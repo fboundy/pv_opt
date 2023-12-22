@@ -1814,12 +1814,13 @@ class PVOpt(hass.Hass):
         self.log("Comparing yesterday's tariffs")
         end = pd.Timestamp.now(tz="UTC").normalize()
         start = end - pd.Timedelta("24H")
+
         solar = self._get_solar(start, end)
         consumption = self.load_consumption(start, end)
         static = pd.concat([solar, consumption], axis=1).set_axis(
             ["solar", "consumption"], axis=1
         )
-        self.log(static)
+        # self.log(static)
 
     def _get_solar(self, start, end):
         self.log("  - Getting yesterday's solar generation")
