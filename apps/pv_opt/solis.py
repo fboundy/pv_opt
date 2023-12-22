@@ -32,6 +32,7 @@ INVERTER_DEFS = {
         "default_config": {
             "maximum_dod_percent": "number.{device_name}_battery_minimum_soc",
             "id_battery_soc": "sensor.{device_name}_battery_soc",
+            "id_consumption_today": "sensor.{device_name}_house_load_today",
             "id_consumption": [
                 "sensor.{device_name}_house_load",
                 "sensor.{device_name}_bypass_load",
