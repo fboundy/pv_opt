@@ -511,6 +511,8 @@ class PVsystemModel:
 
         df["chg"] = chg[:-1]
         df["chg"] = df["chg"].ffill()
+        df["chg_end"] = chg[1:]
+        df["chg_end"] = df["chg_end"].bfill()
         df["battery"] = (pd.Series(chg).diff(-1) / freq)[:-1].to_list()
         df.loc[df["battery"] > 0, "battery"] = (
             df["battery"] * self.inverter.inverter_efficiency
@@ -521,7 +523,7 @@ class PVsystemModel:
         df["grid"] = -(solar - consumption + df["battery"]).round(0)
         df["forced"] = forced_charge
         df["soc"] = (df["chg"] / self.battery.capacity) * 100
-        df["soc_end"] = df["soc"].shift(-1)
+        df["soc_end"] = (df["chg_end"] / self.battery.capacity) * 100
 
         return df
 
