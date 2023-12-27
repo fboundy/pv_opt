@@ -33,15 +33,14 @@ INVERTER_DEFS = {
             "maximum_dod_percent": "number.{device_name}_battery_minimum_soc",
             "id_battery_soc": "sensor.{device_name}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_house_load_today",
-            "id_consumption": [
-                "sensor.{device_name}_house_load",
-                "sensor.{device_name}_bypass_load",
-            ],
-            "id_consumption_today": "sensor.{device_name}_house_load_today",
+            # "id_consumption": [
+            #     "sensor.{device_name}_house_load",
+            #     "sensor.{device_name}_bypass_load",
+            # ],
             "id_grid_import_today": "sensor.{device_name}_grid_import_today",
             "id_grid_export_today": "sensor.{device_name}_grid_export_today",
-            "id_grid_import_power": "sensor.{device_name}_grid_import_power",
-            "id_grid_export_power": "sensor.{device_name}_grid_export_power",
+            # "id_grid_import_power": "sensor.{device_name}_grid_import_power",
+            # "id_grid_export_power": "sensor.{device_name}_grid_export_power",
             "id_battery_charge_power": "sensor.{device_name}_battery_input_energy",
             "id_inverter_ac_power": "sensor.{device_name}_active_power",
             "supports_hold_soc": True,
@@ -93,10 +92,11 @@ INVERTER_DEFS = {
         "default_config": {
             "maximum_dod_percent": "sensor.{device_name}_overdischarge_soc",
             "id_battery_soc": "sensor.{device_name}_battery_soc",
-            "id_consumption": [
-                "sensor.{device_name}_house_load_power",
-                "sensor.{device_name}_backup_load_power",
-            ],
+            "id_consumption_today": "sensor.{device_name}_daily_consumption",
+            # "id_consumption": [
+            #     "sensor.{device_name}_house_load_power",
+            #     "sensor.{device_name}_backup_load_power",
+            # ],
             "id_grid_power": "sensor.{device_name}_grid_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
@@ -155,10 +155,11 @@ INVERTER_DEFS = {
         "default_config": {
             "maximum_dod_percent": 15,
             "id_battery_soc": "sensor.{device_name}_battery_soc",
-            "id_consumption": [
-                "sensor.{device_name}_house_load_power",
-                "sensor.{device_name}_backup_load_power",
-            ],
+            "id_consumption_today": "sensor.{device_name}_daily_house_backup_consumption",
+            # "id_consumption": [
+            #     "sensor.{device_name}_house_load_power",
+            #     "sensor.{device_name}_backup_load_power",
+            # ],
             "id_grid_power": "sensor.{device_name}_meter_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
