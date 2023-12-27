@@ -19,8 +19,8 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.4.5-beta-02"
-DEBUG = True
+VERSION = "3.5.0"
+DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -233,15 +233,11 @@ class PVOpt(hass.Hass):
         if log:
             self.log(f">>> Getting {days} days' history for {entity_id}")
             self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
+
         hist = self.get_history(entity_id=entity_id, days=days)
 
-        # if log:
-        #     self.log(f">>> {hist}")
         df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
         df.index = pd.to_datetime(df.index, format="ISO8601")
-
-        # if log:
-        #     self.log(f">>> {df}")
 
         df = df.sort_index()
         df = df[df != "unavailable"]
@@ -251,11 +247,17 @@ class PVOpt(hass.Hass):
         return df
 
     def initialize(self):
-        self.debug = DEBUG
         self.config = {}
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
+        self.debug = DEBUG
+        try:
+            subver = int(self.version.split(".")[2])
+        except:
+            self.log("Pre-release version. Enablinf debug logging")
+            self.debug = True
+
         self.adapi = self.get_ad_api()
         self.mqtt = self.get_plugin_api("MQTT")
         self._load_tz()
@@ -283,15 +285,16 @@ class PVOpt(hass.Hass):
 
         # self._estimate_capacity()
         self._load_pv_system_model()
-        if self.get_config("alt_tariffs") is not None:
-            self._compare_tariffs()
-
         self._load_contract()
+
+        if self.get_config("alt_tariffs") is not None:
+            self._setup_compare_schedule()
+            self._compare_tariffs()
 
         if self.agile:
             self._setup_agile_schedule()
 
-        self._cost_today()
+        self._cost_actual()
 
         # Optimise on an EVENT trigger:
         self.listen_event(
@@ -385,7 +388,6 @@ class PVOpt(hass.Hass):
         )
 
     def _setup_agile_schedule(self):
-        # start = (pd.Timestamp.now().round("1H") + pd.Timedelta("5T")).to_pydatetime()
         start = (pd.Timestamp.now() + pd.Timedelta("1T")).to_pydatetime()
         self.timer_handle = self.run_every(
             self._load_agile_cb,
@@ -393,95 +395,64 @@ class PVOpt(hass.Hass):
             interval=3600,
         )
 
-    def _cost_today(self):
+    def _setup_compare_schedule(self):
+        start = (
+            pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta(hours=25, minutes=1)
+        ).to_pydatetime()
+        self.timer_handle = self.run_every(
+            self._compare_tariff_cb,
+            start=start,
+            interval=3600 * 24,
+        )
+
+    def _cost_actual(self, **kwargs):
+        start = kwargs.get("start", pd.Timestamp.now(tz="UTC").normalize())
+        end = kwargs.get("end", pd.Timestamp.now(tz="UTC"))
+
+        self.log(
+            f">>> Start: {start.strftime(DATE_TIME_FORMAT_LONG)} End: {end.strftime(DATE_TIME_FORMAT_LONG)}"
+        )
+        days = (pd.Timestamp.now(tz="UTC") - start).days + 1
+
         index = pd.date_range(
-            pd.Timestamp.now(tz="UTC").normalize(),
-            pd.Timestamp.now(tz="UTC"),
+            start,
+            end,
             freq="30T",
         )
-        if (
-            "id_grid_import_today" in self.config
-            and "id_grid_export_today" in self.config
-        ):
-            cols = ["grid_import", "grid_export"]
-            grid = (
-                pd.concat(
-                    [
-                        self.hass2df(
-                            self.config[f"id_{col}_today"], days=1, log=self.debug
-                        )
-                        .astype(float)
-                        .resample("30T")
-                        .ffill()
-                        .reindex(index)
-                        .ffill()
-                        for col in cols
-                    ],
-                    axis=1,
-                )
-                .set_axis(cols, axis=1)
-                .loc[pd.Timestamp.now(tz="UTC").normalize() :]
-            )
-            grid = (-grid.diff(-1).clip(upper=0) * 2000).round(0)[:-1].fillna(0)
+        cols = ["grid_import", "grid_export"]
+        grid = pd.DataFrame()
+        for col in cols:
+            entity_id = self.config[f"id_{col}_today"]
+            df = self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end)
+            grid = pd.concat([grid, df], axis=1)
 
-        elif (
-            "id_grid_import_power" in self.config
-            and "id_grid_export_power" in self.config
-        ):
-            grid = (
-                pd.concat(
-                    [
-                        self.hass2df(
-                            self.config["id_grid_import_power"], days=1, log=self.debug
-                        )
-                        .astype(float)
-                        .resample("30T")
-                        .mean()
-                        .reindex(index)
-                        .fillna(0)
-                        .reindex(index),
-                        self.hass2df(
-                            self.config["id_grid_export_power"], days=1, log=self.debug
-                        )
-                        .astype(float)
-                        .resample("30T")
-                        .mean()
-                        .reindex(index)
-                        .fillna(0),
-                    ],
-                    axis=1,
-                )
-                .set_axis(["grid_import", "grid_export"], axis=1, log=self.debug)
-                .loc[pd.Timestamp.now(tz="UTC").normalize() :]
-            )
+        grid = grid.set_axis(cols, axis=1).fillna(0)
+        grid["grid_export"] *= -1
 
-        elif "id_grid_power" in self.config:
-            grid = (
-                -(
-                    self.hass2df(self.config["id_grid_power"], days=1, log=self.debug)
-                    .astype(float)
-                    .resample("30T")
-                    .mean()
-                    .reindex(index)
-                    .fillna(0)
-                    .reindex(index)
-                )
-            ).loc[pd.Timestamp.now(tz="UTC").normalize() :]
+        if self.debug:
+            self.log(f">>> {grid.to_string()}")
 
-        # self.log(grid)
-        cost_today = self.contract.net_cost(grid_flow=grid)
+        cost_today = self.contract.net_cost(grid_flow=grid, log=True)
+        if self.debug:
+            self.log(f">>> {cost_today.to_string()}")
+            self.log(f">>> {cost_today.cumsum().to_string()}")
         return cost_today
+
+    @ad.app_lock
+    def _compare_tariff_cb(self, cb_args):
+        self._compare_tariffs()
 
     @ad.app_lock
     def _load_agile_cb(self, cb_args):
         # reload if the time is after 16:00 and the last data we have is today
-
         if (
             self.contract.imp.end().day == pd.Timestamp.now().day
         ) and pd.Timestamp.now().hour > 16:
             self.log(
                 f"Contract end day: {self.contract.imp.end().day} Today:{pd.Timestamp.now().day}"
             )
+            self._load_contract()
+        elif pd.Timestamp.now(tz="UTC").hour == 0:
             self._load_contract()
 
     def get_config(self, item):
@@ -1122,44 +1093,6 @@ class PVOpt(hass.Hass):
 
                 self.set_state(state=state, entity_id=entity_id)
 
-            #     if item == "battery_capacity_wh":
-            #         capacity = round(self._estimate_capacity() / 100, 0) * 100
-            #         if capacity is not None:
-            #             self.config[item] = capacity
-            #             self.log(f"Battery capacity estimated to be {capacity} Wh")
-
-            #     # Only set the state for entities that don't currently exists
-            #     state = self._state_from_value(self.config[item])
-
-            # self.log(f">>>*>> {state}")
-            # # Or entities where the sensor value is no use
-            # if isinstance(self.get_ha_value(entity_id), str) and self.get_ha_value(
-            #     entity_id
-            # ) not in attributes.get("options", {}):
-            #     self.log(f">>Found unexpected str for {entity_id}")
-            #     if item == "battery_capacity_wh":
-            #         capacity = round(self._estimate_capacity() / 100, 0) * 100
-            #         if capacity is not None:
-            #             state = capacity
-            #             self.log(f"Battery capacity estimated to be {capacity} Wh")
-            #         else:
-            #             state = self._state_from_value(self.config[item])
-            #     else:
-            #         state = self._state_from_value(self.config[item])
-            #         self.log(
-            #             f"Can't resolve HA entity {entity_id} to correct type. Using YAML default value of {state}"
-            #         )
-            # elif state is None:
-            #     state = self.get_ha_value(entity_id)
-
-            # self.set_state(
-            #     state=self._state_from_value(state),
-            #     entity_id=entity_id,
-            #     attributes=attributes
-            #     | {"friendly_name": self._name_from_item(item)},
-            # )
-
-            # Now that we have published it, write the entity back to the config so we check the entity in future
             else:
                 state = self.get_state(entity_id)
 
@@ -1352,7 +1285,11 @@ class PVOpt(hass.Hass):
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_optimiser_elapsed",
             state=optimiser_elapsed,
-            attributes={"state_class": "measurement"},
+            attributes={
+                "state_class": "measurement",
+                "state_class": "duration",
+                "unit_of_measurement": "s",
+            },
         )
 
         self._status("Writing to HA")
@@ -1635,7 +1572,7 @@ class PVOpt(hass.Hass):
             self.log(f"Couldn't write to entity {entity}: {e}")
 
     def write_cost(self, name, entity, cost, df):
-        cost_today = self._cost_today()
+        cost_today = self._cost_actual()
         midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta("24H")
         df = df.fillna(0).round(2)
         df["period_start"] = (
@@ -1658,6 +1595,8 @@ class PVOpt(hass.Hass):
         attributes = (
             {
                 "friendly_name": name,
+                "device_class": "monetary",
+                "state_class": "measurement",
                 "unit_of_measurement": "GBP",
                 "cost_today": round(
                     (cost["cost"].loc[: midnight - pd.Timedelta("30T")].sum()) / 100,
@@ -1699,6 +1638,7 @@ class PVOpt(hass.Hass):
             state=self.charge_start_datetime,
             attributes={
                 "friendly_name": "PV Opt Next Charge Period Start",
+                "device_class": "timestamp",
                 "windows": [
                     {
                         k: window[1][k]
@@ -1784,50 +1724,60 @@ class PVOpt(hass.Hass):
             self.log(f"Error loading Solcast: {e}", level="ERROR")
             return
 
+    def _get_hass_power_from_daily_kwh(
+        self, entity_id, start=None, end=None, days=None, log=False
+    ):
+        if days is None:
+            days = (pd.Timestamp.now(tz="UTC") - start).days + 1
+
+        df = self.hass2df(
+            entity_id,
+            days=days,
+            log=log,
+        )
+
+        df.index = pd.to_datetime(df.index)
+        df = pd.to_numeric(df, errors="coerce")
+        df = (
+            df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30T")
+        ).ffill().fillna(0).diff(-1) * 2000
+        df = df.fillna(0)
+        if start is not None:
+            df = df.loc[start:]
+        if end is not None:
+            df = df.loc[:end]
+        return df
+
     def load_consumption(self, start, end):
         self.log("Getting expected consumption data")
 
-        consumption = pd.Series(index=self.static.index, data=0)
+        index = pd.date_range(start, end, inclusive="left", freq="30T")
+        consumption = pd.DataFrame(index=index, data={"consumption": 0})
 
-        if self.entity_exists(self.config["id_consumption_today"]):
-            entity_ids = self.config["id_consumption_today"]
-            consumption_daily = True
-        else:
-            entity_ids = self.config["id_consumption"]
-            consumption_daily = False
+        entity_ids = self.config["id_consumption_today"]
 
         if not isinstance(entity_ids, list):
             entity_ids = [entity_ids]
 
         for entity_id in entity_ids:
-            df = self.hass2df(
+            df = self._get_hass_power_from_daily_kwh(
                 entity_id,
                 days=int(self.get_config("consumption_history_days")),
                 log=self.debug,
             )
+            # df = self.hass2df(
+            #     entity_id,
+            #     days=int(self.get_config("consumption_history_days")),
+            #     log=self.debug,
+            # )
 
-            # except Exception as e:
-            #     self.log(
-            #         f"Unable to get historical consumption from {entity_id}. {e}",
-            #         level="ERROR",
-            #     )
-            #     return False
+            # df.index = pd.to_datetime(df.index)
 
-            df.index = pd.to_datetime(df.index)
-
-            if consumption_daily:  #
-                df = pd.to_numeric(df, errors="coerce")
-                df = (
-                    df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30T")
-                ).ffill().fillna(0).diff(-1) * 2000
-            else:
-                df = (
-                    pd.to_numeric(df, errors="coerce")
-                    .dropna()
-                    .resample("30T")
-                    .mean()
-                    .fillna(0)
-                )
+            # if consumption_daily:  #
+            #     df = pd.to_numeric(df, errors="coerce")
+            #     df = (
+            #         df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30T")
+            #     ).ffill().fillna(0).diff(-1) * 2000
 
             df = df * (1 + self.get_config("consumption_margin") / 100)
             dfx = pd.Series(index=df.index, data=df.to_list())
@@ -1861,7 +1811,69 @@ class PVOpt(hass.Hass):
         static = pd.concat([solar, consumption], axis=1).set_axis(
             ["solar", "consumption"], axis=1
         )
-        # self.log(static)
+
+        initial_soc = (
+            self.hass2df(self.config["id_battery_soc"], days=2, log=self.debug)
+            .astype(float)
+            .resample("30T")
+            .mean()
+        ).loc[start]
+
+        base = self.pv_system.flows(initial_soc, static, solar="solar")
+
+        contracts = [self.contract]
+
+        for tariff_set in self.config["alt_tariffs"]:
+            code = {}
+            tariffs = {}
+            name = tariff_set["name"]
+            for imp_exp in IMPEXP:
+                code[imp_exp] = tariff_set[f"octopus_{imp_exp}_tariff_code"]
+                tariffs[imp_exp] = pv.Tariff(
+                    code[imp_exp], export=(imp_exp == "export"), host=self
+                )
+
+            contracts.append(
+                pv.Contract(
+                    name=name,
+                    imp=tariffs["import"],
+                    exp=tariffs["export"],
+                    host=self,
+                )
+            )
+
+        actual = self._cost_actual(start=start, end=end - pd.Timedelta("30T"))
+        self.log(
+            f"  Actual:                                          {actual.sum():6.1f}p"
+        )
+
+        attributes = {
+            "state_class": measurement,
+            "device_class": monetary,
+            "unit_of_measurement": "GBP",
+        }
+
+        for contract in contracts:
+            net_base = contract.net_cost(base)
+            opt = self.pv_system.optimised_force(
+                initial_soc,
+                static,
+                contract,
+                solar="solar",
+                discharge=self.get_config("forced_discharge"),
+                max_iters=MAX_ITERS,
+                log=False,
+            )
+            net_opt = contract.net_cost(opt)
+            self.log(
+                f"  {contract.name:10s}  Base Cost: {net_base.sum():6.1f}p   Optimised Cost: {net_opt.sum():6.1f}p"
+            )
+            entity_id = f"sensor.{self.prefix}_opt_cost_{contract_name}"
+            self.set_state(
+                state=round(net_opt.sum() / 100, 2),
+                entity_id=entity_id,
+                attributes=attributes,
+            )
 
     def _get_solar(self, start, end):
         self.log("  - Getting yesterday's solar generation")
@@ -1880,3 +1892,6 @@ class PVOpt(hass.Hass):
         df.index = pd.to_datetime(df.index)
         df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
         return df
+
+
+# %%

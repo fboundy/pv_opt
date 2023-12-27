@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.4.4
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.5.0
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -378,15 +378,9 @@ The `InverterController` class must expose the following:
 ||`update_cycle_seconds` |`int`| Time in seconds between HA updates | 15|
 ||`supports_hold_soc` |`bool`| Flags whether the integration supports holding a fixed SOC | `true`|
 ||`id_battery_soc` | `str`|`entity_id` of Battery State of Charge | `number.{device_name}_battery_soc`|
-||`id_consumption` | `str` or `list` of `str`s|`entity_id` of House Load. May also be a list of `entity_id`s in which case the load from these will be summed to give total load | `[sensor.{device_name}_house_load_power , sensor.{device_name}_bypass_load_power]`|
-|Either:|
+||`id_consumption_today`| `str`|`entity_id` of Daily Consumption Total  | `sensor.{device_name}_house_load_today`|
 ||`id_grid_import_today`| `str`|`entity_id` of Daily Grid Import Total  | `sensor.{device_name}_grid_import_today`|
 ||`id_grid_export_today`| `str`|`entity_id` of Daily Grid Export Total  | `sensor.{device_name}_grid_export_today`|
-|Or:|
-||`id_grid_import_power`| `str`|`entity_id` of Grid Import Power  | `sensor.{device_name}_grid_import_power`|
-||`id_grid_export_power`| `str`|`entity_id` of Grid Export Power  | `sensor.{device_name}_grid_export_power`|
-|Or:|
-||`id_grid_power`| `str`|`entity_id` of Grid Power (+ve import, -ve export) | `sensor.{device_name}_meter_active_power`|
 |`.brand_config`| | `dict`| This dict contains all the names of all the entities that this brand/integration requires. These are only exposed for logging purposes and to allow the plug-in to use methods from the main app that use query `entity_id`s such as `.get_config(entity_id)` . A limited number of examples are given as this will vary for each plug-in.|
 ||`battery_voltage` | `str` / `int`| Battery voltage for converting power to current - nay be an entity_id or a number | `sensor.{device_name}_battery_voltage`|
 ||`id_timed_charge_start_hours` | `str`|`entity_id` of Timed Charge Start Hours | `number.{device_name}_timed_charge_start_hours`|

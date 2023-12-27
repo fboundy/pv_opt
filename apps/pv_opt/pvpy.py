@@ -64,7 +64,7 @@ class Tariff:
         self.area = code[-1]
 
         params = {
-            "page_size": 100,
+            "page_size": 500,
             "order_by": "period",
         } | {
             k: self._oct_time(kwargs.get(k, None))
@@ -430,7 +430,11 @@ class Contract:
             grid_exp = grid_flow.clip(upper=0)
 
         nc = self.imp.to_df(start, end)["fixed"]
+        if kwargs.get("log"):
+            self.log(f">>> Import{self.imp.to_df(start,end).to_string()}")
         nc += self.imp.to_df(start, end)["unit"] * grid_imp / 2000
+        if kwargs.get("log"):
+            self.log(f">>> Export{self.exp.to_df(start,end).to_string()}")
         nc += self.exp.to_df(start, end)["unit"] * grid_exp / 2000
 
         return nc
@@ -528,6 +532,8 @@ class PVsystemModel:
         return df
 
     def optimised_force(self, initial_soc, static_flows, contract: Contract, **kwargs):
+        log = kwargs.pop("log", True)
+
         cols = {k: kwargs.get(k, k) for k in ["consumption"]}
         consumption = static_flows[cols["consumption"]]
         consumption.name = "consumption"
@@ -548,9 +554,10 @@ class PVsystemModel:
                 axis=1,
             )
 
-        self.log(
-            f"  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
-        )
+        if log:
+            self.log(
+                f"  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
+            )
 
         prices = prices.set_axis(["import", "export"], axis=1)
 
@@ -566,10 +573,11 @@ class PVsystemModel:
 
         # Add any slots where the price is negative:
         if neg:
-            self.log("")
-            self.log("Negative Price Import Slots")
-            self.log("---------------------------")
-            self.log("")
+            if log:
+                self.log("")
+                self.log("Negative Price Import Slots")
+                self.log("---------------------------")
+                self.log("")
 
             neg_slots = df[df["import"] <= 0].sort_values("import", ascending=True)
 
@@ -587,23 +595,26 @@ class PVsystemModel:
                         axis=1,
                     )
                     net_cost.append(contract.net_cost(df).sum())
-                    str_log = f" {df['import'].loc[idx]:5.2f}p/kWh at {idx.strftime(TIME_FORMAT)} {df.loc[idx]['forced']:4.0f}W "
-                    str_log += f" SOC: {df.loc[idx]['soc']:5.1f}%->{df.loc[idx]['soc_end']:5.1f}% "
-                    str_log += f"Net: {net_cost[-1]:6.1f}"
-                    self.log(str_log)
+                    if log:
+                        str_log = f" {df['import'].loc[idx]:5.2f}p/kWh at {idx.strftime(TIME_FORMAT)} {df.loc[idx]['forced']:4.0f}W "
+                        str_log += f" SOC: {df.loc[idx]['soc']:5.1f}%->{df.loc[idx]['soc_end']:5.1f}% "
+                        str_log += f"Net: {net_cost[-1]:6.1f}"
+                        self.log(str_log)
                 net_cost_opt = min(net_cost)
                 opt_neg_slots = net_cost.index(net_cost_opt)
                 slots = slots[: opt_neg_slots + 1]
             else:
-                self.log("No slots")
+                if log:
+                    self.log("No slots")
 
         # --------------------------------------------------------------------------------------------
         #  Charging 1st Pass
         # --------------------------------------------------------------------------------------------
-        self.log("")
-        self.log("High Cost Usage Swaps")
-        self.log("---------------------")
-        self.log("")
+        if log:
+            self.log("")
+            self.log("High Cost Usage Swaps")
+            self.log("---------------------")
+            self.log("")
 
         done = False
         i = 0
@@ -723,7 +734,8 @@ class PVsystemModel:
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                             net_cost_opt = net_cost[-1]
                             str_log += f"Net: {net_cost_opt:6.1f}"
-                            self.log(str_log)
+                            if log:
+                                self.log(str_log)
                         else:
                             available[max_slot] = False
                 else:
@@ -735,9 +747,10 @@ class PVsystemModel:
         z["slot_total"] = z["slot_count"].cumsum()
         z["delta"] = z["net_cost"].diff()
         max_delta = z["net_cost"].diff().iloc[1:].max()
-        self.log("")
-        self.log(f"Maximum 1st pass slot delta is {max_delta:0.1f}p")
-        self.log("")
+        if log:
+            self.log("")
+            self.log(f"Maximum 1st pass slot delta is {max_delta:0.1f}p")
+            self.log("")
 
         df = pd.concat(
             [
@@ -759,16 +772,18 @@ class PVsystemModel:
 
             # Check how many slots which aren't full are at an import price less than any export price:
             max_export_price = df[df["forced"] <= 0]["export"].max()
-            self.log("")
-            self.log("Low Cost Charging")
-            self.log("------------------")
-            self.log("")
+            if log:
+                self.log("")
+                self.log("Low Cost Charging")
+                self.log("------------------")
+                self.log("")
             net_cost_pre = net_cost_opt
             slots_pre = copy(slots)
 
-            self.log(
-                f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh"
-            )
+            if log:
+                self.log(
+                    f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh"
+                )
 
             i = 0
             available = (
@@ -778,9 +793,10 @@ class PVsystemModel:
             )
             # self.log((df["import"]<max_export_price)
             a0 = available.sum()
-            self.log(
-                f"{available.sum()} slots have an import price less than the max export price"
-            )
+            if log:
+                self.log(
+                    f"{available.sum()} slots have an import price less than the max export price"
+                )
             done = available.sum() == 0
 
             while not done:
@@ -844,7 +860,8 @@ class PVsystemModel:
                         str_log += f"Max export: {-df['grid'].min():0.0f}W "
                         net_cost_opt = net_cost
                         slots_added += 1
-                        self.log(str_log)
+                        if log:
+                            self.log(str_log)
                     else:
                         # done = True
                         slots = slots[:-1]
@@ -872,8 +889,9 @@ class PVsystemModel:
             else:
                 str_log += f": > threshold {self.host.get_config('pass_threshold_p')} => Included"
 
-            self.log("")
-            self.log(str_log)
+            if log:
+                self.log("")
+                self.log(str_log)
 
             # -----------
             # Discharging
@@ -886,17 +904,19 @@ class PVsystemModel:
 
                 # Check how many slots which aren't full are at an export price less than any import price:
                 min_import_price = df["import"].min()
-                self.log("")
-                self.log("Forced Discharging")
-                self.log("------------------")
-                self.log("")
+                if log:
+                    self.log("")
+                    self.log("Forced Discharging")
+                    self.log("------------------")
+                    self.log("")
 
                 i = 0
                 available = (df["export"] > min_import_price) & (df["forced"] == 0)
                 a0 = available.sum()
-                self.log(
-                    f"{available.sum()} slots have an export price greater than the min import price"
-                )
+                if log:
+                    self.log(
+                        f"{available.sum()} slots have an export price greater than the min import price"
+                    )
                 done = available.sum() == 0
 
                 while not done:
@@ -960,7 +980,8 @@ class PVsystemModel:
                             str_log += f"Max export: {-df['grid'].min():0.0f}W "
                             net_cost_opt = net_cost
                             slots_added += 1
-                            self.log(str_log)
+                            if log:
+                                self.log(str_log)
                         else:
                             # done = True
                             slots = slots[:-1]
@@ -987,16 +1008,19 @@ class PVsystemModel:
                 else:
                     str_log += f": > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
 
-                self.log("")
-                self.log(str_log)
+                if log:
+                    self.log("")
+                    self.log(str_log)
 
-            self.log(f"Iteration {j:2d}: Slots added: {slots_added:3d}")
+            if log:
+                self.log(f"Iteration {j:2d}: Slots added: {slots_added:3d}")
 
         df.index = pd.to_datetime(df.index)
 
         if not self.host.get_config("allow_cyclic"):
-            self.log("")
-            self.log("Removing cyclic charge/discharge")
+            if log:
+                self.log("")
+                self.log("Removing cyclic charge/discharge")
             a = df["forced"][df["forced"] != 0].to_dict()
             new_slots = [(k, a[k]) for k in a]
             revised_slots = []
@@ -1006,9 +1030,10 @@ class PVsystemModel:
                     int(-next_slot[1]) == self.inverter.inverter_power
                 ):
                     skip_flag = True
-                    self.log(
-                        f"  Skipping slots at {slot[0].strftime(TIME_FORMAT)} ({slot[1]}W) and {next_slot[0].strftime(TIME_FORMAT)} ({next_slot[1]}W)"
-                    )
+                    if log:
+                        self.log(
+                            f"  Skipping slots at {slot[0].strftime(TIME_FORMAT)} ({slot[1]}W) and {next_slot[0].strftime(TIME_FORMAT)} ({next_slot[1]}W)"
+                        )
                 elif skip_flag:
                     skip_flag = False
                 else:
@@ -1024,12 +1049,12 @@ class PVsystemModel:
                 axis=1,
             )
             net_cost_opt_new = contract.net_cost(df).sum()
-            self.log(
-                f"  Net cost revised from {net_cost_opt:0.1f}p to {net_cost_opt_new:0.1f}p"
-            )
+            if log:
+                self.log(
+                    f"  Net cost revised from {net_cost_opt:0.1f}p to {net_cost_opt_new:0.1f}p"
+                )
             slots = revised_slots
             df.index = pd.to_datetime(df.index)
-
         return df
 
 
