@@ -19,7 +19,8 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.4.3"
+VERSION = "3.4.5-beta-02"
+DEBUG = True
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
@@ -229,18 +230,28 @@ def importName(modulename, name):
 
 class PVOpt(hass.Hass):
     def hass2df(self, entity_id, days=2, log=False):
-        hist = self.get_history(entity_id=entity_id, days=days)
         if log:
-            self.log(hist)
+            self.log(f">>> Getting {days} days' history for {entity_id}")
+            self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
+        hist = self.get_history(entity_id=entity_id, days=days)
+
+        # if log:
+        #     self.log(f">>> {hist}")
         df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
         df.index = pd.to_datetime(df.index, format="ISO8601")
+
+        # if log:
+        #     self.log(f">>> {df}")
+
         df = df.sort_index()
         df = df[df != "unavailable"]
         df = df[df != "unknown"]
+        if log:
+            self.log(f">>> {df}")
         return df
 
     def initialize(self):
-        self.debug = False
+        self.debug = DEBUG
         self.config = {}
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
@@ -270,7 +281,7 @@ class PVOpt(hass.Hass):
         # if not, set up entities using MQTT discovery and write the initial state to them
         self._load_args()
 
-        self._estimate_capacity()
+        # self._estimate_capacity()
         self._load_pv_system_model()
         if self.get_config("alt_tariffs") is not None:
             self._compare_tariffs()
@@ -308,7 +319,9 @@ class PVOpt(hass.Hass):
         if "id_battery_charge_power" in self.config:
             df = pd.DataFrame(
                 self.hass2df(
-                    entity_id=self.config["id_battery_charge_power"], days=7
+                    entity_id=self.config["id_battery_charge_power"],
+                    days=7,
+                    log=self.debug,
                 ).astype(int, errors="ignore")
             ).set_axis(["Power"], axis=1)
 
@@ -394,7 +407,9 @@ class PVOpt(hass.Hass):
             grid = (
                 pd.concat(
                     [
-                        self.hass2df(self.config[f"id_{col}_today"], days=1)
+                        self.hass2df(
+                            self.config[f"id_{col}_today"], days=1, log=self.debug
+                        )
                         .astype(float)
                         .resample("30T")
                         .ffill()
@@ -416,14 +431,18 @@ class PVOpt(hass.Hass):
             grid = (
                 pd.concat(
                     [
-                        self.hass2df(self.config["id_grid_import_power"], days=1)
+                        self.hass2df(
+                            self.config["id_grid_import_power"], days=1, log=self.debug
+                        )
                         .astype(float)
                         .resample("30T")
                         .mean()
                         .reindex(index)
                         .fillna(0)
                         .reindex(index),
-                        self.hass2df(self.config["id_grid_export_power"], days=1)
+                        self.hass2df(
+                            self.config["id_grid_export_power"], days=1, log=self.debug
+                        )
                         .astype(float)
                         .resample("30T")
                         .mean()
@@ -432,14 +451,14 @@ class PVOpt(hass.Hass):
                     ],
                     axis=1,
                 )
-                .set_axis(["grid_import", "grid_export"], axis=1)
+                .set_axis(["grid_import", "grid_export"], axis=1, log=self.debug)
                 .loc[pd.Timestamp.now(tz="UTC").normalize() :]
             )
 
         elif "id_grid_power" in self.config:
             grid = (
                 -(
-                    self.hass2df(self.config["id_grid_power"], days=1)
+                    self.hass2df(self.config["id_grid_power"], days=1, log=self.debug)
                     .astype(float)
                     .resample("30T")
                     .mean()
@@ -1277,10 +1296,9 @@ class PVOpt(hass.Hass):
         # else:
         #     self.tariffs = self.config["alt_tariffs"] + [None]
 
-        x = self.hass2df(
-            self.config["id_battery_soc"],
-            days=1,
-        ).astype(float)
+        x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug).astype(
+            float
+        )
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
         x = pd.concat(
             [
@@ -1768,35 +1786,48 @@ class PVOpt(hass.Hass):
 
     def load_consumption(self, start, end):
         self.log("Getting expected consumption data")
-        index = pd.date_range(
-            start,
-            end,
-            freq="30T",
-            inclusive="left",
-        )
-        consumption = pd.DataFrame(index=index, data={"consumption": 0})
-        for entity_id in self.config["id_consumption"]:
-            try:
-                df = self.hass2df(
-                    entity_id,
-                    days=int(self.get_config("consumption_history_days")),
-                )
 
-            except Exception as e:
-                self.log(
-                    f"Unable to get historical consumption from {entity_id}. {e}",
-                    level="ERROR",
-                )
-                return
+        consumption = pd.Series(index=self.static.index, data=0)
+
+        if self.entity_exists(self.config["id_consumption_today"]):
+            entity_ids = self.config["id_consumption_today"]
+            consumption_daily = True
+        else:
+            entity_ids = self.config["id_consumption"]
+            consumption_daily = False
+
+        if not isinstance(entity_ids, list):
+            entity_ids = [entity_ids]
+
+        for entity_id in entity_ids:
+            df = self.hass2df(
+                entity_id,
+                days=int(self.get_config("consumption_history_days")),
+                log=self.debug,
+            )
+
+            # except Exception as e:
+            #     self.log(
+            #         f"Unable to get historical consumption from {entity_id}. {e}",
+            #         level="ERROR",
+            #     )
+            #     return False
 
             df.index = pd.to_datetime(df.index)
-            df = (
-                pd.to_numeric(df, errors="coerce")
-                .dropna()
-                .resample("30T")
-                .mean()
-                .fillna(0)
-            )
+
+            if consumption_daily:  #
+                df = pd.to_numeric(df, errors="coerce")
+                df = (
+                    df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30T")
+                ).ffill().fillna(0).diff(-1) * 2000
+            else:
+                df = (
+                    pd.to_numeric(df, errors="coerce")
+                    .dropna()
+                    .resample("30T")
+                    .mean()
+                    .fillna(0)
+                )
 
             df = df * (1 + self.get_config("consumption_margin") / 100)
             dfx = pd.Series(index=df.index, data=df.to_list())

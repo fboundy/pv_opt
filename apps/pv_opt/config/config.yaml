@@ -23,6 +23,7 @@ pv_opt:
   # inverter_type: "SOLIS_CORE_MODBUS"
   # inverter_type: SOLIS_SOLARMAN
   device_name: solis
+  consumption_history_days: 2
 
   # ========================================
   # Plant parameters
@@ -125,7 +126,7 @@ pv_opt:
   # battery_voltage: sensor.{device_name}_battery_voltage
   # maximum_dod_percent: sensor.{device_name}_overdischarge_soc
   # update_cycle_seconds: 60
-  
+  # id_consumption_today: sensor.{device_name}_house_load_today
   # id_consumption:
   #   - sensor.{device_name}_house_load_power
   #   - sensor.{device_name}_backup_load_power
