@@ -253,9 +253,9 @@ class PVOpt(hass.Hass):
         self.log("")
         self.debug = DEBUG
         try:
-            subver = int(self.version.split(".")[2])
+            subver = int(VERSION.split(".")[2])
         except:
-            self.log("Pre-release version. Enablinf debug logging")
+            self.log("Pre-release version. Enabling debug logging")
             self.debug = True
 
         self.adapi = self.get_ad_api()
@@ -288,8 +288,8 @@ class PVOpt(hass.Hass):
         self._load_contract()
 
         if self.get_config("alt_tariffs") is not None:
-            self._setup_compare_schedule()
             self._compare_tariffs()
+            self._setup_compare_schedule()
 
         if self.agile:
             self._setup_agile_schedule()
@@ -409,9 +409,10 @@ class PVOpt(hass.Hass):
         start = kwargs.get("start", pd.Timestamp.now(tz="UTC").normalize())
         end = kwargs.get("end", pd.Timestamp.now(tz="UTC"))
 
-        self.log(
-            f">>> Start: {start.strftime(DATE_TIME_FORMAT_LONG)} End: {end.strftime(DATE_TIME_FORMAT_LONG)}"
-        )
+        if self.debug:
+            self.log(
+                f">>> Start: {start.strftime(DATE_TIME_FORMAT_LONG)} End: {end.strftime(DATE_TIME_FORMAT_LONG)}"
+            )
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
 
         index = pd.date_range(
@@ -432,7 +433,7 @@ class PVOpt(hass.Hass):
         if self.debug:
             self.log(f">>> {grid.to_string()}")
 
-        cost_today = self.contract.net_cost(grid_flow=grid, log=True)
+        cost_today = self.contract.net_cost(grid_flow=grid, log=self.debug)
         if self.debug:
             self.log(f">>> {cost_today.to_string()}")
             self.log(f">>> {cost_today.cumsum().to_string()}")
@@ -1224,11 +1225,6 @@ class PVOpt(hass.Hass):
         # self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
 
-        # if self.config["alt_tariffs"] is None:
-        #     self.tariffs = [None]
-        # else:
-        #     self.tariffs = self.config["alt_tariffs"] + [None]
-
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug).astype(
             float
         )
@@ -1249,10 +1245,10 @@ class PVOpt(hass.Hass):
         self.base = self.pv_system.flows(
             self.initial_soc, self.static, solar=self.get_config("solar_forecast")
         )
-        self.log("Calculating Base cost")
 
         self.base_cost = self.contract.net_cost(self.base)
-
+        self.log(f"Base cost: {self.base_cost.sum():6.2f}p")
+        self.log("")
         self.log(
             f'Optimising for {self.get_config("solar_forecast")} forecast from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}'
         )
@@ -1478,7 +1474,6 @@ class PVOpt(hass.Hass):
     def _create_windows(self):
         self.opt["period"] = (self.opt["forced"].diff() > 0).cumsum()
         if (self.opt["forced"] != 0).sum() > 0:
-            self.log("Optimal forced charge/discharge slots:")
             x = self.opt[self.opt["forced"] > 0].copy()
             x["start"] = x.index
             x["end"] = x.index + pd.Timedelta("30T")
@@ -1520,6 +1515,8 @@ class PVOpt(hass.Hass):
                     < HOLD_TOLERANCE
                 ] = "<="
 
+            self.log("")
+            self.log("Optimal forced charge/discharge slots:")
             for window in self.windows.iterrows():
                 self.log(
                     f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
@@ -1765,19 +1762,6 @@ class PVOpt(hass.Hass):
                 days=int(self.get_config("consumption_history_days")),
                 log=self.debug,
             )
-            # df = self.hass2df(
-            #     entity_id,
-            #     days=int(self.get_config("consumption_history_days")),
-            #     log=self.debug,
-            # )
-
-            # df.index = pd.to_datetime(df.index)
-
-            # if consumption_daily:  #
-            #     df = pd.to_numeric(df, errors="coerce")
-            #     df = (
-            #         df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30T")
-            #     ).ffill().fillna(0).diff(-1) * 2000
 
             df = df * (1 + self.get_config("consumption_margin") / 100)
             dfx = pd.Series(index=df.index, data=df.to_list())
@@ -1848,8 +1832,8 @@ class PVOpt(hass.Hass):
         )
 
         attributes = {
-            "state_class": measurement,
-            "device_class": monetary,
+            "state_class": "measurement",
+            "device_class": "monetary",
             "unit_of_measurement": "GBP",
         }
 
@@ -1868,7 +1852,7 @@ class PVOpt(hass.Hass):
             self.log(
                 f"  {contract.name:10s}  Base Cost: {net_base.sum():6.1f}p   Optimised Cost: {net_opt.sum():6.1f}p"
             )
-            entity_id = f"sensor.{self.prefix}_opt_cost_{contract_name}"
+            entity_id = f"sensor.{self.prefix}_opt_cost_{contract.name}"
             self.set_state(
                 state=round(net_opt.sum() / 100, 2),
                 entity_id=entity_id,
