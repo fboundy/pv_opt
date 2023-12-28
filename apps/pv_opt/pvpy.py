@@ -538,7 +538,6 @@ class PVsystemModel:
         consumption = static_flows[cols["consumption"]]
         consumption.name = "consumption"
 
-        neg = kwargs.pop("neg", True)
         discharge = kwargs.pop("discharge", False)
         max_iters = kwargs.pop("max_iters", 3)
 
@@ -570,42 +569,6 @@ class PVsystemModel:
         net_cost_opt = base_cost
 
         slots = []
-
-        # Add any slots where the price is negative:
-        if neg:
-            if log:
-                self.log("")
-                self.log("Negative Price Import Slots")
-                self.log("---------------------------")
-                self.log("")
-
-            neg_slots = df[df["import"] <= 0].sort_values("import", ascending=True)
-
-            if len(neg_slots.index) > 0:
-                for idx in neg_slots.index:
-                    slots.append((idx, self.inverter.charger_power))
-                    df = pd.concat(
-                        [
-                            prices,
-                            consumption,
-                            self.flows(
-                                initial_soc, static_flows, slots=slots, **kwargs
-                            ),
-                        ],
-                        axis=1,
-                    )
-                    net_cost.append(contract.net_cost(df).sum())
-                    if log:
-                        str_log = f" {df['import'].loc[idx]:5.2f}p/kWh at {idx.strftime(TIME_FORMAT)} {df.loc[idx]['forced']:4.0f}W "
-                        str_log += f" SOC: {df.loc[idx]['soc']:5.1f}%->{df.loc[idx]['soc_end']:5.1f}% "
-                        str_log += f"Net: {net_cost[-1]:6.1f}"
-                        self.log(str_log)
-                net_cost_opt = min(net_cost)
-                opt_neg_slots = net_cost.index(net_cost_opt)
-                slots = slots[: opt_neg_slots + 1]
-            else:
-                if log:
-                    self.log("No slots")
 
         # --------------------------------------------------------------------------------------------
         #  Charging 1st Pass

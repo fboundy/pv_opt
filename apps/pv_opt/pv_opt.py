@@ -1616,6 +1616,18 @@ class PVOpt(hass.Hass):
         )
 
     def _write_output(self):
+        unit_cost_today = (
+            self._cost_actual().sum() * 100 / self.get_config("id_consumption_today")
+        )
+        self.log(f"Average unit cost today: {unit_cost_today:0.2f}p/kWh")
+        self.write_to_hass(
+            entity=f"sensor.{self.prefix}_unit_cost_today",
+            state=unit_cost_today,
+            attributes={
+                "friendly_name": "PV Opt Unit Electricity Cost Today",
+            },
+        )
+
         self.write_cost(
             "PV Opt Base Cost",
             entity=f"sensor.{self.prefix}_base_cost",
