@@ -1616,8 +1616,8 @@ class PVOpt(hass.Hass):
         )
 
     def _write_output(self):
-        unit_cost_today = (
-            self._cost_actual().sum() * 100 / self.get_config("id_consumption_today")
+        unit_cost_today = round(
+            self._cost_actual().sum() / self.get_config("id_consumption_today"), 1
         )
         self.log(f"Average unit cost today: {unit_cost_today:0.2f}p/kWh")
         self.write_to_hass(
