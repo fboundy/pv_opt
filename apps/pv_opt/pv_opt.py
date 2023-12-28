@@ -1353,7 +1353,7 @@ class PVOpt(hass.Hass):
                         self.log(
                             f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%"
                         )
-                        self.inverter.hold_soc(enabled=True, soc=self.hold[0]["soc"])
+                        self.inverter.hold_soc(enable=True, soc=self.hold[0]["soc"])
                     else:
                         self.log(
                             f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%"
@@ -1441,7 +1441,7 @@ class PVOpt(hass.Hass):
                     self.inverter.control_charge(enable=False)
 
                 elif status["hold_soc"]["active"]:
-                    self.inverter.hold_soc(enabled=False)
+                    self.inverter.hold_soc(enable=False)
                     str_log += " but inverter is holding SOC. Disabling."
                     self.log(str_log)
 
