@@ -348,7 +348,7 @@ class InverterController:
 
         write_flag = True
         value_changed = False
-        self.log(f"Times: {times}")
+
         for limit in times:
             if times[limit] is not None:
                 for unit in ["hours", "minutes"]:
