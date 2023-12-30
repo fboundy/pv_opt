@@ -19,7 +19,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.5.0"
+VERSION = "3.5.1"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -388,7 +388,7 @@ class PVOpt(hass.Hass):
         )
 
     def _setup_agile_schedule(self):
-        start = (pd.Timestamp.now() + pd.Timedelta("1T")).to_pydatetime()
+        start = (pd.Timestamp.now(tz="UTC") + pd.Timedelta("1T")).to_pydatetime()
         self.timer_handle = self.run_every(
             self._load_agile_cb,
             start=start,
@@ -433,7 +433,9 @@ class PVOpt(hass.Hass):
         if self.debug:
             self.log(f">>> {grid.to_string()}")
 
-        cost_today = self.contract.net_cost(grid_flow=grid, log=self.debug)
+        cost_today = self.contract.net_cost(
+            grid_flow=grid, log=self.debug, day_ahead=False
+        )
         if self.debug:
             self.log(f">>> {cost_today.to_string()}")
             self.log(f">>> {cost_today.cumsum().to_string()}")
@@ -446,6 +448,7 @@ class PVOpt(hass.Hass):
     @ad.app_lock
     def _load_agile_cb(self, cb_args):
         # reload if the time is after 16:00 and the last data we have is today
+        self.log(">>> Agile Callback Handler")
         if (
             self.contract.imp.end().day == pd.Timestamp.now().day
         ) and pd.Timestamp.now().hour > 16:
@@ -645,7 +648,13 @@ class PVOpt(hass.Hass):
 
         else:
             for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
-                self.log(f"  {imp_exp.title()}: {t.name}")
+                try:
+                    z = t.end().strftime(DATE_TIME_FORMAT_LONG)
+                except:
+                    z = "N/A"
+                self.log(
+                    f"  {imp_exp.title()}: {t.name:40s} Start: {t.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
+                )
                 if "AGILE" in t.name:
                     self.agile = True
 
@@ -1568,7 +1577,13 @@ class PVOpt(hass.Hass):
         except Exception as e:
             self.log(f"Couldn't write to entity {entity}: {e}")
 
-    def write_cost(self, name, entity, cost, df):
+    def write_cost(
+        self,
+        name,
+        entity,
+        cost,
+        df,
+    ):
         cost_today = self._cost_actual()
         midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta("24H")
         df = df.fillna(0).round(2)
@@ -1576,7 +1591,14 @@ class PVOpt(hass.Hass):
             df.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
             + ":00"
         )
-        cols = ["soc", "forced", "import", "export", "grid", "consumption"]
+        cols = [
+            "soc",
+            "forced",
+            "import",
+            "export",
+            "grid",
+            "consumption",
+        ]
 
         cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1)
         cost["cumulative_cost"] = cost["cost"].cumsum()
@@ -1625,6 +1647,7 @@ class PVOpt(hass.Hass):
             state=unit_cost_today,
             attributes={
                 "friendly_name": "PV Opt Unit Electricity Cost Today",
+                "unit_of_measurement": "p/kWh",
             },
         )
 
@@ -1843,14 +1866,10 @@ class PVOpt(hass.Hass):
             f"  Actual:                                          {actual.sum():6.1f}p"
         )
 
-        attributes = {
-            "state_class": "measurement",
-            "device_class": "monetary",
-            "unit_of_measurement": "GBP",
-        }
+        cols = ["soc", "forced", "import", "export", "grid", "consumption", "solar"]
 
         for contract in contracts:
-            net_base = contract.net_cost(base)
+            net_base = contract.net_cost(base, day_ahead=False)
             opt = self.pv_system.optimised_force(
                 initial_soc,
                 static,
@@ -1858,9 +1877,27 @@ class PVOpt(hass.Hass):
                 solar="solar",
                 discharge=self.get_config("forced_discharge"),
                 max_iters=MAX_ITERS,
-                log=False,
+                log=True,
             )
-            net_opt = contract.net_cost(opt)
+
+            opt["period_start"] = (
+                opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
+                + ":00"
+            )
+
+            attributes = {
+                "state_class": "measurement",
+                "device_class": "monetary",
+                "unit_of_measurement": "GBP",
+                "friendly_name": f"PV Opt Comparison {contract.name}",
+            } | {
+                col: opt[["period_start", col]].to_dict("records")
+                for col in cols
+                if col in opt.columns
+            }
+            # | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")}
+
+            net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(
                 f"  {contract.name:10s}  Base Cost: {net_base.sum():6.1f}p   Optimised Cost: {net_opt.sum():6.1f}p"
             )
