@@ -19,7 +19,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.5.1"
+VERSION = "3.5.2"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -31,6 +31,7 @@ EVENT_TRIGGER = "PV_OPT"
 DEBUG_TRIGGER = "PV_DEBUG"
 HOLD_TOLERANCE = 3
 MAX_ITERS = 10
+MAX_INVERTER_UPDATES = 2
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -436,6 +437,7 @@ class PVOpt(hass.Hass):
         cost_today = self.contract.net_cost(
             grid_flow=grid, log=self.debug, day_ahead=False
         )
+
         if self.debug:
             self.log(f">>> {cost_today.to_string()}")
             self.log(f">>> {cost_today.cumsum().to_string()}")
@@ -647,23 +649,36 @@ class PVOpt(hass.Hass):
             raise ValueError(e)
 
         else:
-            for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
-                try:
-                    z = t.end().strftime(DATE_TIME_FORMAT_LONG)
-                except:
-                    z = "N/A"
-                self.log(
-                    f"  {imp_exp.title()}: {t.name:40s} Start: {t.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
-                )
-                if "AGILE" in t.name:
-                    self.agile = True
-
-            if self.agile:
-                self.log("AGILE tariff detected. Rates will update at 16:00 daily")
+            self._check_tariffs()
 
             self.log("")
             self._load_saving_events()
         self.log("Finished loading contract")
+
+    def _check_tariffs(self):
+        tariff_error = False
+        for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
+            try:
+                z = t.end().strftime(DATE_TIME_FORMAT_LONG)
+                if t.end() < pd.Timestamp.now(tz="UTC"):
+                    z = z + " <<< ERROR: Tariff end datetime in past"
+                    tariff_error = True
+
+            except:
+                z = "N/A"
+
+            if t.start() > pd.Timestamp.now(tz="UTC"):
+                z = z + " <<< ERROR: Tariff start datetime in future"
+                tariff_error = True
+
+            self.log(
+                f"  {imp_exp.title()}: {t.name:40s} Start: {t.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
+            )
+            if "AGILE" in t.name:
+                self.agile = True
+
+        if self.agile:
+            self.log("AGILE tariff detected. Rates will update at 16:00 daily")
 
     def _load_saving_events(self):
         if (
@@ -1199,6 +1214,7 @@ class PVOpt(hass.Hass):
     @ad.app_lock
     def optimise(self):
         # initialse a DataFrame to cover today and tomorrow at 30 minute frequency
+
         self.log("")
         self._load_saving_events()
 
@@ -1206,10 +1222,24 @@ class PVOpt(hass.Hass):
             discharge_enable = "enabled"
         else:
             discharge_enable = "disabled"
+
+        self.log("")
         self.log(f"Starting Opimisation with discharge {discharge_enable}")
-        self.log(
-            f"-------------------------------------------{len(discharge_enable)*'-'}"
-        )
+        self.log(f"------------------------------------{len(discharge_enable)*'-'}")
+
+        self.log("")
+        self.log("Checking tariffs:")
+        self.log("-----------------")
+
+        if self._check_tariffs():
+            self.log("")
+            self.log("  - Tariff error detected. Attempting to re-load.")
+            self.log("")
+            self._load_contract()
+        else:
+            self.log("  - Tariffs OK")
+            self.log("")
+
         self.t0 = pd.Timestamp.now()
         self.static = pd.DataFrame(
             index=pd.date_range(
@@ -1306,179 +1336,199 @@ class PVOpt(hass.Hass):
 
         else:
             # Get the current status of the inverter
-            self._status("Updating Inverter")
-            status = self.inverter.status
-            self._log_inverter_status(status)
-
-            time_to_slot_start = (
-                self.charge_start_datetime - pd.Timestamp.now(self.tz)
-            ).total_seconds() / 60
-            time_to_slot_end = (
-                self.charge_end_datetime - pd.Timestamp.now(self.tz)
-            ).total_seconds() / 60
-
             did_something = True
+            self._status("Updating Inverter")
 
-            if (time_to_slot_start > 0) and (
-                time_to_slot_start < self.get_config("optimise_frequency_minutes")
-            ):
-                # Next slot starts before the next optimiser run. This implies we are not currently in
-                # a charge or discharge slot
+            inverter_update_count = 0
+            while did_something and inverter_update_count < MAX_INVERTER_UPDATES:
+                inverter_update_count += 1
 
-                self.log(
-                    f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
-                )
+                status = self.inverter.status
+                self._log_inverter_status(status)
 
-                if self.charge_power > 0:
-                    self.inverter.control_charge(
-                        enable=True,
-                        start=self.charge_start_datetime,
-                        end=self.charge_end_datetime,
-                        power=self.charge_power,
-                    )
-                    self.inverter.control_discharge(enable=False)
+                time_to_slot_start = (
+                    self.charge_start_datetime - pd.Timestamp.now(self.tz)
+                ).total_seconds() / 60
+                time_to_slot_end = (
+                    self.charge_end_datetime - pd.Timestamp.now(self.tz)
+                ).total_seconds() / 60
 
-                elif self.charge_power < 0:
-                    self.inverter.control_discharge(
-                        enable=True,
-                        start=self.charge_start_datetime,
-                        end=self.charge_end_datetime,
-                        power=self.charge_power,
-                    )
-                    self.inverter.control_charge(enable=False)
+                if (time_to_slot_start > 0) and (
+                    time_to_slot_start < self.get_config("optimise_frequency_minutes")
+                ):
+                    # Next slot starts before the next optimiser run. This implies we are not currently in
+                    # a charge or discharge slot
 
-            elif (time_to_slot_start <= 0) and (
-                time_to_slot_start < self.get_config("optimise_frequency_minutes")
-            ):
-                # We are currently in a charge/discharge slot
-
-                # If the current slot is a Hold SOC slot and we aren't holding then we need to
-                # enable Hold SOC
-                if self.hold[0]["active"]:
-                    if (
-                        not status["hold_soc"]["active"]
-                        or status["hold_soc"]["soc"] != self.hold[0]["soc"]
-                    ):
-                        self.log(
-                            f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%"
-                        )
-                        self.inverter.hold_soc(enable=True, soc=self.hold[0]["soc"])
-                    else:
-                        self.log(
-                            f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%"
-                        )
-
-                else:
                     self.log(
-                        f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
+                        f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
                     )
 
                     if self.charge_power > 0:
-                        if not status["charge"]["active"]:
-                            start = pd.Timestamp.now()
-                        else:
-                            start = None
-
                         self.inverter.control_charge(
                             enable=True,
-                            start=start,
+                            start=self.charge_start_datetime,
                             end=self.charge_end_datetime,
                             power=self.charge_power,
                         )
-
-                        if status["discharge"]["active"]:
-                            self.inverter.control_discharge(
-                                enable=False,
-                            )
+                        self.inverter.control_discharge(enable=False)
 
                     elif self.charge_power < 0:
-                        if not status["discharge"]["active"]:
-                            start = pd.Timestamp.now()
-                        else:
-                            start = None
-
                         self.inverter.control_discharge(
                             enable=True,
-                            start=start,
+                            start=self.charge_start_datetime,
                             end=self.charge_end_datetime,
                             power=self.charge_power,
                         )
+                        self.inverter.control_charge(enable=False)
 
-                        if status["charge"]["active"]:
-                            self.inverter.control_charge(
-                                enable=False,
+                elif (time_to_slot_start <= 0) and (
+                    time_to_slot_start < self.get_config("optimise_frequency_minutes")
+                ):
+                    # We are currently in a charge/discharge slot
+
+                    # If the current slot is a Hold SOC slot and we aren't holding then we need to
+                    # enable Hold SOC
+                    if self.hold[0]["active"]:
+                        if (
+                            not status["hold_soc"]["active"]
+                            or status["hold_soc"]["soc"] != self.hold[0]["soc"]
+                        ):
+                            self.log(
+                                f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%"
+                            )
+                            self.inverter.hold_soc(enable=True, soc=self.hold[0]["soc"])
+                        else:
+                            self.log(
+                                f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%"
                             )
 
-            else:
-                if self.charge_power > 0:
-                    direction = "charge"
-                elif self.charge_power < 0:
-                    direction = "discharge"
+                    else:
+                        self.log(
+                            f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
+                        )
 
-                # We aren't in a charge/discharge slot and the next one doesn't start before the
-                # optimiser runs again
+                        if self.charge_power > 0:
+                            if not status["charge"]["active"]:
+                                start = pd.Timestamp.now()
+                            else:
+                                start = None
 
-                str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes."
+                            self.inverter.control_charge(
+                                enable=True,
+                                start=start,
+                                end=self.charge_end_datetime,
+                                power=self.charge_power,
+                            )
 
-                # If the next slot isn't soon then just check that current status matches what we see:
-                if status["charge"]["active"]:
-                    str_log += " but inverter is charging. Disabling charge."
-                    self.log(str_log)
-                    self.inverter.control_charge(enable=False)
+                            if status["discharge"]["active"]:
+                                self.inverter.control_discharge(
+                                    enable=False,
+                                )
 
-                elif status["discharge"]["active"]:
-                    str_log += " but inverter is discharging. Disabling discharge."
-                    self.log(str_log)
-                    self.inverter.control_discharge(enable=False)
+                        elif self.charge_power < 0:
+                            if not status["discharge"]["active"]:
+                                start = pd.Timestamp.now()
+                            else:
+                                start = None
 
-                elif (
-                    direction == "charge"
-                    and self.charge_start_datetime > status["discharge"]["start"]
-                    and status["discharge"]["start"] != status["discharge"]["end"]
-                ):
-                    str_log += " but inverter is has a discharge slot before then. Disabling discharge."
-                    self.log(str_log)
-                    self.inverter.control_discharge(enable=False)
+                            self.inverter.control_discharge(
+                                enable=True,
+                                start=start,
+                                end=self.charge_end_datetime,
+                                power=self.charge_power,
+                            )
 
-                elif (
-                    direction == "discharge"
-                    and self.charge_start_datetime > status["charge"]["start"]
-                    and status["charge"]["start"] != status["charge"]["end"]
-                ):
-                    str_log += " but inverter is has a charge slot before then. Disabling charge."
-                    self.log(str_log)
-                    self.inverter.control_charge(enable=False)
-
-                elif status["hold_soc"]["active"]:
-                    self.inverter.hold_soc(enable=False)
-                    str_log += " but inverter is holding SOC. Disabling."
-                    self.log(str_log)
+                            if status["charge"]["active"]:
+                                self.inverter.control_charge(
+                                    enable=False,
+                                )
 
                 else:
-                    str_log += " Nothing to do."
-                    self.log(str_log)
-                    did_something = False
+                    if self.charge_power > 0:
+                        direction = "charge"
+                    elif self.charge_power < 0:
+                        direction = "discharge"
 
-            if did_something:
-                if self.get_config("update_cycle_seconds") is not None:
-                    i = int(self.get_config("update_cycle_seconds"))
-                    self.log(f"Wating for Modbus Read cycle: {i} seconds")
-                    while i > 0:
-                        self._status(f"Waiting for Modbus Read cycle: {i}")
-                        time.sleep(1)
-                        i -= 1
+                    # We aren't in a charge/discharge slot and the next one doesn't start before the
+                    # optimiser runs again
 
-                    status = self.inverter.status
-                    self._log_inverter_status(status)
+                    str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes."
+
+                    # If the next slot isn't soon then just check that current status matches what we see:
+                    if status["charge"]["active"]:
+                        str_log += " but inverter is charging. Disabling charge."
+                        self.log(str_log)
+                        self.inverter.control_charge(enable=False)
+
+                    elif status["discharge"]["active"]:
+                        str_log += " but inverter is discharging. Disabling discharge."
+                        self.log(str_log)
+                        self.inverter.control_discharge(enable=False)
+
+                    elif (
+                        direction == "charge"
+                        and self.charge_start_datetime > status["discharge"]["start"]
+                        and status["discharge"]["start"] != status["discharge"]["end"]
+                    ):
+                        str_log += " but inverter is has a discharge slot before then. Disabling discharge."
+                        self.log(str_log)
+                        self.inverter.control_discharge(enable=False)
+
+                    elif (
+                        direction == "discharge"
+                        and self.charge_start_datetime > status["charge"]["start"]
+                        and status["charge"]["start"] != status["charge"]["end"]
+                    ):
+                        str_log += " but inverter is has a charge slot before then. Disabling charge."
+                        self.log(str_log)
+                        self.inverter.control_charge(enable=False)
+
+                    elif status["hold_soc"]["active"]:
+                        self.inverter.hold_soc(enable=False)
+                        str_log += " but inverter is holding SOC. Disabling."
+                        self.log(str_log)
+
+                    else:
+                        str_log += " Nothing to do."
+                        self.log(str_log)
+                        did_something = False
+
+                if did_something:
+                    if self.get_config("update_cycle_seconds") is not None:
+                        i = int(self.get_config("update_cycle_seconds") * 1.2)
+                        self.log(f"Wating for Modbus Read cycle: {i} seconds")
+                        while i > 0:
+                            self._status(f"Waiting for Modbus Read cycle: {i}")
+                            time.sleep(1)
+                            i -= 1
+
+                        # status = self.inverter.status
+                        # self._log_inverter_status(status)
+
+            status_switches = {"charge": "off", "discharge": "off", "hold_soc": "off"}
 
             if status["hold_soc"]["active"]:
                 self._status(f"Holding SOC at {status['hold_soc']['soc']:0.0f}%")
+                status_switches["hold_soc"] = "on"
+
             elif status["charge"]["active"]:
                 self._status("Charging")
+                status_switches["charge"] = "on"
+
             elif status["discharge"]["active"]:
                 self._status("Discharging")
+                status_switches["discharge"] = "on"
+
             else:
                 self._status("Idle")
+
+            for switch in status_switches:
+                service = f"switch/turn_{status_switches[switch]}"
+                entity_id = f"switch.{self.prefix}_{switch}_active"
+                self.call_service(
+                    service=service,
+                    entity_id=entity_id,
+                )
 
     def _create_windows(self):
         self.opt["period"] = (self.opt["forced"].diff() > 0).cumsum()
@@ -1877,7 +1927,7 @@ class PVOpt(hass.Hass):
                 solar="solar",
                 discharge=self.get_config("forced_discharge"),
                 max_iters=MAX_ITERS,
-                log=True,
+                log=self.debug,
             )
 
             opt["period_start"] = (

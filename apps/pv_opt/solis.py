@@ -445,6 +445,7 @@ class InverterController:
         switches = status["switches"]
         for switch in switches:
             if switch in kwargs:
+                self.log(f">>> {switch}: {kwargs[switch]}")
                 switches[switch] = kwargs[switch]
 
         bits = INVERTER_DEFS[self.type]["bits"]
