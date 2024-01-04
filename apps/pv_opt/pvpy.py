@@ -417,6 +417,9 @@ class Contract:
         return str
 
     def net_cost(self, grid_flow, **kwargs):
+        if len(grid_flow) == 0:
+            return pd.Series()
+
         grid_import = kwargs.pop("grid_import", "grid_import")
         grid_export = kwargs.pop("grid_export", "grid_export")
         grid_col = kwargs.pop("grid_col", "grid")
