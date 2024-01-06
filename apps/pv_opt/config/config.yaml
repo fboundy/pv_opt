@@ -95,7 +95,7 @@ pv_opt:
   # update_cycle_seconds: 15
   # maximum_dod_percent: number.{device_name}_battery_minimum_soc 
   
-  # id_consumption_today: sensor.{device_name}_house_load_today
+  id_consumption_today: sensor.{device_name}_consumption_today
   # id_grid_import_today: sensor.{device_name}_grid_import_today
   # id_grid_export_today: sensor.{device_name}_grid_export_today
 

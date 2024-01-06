@@ -1452,20 +1452,34 @@ class PVOpt(hass.Hass):
                     # We aren't in a charge/discharge slot and the next one doesn't start before the
                     # optimiser runs again
 
-                    str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes."
+                    str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes "
 
                     # If the next slot isn't soon then just check that current status matches what we see:
+                    did_something = False
+
                     if status["charge"]["active"]:
                         str_log += " but inverter is charging. Disabling charge."
                         self.log(str_log)
                         self.inverter.control_charge(enable=False)
+                        did_something = True
+                    elif status["charge"]["start"] != status["charge"]["end"]:
+                        str_log += " but charge start and end times are different."
+                        self.log(str_log)
+                        self.inverter.control_charge(enable=False)
+                        did_something = True
 
-                    elif status["discharge"]["active"]:
+                    if status["discharge"]["active"]:
                         str_log += " but inverter is discharging. Disabling discharge."
                         self.log(str_log)
                         self.inverter.control_discharge(enable=False)
+                        did_something = True
+                    elif status["discharge"]["start"] != status["discharge"]["end"]:
+                        str_log += " but charge start and end times are different."
+                        self.log(str_log)
+                        self.inverter.control_charge(enable=False)
+                        did_something = True
 
-                    elif (
+                    if (
                         direction == "charge"
                         and self.charge_start_datetime > status["discharge"]["start"]
                         and status["discharge"]["start"] != status["discharge"]["end"]
@@ -1473,6 +1487,7 @@ class PVOpt(hass.Hass):
                         str_log += " but inverter is has a discharge slot before then. Disabling discharge."
                         self.log(str_log)
                         self.inverter.control_discharge(enable=False)
+                        did_something = True
 
                     elif (
                         direction == "discharge"
@@ -1482,16 +1497,17 @@ class PVOpt(hass.Hass):
                         str_log += " but inverter is has a charge slot before then. Disabling charge."
                         self.log(str_log)
                         self.inverter.control_charge(enable=False)
+                        did_something = True
 
-                    elif status["hold_soc"]["active"]:
+                    if status["hold_soc"]["active"]:
                         self.inverter.hold_soc(enable=False)
                         str_log += " but inverter is holding SOC. Disabling."
                         self.log(str_log)
+                        did_something = True
 
-                    else:
-                        str_log += " Nothing to do."
+                    if not did_something:
+                        str_log += ". Nothing to do."
                         self.log(str_log)
-                        did_something = False
 
                 if did_something:
                     if self.get_config("update_cycle_seconds") is not None:

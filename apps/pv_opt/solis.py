@@ -221,11 +221,13 @@ class InverterController:
             )
 
     def control_charge(self, enable, **kwargs):
-        self.enable_timed_mode()
+        if enable:
+            self.enable_timed_mode()
         self._control_charge_discharge("charge", enable, **kwargs)
 
     def control_discharge(self, enable, **kwargs):
-        self.enable_timed_mode()
+        if enable:
+            self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
     def hold_soc(self, enable, soc=None):
@@ -313,6 +315,8 @@ class InverterController:
             self._solis_control_charge_discharge(direction, enable, **kwargs)
 
     def _solis_control_charge_discharge(self, direction, enable, **kwargs):
+        status = self._solis_state()
+
         times = {
             "start": kwargs.get("start", None),
             "end": kwargs.get("end", None),
@@ -332,7 +336,7 @@ class InverterController:
 
         # Disable by setting the times the same
         if (enable is not None) and (not enable):
-            times["start"] = pd.Timestamp.now().floor("1T")
+            times["start"] = status[direction]["start"]
             times["end"] = times["start"]
 
         # Don't span midnight
