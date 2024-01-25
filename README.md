@@ -153,7 +153,7 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
               client_password: !secret mqtt-password
 
         http:
-        url: http://127.0.0.1:5050
+          url: http://127.0.0.1:5050
         admin:
         api:
         hadashboard:
