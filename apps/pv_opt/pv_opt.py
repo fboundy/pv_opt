@@ -19,7 +19,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.5.3"
+VERSION = "3.6.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -40,6 +40,15 @@ BOTTLECAP_DAVE = {
 }
 
 INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN"]
+
+SYSTEM_ARGS = [
+    "module",
+    "class",
+    "prefix",
+    "log",
+    "dependencies",
+    "overwrite_ha_on_restart",
+]
 
 IMPEXP = ["import", "export"]
 
@@ -785,21 +794,21 @@ class PVOpt(hass.Hass):
         if self.debug:
             self.log(self.args)
 
-        self.prefix = self.args["prefix"]
+        self.prefix = self.args.get("prefix", "solis")
 
         self._status("Loading Configuation")
+        over_write = self.args.get("overwrite_ha_on_restart", False)
 
         change_entities = []
 
         self.log("Reading arguments from YAML:")
         self.log("-----------------------------------")
+        if over_write:
+            self.log("")
+            self.log("  Over-write flag is set so YAML will over-write HA")
 
         if items is None:
-            items = [
-                i
-                for i in self.args
-                if i not in ["module", "class", "prefix", "log", "dependencies"]
-            ]
+            items = [i for i in self.args if i not in SYSTEM_ARGS]
 
         for item in items:
             # Attempt to read entity states for all string paramters unless they start
@@ -1035,9 +1044,7 @@ class PVOpt(hass.Hass):
 
         self.log("")
 
-        self.log("Exposing config to Home Assistant:")
-        self.log("----------------------------------")
-        self._expose_configs()
+        self._expose_configs(over_write)
 
     def _name_from_item(self, item):
         name = item.replace("_", " ")
@@ -1057,7 +1064,7 @@ class PVOpt(hass.Hass):
             state = value
         return state
 
-    def _expose_configs(self):
+    def _expose_configs(self, over_write=True):
         mqtt_items = [
             item
             for item in DEFAULT_CONFIG
@@ -1067,6 +1074,8 @@ class PVOpt(hass.Hass):
             and ("auto" not in item)
             and "domain" in DEFAULT_CONFIG[item]
         ]
+
+        over_write_log = False
 
         for item in mqtt_items:
             state = None
@@ -1118,12 +1127,37 @@ class PVOpt(hass.Hass):
 
                 self.set_state(state=state, entity_id=entity_id)
 
+            elif item in self.config:
+                state = self.get_state(entity_id)
+                new_state = str(self._state_from_value(self.config[item]))
+                if over_write and state != new_state:
+                    if not over_write_log:
+                        self.log("")
+                        self.log("Over-writing HA from YAML:")
+                        self.log("--------------------------")
+                        self.log("")
+                        self.log(
+                            f"  {'Config Item':40s}  {'HA Entity':42s}  Old State   New State"
+                        )
+                        self.log(
+                            f"  {'-----------':40s}  {'---------':42s}  ----------  ----------"
+                        )
+
+                    self.log(
+                        f"  {item:40s}  {entity_id:42s}  {state:10s}  {new_state:10s}"
+                    )
+                    state = new_state
+                    self.set_state(state=state, entity_id=entity_id)
+
             else:
                 state = self.get_state(entity_id)
 
             self.config[item] = entity_id
             self.change_items[entity_id] = item
             self.config_state[item] = state
+
+        self.log("Syncing config with Home Assistant:")
+        self.log("-----------------------------------")
 
         if self.change_items:
             self.log("")
