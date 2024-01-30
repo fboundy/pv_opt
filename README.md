@@ -129,7 +129,7 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
 
 2. The suggested configuration is as follows. This assumes that you are using `secrets.yaml` for your password information. If not then the `secrets` entry can be deleted and the `MQTT` `client_user` and `client password` will need to be entered explicitly.
 
-        secrets: //homeassistant/secrets.yaml
+        secrets: /homeassistant/secrets.yaml
         appdaemon:
           latitude: 54.729
           longitude: -2.991
@@ -153,7 +153,7 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
               client_password: !secret mqtt-password
 
         http:
-        url: http://127.0.0.1:5050
+          url: http://127.0.0.1:5050
         admin:
         api:
         hadashboard:
@@ -182,7 +182,7 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
    ```
    init_commands: []
    python_packages:
-     - numpy == 1.25
+     - numpy==1.25
      - pandas
    system_packages: []
 
@@ -244,6 +244,7 @@ That's it. AppDaemon is up and running. There is futher documentation for the on
 
 <h3>Install PV Opt from HACS</h3>
 
+  0. Make sure HACS "Enable AppDaemon apps discovery & tracking" is enabled - under integrations in HA https://hacs.xyz/docs/categories/appdaemon_apps/
   1. Go to HACS
   2. Select `Automation`
   3. Click on the 3 dots top right and `Add Custom Repository`
@@ -326,8 +327,11 @@ The easiest way to control and visualise this is through the `pvopt_dashboard.ya
 
 ![Alt text](image-1.png)
 
-This dashboards uses a couple of template sensors which will need adding to `configuration.yaml`:
+This dashboards uses a couple of template sensors and time which will need adding to `/homeassistant/configuration.yaml`:
 
+```
+template:
+  - sensor:
     - name: "Solis Grid Export Power"
       unique_id: solis_grid_export_power
       unit_of_measurement: W
@@ -342,7 +346,25 @@ This dashboards uses a couple of template sensors which will need adding to `con
       device_class: power
       state_class: measurement
       state: >-
-        {{max(-(states('sensor.solis_meter_active_power') | float(0)),0)}}    
+        {{max(-(states('sensor.solis_meter_active_power') | float(0)),0)}}
+
+sensor:
+  - platform: time_date
+    display_options:
+      - 'time'
+      - 'date'
+      - 'date_time'
+      - 'date_time_utc'
+      - 'date_time_iso'    
+```
+The dashboards also depend on the following Frontend components from HACS:
+ - template-entity-row
+ - bar-card
+ - card-mod
+ - Stack In Card
+ - layout-card
+ - apexcharts-card
+
 
 <h2>Development - Adding Additional Inverters: the PV Opt API</h2>
 
