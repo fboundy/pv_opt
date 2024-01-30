@@ -17,12 +17,17 @@ pv_opt:
   log: pv_opt_log
   prefix: pvopt
 
+
 # User configuration ---  EDIT AWAY! ---
 
   inverter_type: "SOLIS_SOLAX_MODBUS"
   # inverter_type: "SOLIS_CORE_MODBUS"
   # inverter_type: SOLIS_SOLARMAN
   device_name: solis
+
+  # If true the current config in HA will be over-written with that in the config.yaml. 
+  overwrite_ha_on_restart: true
+
   consumption_history_days: 2
 
   # ========================================
@@ -95,7 +100,7 @@ pv_opt:
   # update_cycle_seconds: 15
   # maximum_dod_percent: number.{device_name}_battery_minimum_soc 
   
-  id_consumption_today: sensor.{device_name}_consumption_today
+  # id_consumption_today: sensor.{device_name}_consumption_today
   # id_grid_import_today: sensor.{device_name}_grid_import_today
   # id_grid_export_today: sensor.{device_name}_grid_export_today
 

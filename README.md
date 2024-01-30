@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.5.3
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.6.0
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -275,7 +275,9 @@ If you are running a different integration or inverter brand you will need to ed
     inverter_type: SOLIS_CORE_MODBUS
     device_name: solis
 
-The `config.yaml` file also includes all the other configuration used by PV Opt. If you are using the default setup you shouldn't need to change this but you can edit anything by un-commenting the relevant line in the file. The configuration is grouped by inverter/integration and should be self-explanatory
+The `config.yaml` file also includes all the other configuration used by PV Opt. If you are using the default setup you shouldn't need to change this but you can edit anything by un-commenting the relevant line in the file. The configuration is grouped by inverter/integration and should be self-explanatory. Once PV Opt is installed the config is stored within entities in Home Assistant. It you want these over-ritten please ensure that `overwrite_ha_on_restart` is set to `true`:
+
+    overwrite_ha_on_restart: true
 
 <b><i>PV_Opt</b></i> needs to know the size of your battery and the power of your inverter: both when inverting battery to AC power and when chargingh tha battery. It will attempt to work these out from the data it has loaded (WIP) but you should check the following enitities in Home Assistant:
 
