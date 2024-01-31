@@ -816,7 +816,7 @@ class PVOpt(hass.Hass):
         self.prefix = self.args.get("prefix", "solis")
 
         self._status("Loading Configuation")
-        over_write = self.args.get("overwrite_ha_on_restart", False)
+        over_write = self.args.get("overwrite_ha_on_restart", True)
 
         change_entities = []
 
