@@ -10,6 +10,7 @@ import time
 import pvpy as pv
 import numpy as np
 from numpy import nan
+import re
 
 
 # import pvpy as pv
@@ -19,13 +20,14 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.6.0"
+VERSION = "3.6.1"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
 TIME_FORMAT = "%H:%M"
 
+REDACT_REGEX = ["[0-9]{2}m[0-9]{7}_[0-9]{13}", "a_[0-f]{8}"]
 
 EVENT_TRIGGER = "PV_OPT"
 DEBUG_TRIGGER = "PV_DEBUG"
@@ -276,6 +278,8 @@ class PVOpt(hass.Hass):
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self.device_name = self.args.pop("device_name", "solis")
+        self.redact = self.args.pop("edact_personal_data_from_log", True)
+
         self._load_inverter()
 
         self.change_items = {}
@@ -327,6 +331,17 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
                 )
+
+    def redact_for_log(self, entity_id):
+        if self.redact:
+            e = entity_id
+            for pattern in REDACT_REGEX:
+                x = re.search(pattern, e)
+                if x:
+                    e = re.sub(pattern, "*" * len(x.group()), e)
+            return e
+        else:
+            return entity_id
 
     def _estimate_capacity(self):
         if "id_battery_charge_power" in self.config:
@@ -547,7 +562,9 @@ class PVOpt(hass.Hass):
 
                     for imp_exp in IMPEXP:
                         for entity in entities[imp_exp]:
-                            self.log(f"    Found {imp_exp} entity {entity}")
+                            self.log(
+                                f"    Found {imp_exp} entity {self.redact_for_log(entity)}"
+                            )
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
@@ -706,7 +723,9 @@ class PVOpt(hass.Hass):
                 if ("octoplus_saving_session_events" in name)
             ][0]
             self.log("")
-            self.log(f"Found Octopus Savings Events entity: {saving_events_entity}")
+            self.log(
+                f"Found Octopus Savings Events entity: {self.redact_for_log(saving_events_entity)}"
+            )
 
             available_events = self.get_state(saving_events_entity, attribute="all")[
                 "attributes"
