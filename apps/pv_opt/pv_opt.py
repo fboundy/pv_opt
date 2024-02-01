@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.7.0 beta 01"
+VERSION = "3.7.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -254,8 +254,7 @@ class PVOpt(hass.Hass):
         df = df.sort_index()
         df = df[df != "unavailable"]
         df = df[df != "unknown"]
-        if log:
-            self.log(f">>> {df}")
+
         return df
 
     def initialize(self):
@@ -455,16 +454,10 @@ class PVOpt(hass.Hass):
         grid = grid.set_axis(cols, axis=1).fillna(0)
         grid["grid_export"] *= -1
 
-        if self.debug:
-            self.log(f">>> {grid.to_string()}")
-
         cost_today = self.contract.net_cost(
             grid_flow=grid, log=self.debug, day_ahead=False
         )
 
-        if self.debug:
-            self.log(f">>> {cost_today.to_string()}")
-            self.log(f">>> {cost_today.cumsum().to_string()}")
         return cost_today
 
     @ad.app_lock
@@ -488,6 +481,7 @@ class PVOpt(hass.Hass):
                 f"Contract end day: {self.contract.imp.end().day} Today:{pd.Timestamp.now().day}"
             )
             self._load_contract()
+
         elif pd.Timestamp.now(tz="UTC").hour == 0:
             self._load_contract()
 
