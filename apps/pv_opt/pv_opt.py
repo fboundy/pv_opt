@@ -475,9 +475,15 @@ class PVOpt(hass.Hass):
     def _load_agile_cb(self, cb_args):
         # reload if the time is after 16:00 and the last data we have is today
         self.log(">>> Agile Callback Handler")
-        if (
-            self.contract.imp.end().day == pd.Timestamp.now().day
-        ) and pd.Timestamp.now().hour > 16:
+        self.log(
+            f">>> Contract end day: {self.contract.imp.end().day:2d} Today:{pd.Timestamp.now().day:2d}  {(self.contract.imp.end().day == pd.Timestamp.now().day)}"
+        )
+        self.log(
+            f">>> Current hour:     {pd.Timestamp.now().hour:2d}           {pd.Timestamp.now().hour > 16}"
+        )
+        if (self.contract.imp.end().day == pd.Timestamp.now().day) and (
+            pd.Timestamp.now().hour > 16
+        ):
             self.log(
                 f"Contract end day: {self.contract.imp.end().day} Today:{pd.Timestamp.now().day}"
             )
@@ -704,6 +710,7 @@ class PVOpt(hass.Hass):
                 self.agile = True
 
         if self.agile:
+            self.log("")
             self.log("AGILE tariff detected. Rates will update at 16:00 daily")
 
     def _load_saving_events(self):
@@ -1169,6 +1176,7 @@ class PVOpt(hass.Hass):
                         self.log(
                             f"  {'-----------':40s}  {'---------':42s}  ----------  ----------"
                         )
+                        over_write_log = True
 
                     self.log(
                         f"  {item:40s}  {entity_id:42s}  {state:10s}  {new_state:10s}"
@@ -1183,6 +1191,7 @@ class PVOpt(hass.Hass):
             self.change_items[entity_id] = item
             self.config_state[item] = state
 
+        self.log("")
         self.log("Syncing config with Home Assistant:")
         self.log("-----------------------------------")
 
