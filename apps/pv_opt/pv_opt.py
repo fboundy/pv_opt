@@ -819,6 +819,7 @@ class PVOpt(hass.Hass):
         over_write = self.args.get("overwrite_ha_on_restart", True)
 
         change_entities = []
+        self.yaml_config = {}
 
         self.log("Reading arguments from YAML:")
         self.log("-----------------------------------")
@@ -855,6 +856,7 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value(s) in YAML"
                 )
+                self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
                 if min([self.entity_exists(v) for v in values]):
@@ -866,6 +868,7 @@ class PVOpt(hass.Hass):
                     self.log(
                         f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value(s) in YAML"
                     )
+                    self.yaml_config[item] = self.config[item]
 
                 elif self.entity_exists(self.get_default_config(item)):
                     self.config[item] = self.get_default_config(item)
@@ -902,6 +905,7 @@ class PVOpt(hass.Hass):
                     self.log(
                         f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                     )
+                    self.yaml_config[item] = self.config[item]
 
                 elif min(arg_types[str]):
                     if self.debug:
@@ -915,6 +919,7 @@ class PVOpt(hass.Hass):
                         self.log(
                             f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                         )
+                        self.yaml_config[item] = self.config[item]
 
                     else:
                         ha_values = [self.get_ha_value(entity_id=v) for v in values]
@@ -999,6 +1004,7 @@ class PVOpt(hass.Hass):
                     self.log(
                         f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                     )
+                    self.yaml_config[item] = self.config[item]
 
                 elif (
                     len(values) > 1
@@ -1062,6 +1068,8 @@ class PVOpt(hass.Hass):
             self.log("All config items defined OK")
 
         self.log("")
+
+        self.log(f">>> {self.yaml_config}")
 
         self._expose_configs(over_write)
 
@@ -1146,7 +1154,7 @@ class PVOpt(hass.Hass):
 
                 self.set_state(state=state, entity_id=entity_id)
 
-            elif item in self.config:
+            elif item in self.yaml_config:
                 state = self.get_state(entity_id)
                 new_state = str(self._state_from_value(self.config[item]))
                 if over_write and state != new_state:
