@@ -243,6 +243,9 @@ class InverterController:
             else:
                 self.enable_timed_mode()
 
+            # Waiyt for a second to make sure the mode is correct
+            time.sleep(1)
+
             if soc is None:
                 soc = self.host.get_config("maximum_dod_percent")
 
