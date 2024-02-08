@@ -169,7 +169,8 @@ class Tariff:
                     self.log("")
                     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
-                self.log(f">>> {df.index[-1].day}  {end.day}")
+                if self.host.debug:
+                    self.log(f">>> {df.index[-1].day}  {end.day}")
                 if pd.Timestamp.now(tz="UTC").hour > 11 and df.index[-1].day != end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:

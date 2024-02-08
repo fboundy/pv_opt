@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.7.1"
+VERSION = "3.7.2"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -467,13 +467,14 @@ class PVOpt(hass.Hass):
     @ad.app_lock
     def _load_agile_cb(self, cb_args):
         # reload if the time is after 16:00 and the last data we have is today
-        self.log(">>> Agile Callback Handler")
-        self.log(
-            f">>> Contract end day: {self.contract.imp.end().day:2d} Today:{pd.Timestamp.now().day:2d}  {(self.contract.imp.end().day == pd.Timestamp.now().day)}"
-        )
-        self.log(
-            f">>> Current hour:     {pd.Timestamp.now().hour:2d}           {pd.Timestamp.now().hour > 16}"
-        )
+        if self.debug:
+            self.log(">>> Agile Callback Handler")
+            self.log(
+                f">>> Contract end day: {self.contract.imp.end().day:2d} Today:{pd.Timestamp.now().day:2d}  {(self.contract.imp.end().day == pd.Timestamp.now().day)}"
+            )
+            self.log(
+                f">>> Current hour:     {pd.Timestamp.now().hour:2d}           {pd.Timestamp.now().hour > 16}"
+            )
         if (self.contract.imp.end().day == pd.Timestamp.now().day) and (
             pd.Timestamp.now().hour > 16
         ):
@@ -1070,7 +1071,7 @@ class PVOpt(hass.Hass):
 
         self.log("")
 
-        self.log(f">>> {self.yaml_config}")
+        # self.log(f">>> {self.yaml_config}")
 
         self._expose_configs(over_write)
 
@@ -1512,6 +1513,8 @@ class PVOpt(hass.Hass):
                         direction = "charge"
                     elif self.charge_power < 0:
                         direction = "discharge"
+                    else:
+                        direction = "hold"
 
                     # We aren't in a charge/discharge slot and the next one doesn't start before the
                     # optimiser runs again
@@ -1730,7 +1733,11 @@ class PVOpt(hass.Hass):
             "consumption",
         ]
 
-        cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1)
+        cost = (
+            pd.DataFrame(pd.concat([cost_today, cost]))
+            .set_axis(["cost"], axis=1)
+            .fillna(0)
+        )
         cost["cumulative_cost"] = cost["cost"].cumsum()
 
         for d in [df, cost]:
