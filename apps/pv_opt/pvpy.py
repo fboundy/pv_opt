@@ -118,6 +118,9 @@ class Tariff:
         return max([pd.Timestamp(x["valid_to"]) for x in self.unit])
 
     def to_df(self, start=None, end=None, **kwargs):
+        self.log(
+            f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}"
+        )
         use_day_ahead = kwargs.get("day_ahead", True)
         if start is None:
             if self.eco7:
@@ -166,6 +169,8 @@ class Tariff:
                     self.log("")
                     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
+                if self.host.debug:
+                    self.log(f">>> {df.index[-1].day}  {end.day}")
                 if pd.Timestamp.now(tz="UTC").hour > 11 and df.index[-1].day != end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
