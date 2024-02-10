@@ -1778,9 +1778,13 @@ class PVOpt(hass.Hass):
         )
 
     def _write_output(self):
-        unit_cost_today = round(
-            self._cost_actual().sum() / self.get_config("id_consumption_today"), 1
-        )
+        if self.get_config("id_consumption_today") > 0:
+            unit_cost_today = round(
+                self._cost_actual().sum() / self.get_config("id_consumption_today"), 1
+            )
+        else:
+            unit_cost_today = 0
+
         self.log(f"Average unit cost today: {unit_cost_today:0.2f}p/kWh")
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_unit_cost_today",
