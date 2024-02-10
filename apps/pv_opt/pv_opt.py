@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.7.2"
+VERSION = "3.7.3"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -412,7 +412,9 @@ class PVOpt(hass.Hass):
         )
 
     def _setup_agile_schedule(self):
-        start = (pd.Timestamp.now(tz="UTC") + pd.Timedelta("1T")).to_pydatetime()
+        start = (
+            pd.Timestamp.now(tz="UTC") + pd.Timedelta(1, "minutes")
+        ).to_pydatetime()
         self.timer_handle = self.run_every(
             self._load_agile_cb,
             start=start,
@@ -1618,7 +1620,7 @@ class PVOpt(hass.Hass):
         if (self.opt["forced"] != 0).sum() > 0:
             x = self.opt[self.opt["forced"] > 0].copy()
             x["start"] = x.index
-            x["end"] = x.index + pd.Timedelta("30T")
+            x["end"] = x.index + pd.Timedelta(30, "minutes")
             x["soc"] = x["soc"].round(0).astype(int)
             x["soc_end"] = x["soc_end"].round(0).astype(int)
             windows = pd.concat(
@@ -1631,7 +1633,7 @@ class PVOpt(hass.Hass):
 
             x = self.opt[self.opt["forced"] < 0].copy()
             x["start"] = x.index
-            x["end"] = x.index + pd.Timedelta("30T")
+            x["end"] = x.index + pd.Timedelta(30, "minutes")
             self.windows = pd.concat(
                 [
                     x.groupby("period").first()[["start", "soc", "forced"]],
@@ -1718,7 +1720,7 @@ class PVOpt(hass.Hass):
         df,
     ):
         cost_today = self._cost_actual()
-        midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta("24H")
+        midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta(24, "hours")
         df = df.fillna(0).round(2)
         df["period_start"] = (
             df.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
@@ -1755,7 +1757,8 @@ class PVOpt(hass.Hass):
                 "state_class": "measurement",
                 "unit_of_measurement": "GBP",
                 "cost_today": round(
-                    (cost["cost"].loc[: midnight - pd.Timedelta("30T")].sum()) / 100,
+                    (cost["cost"].loc[: midnight - pd.Timedelta(30, "minutes")].sum())
+                    / 100,
                     2,
                 ),
                 "cost_tomorrow": round((cost["cost"].loc[midnight:].sum()) / 100, 2),
@@ -1775,9 +1778,13 @@ class PVOpt(hass.Hass):
         )
 
     def _write_output(self):
-        unit_cost_today = round(
-            self._cost_actual().sum() / self.get_config("id_consumption_today"), 1
-        )
+        if self.get_config("id_consumption_today") > 0:
+            unit_cost_today = round(
+                self._cost_actual().sum() / self.get_config("id_consumption_today"), 1
+            )
+        else:
+            unit_cost_today = 0
+
         self.log(f"Average unit cost today: {unit_cost_today:0.2f}p/kWh")
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_unit_cost_today",
@@ -1845,7 +1852,7 @@ class PVOpt(hass.Hass):
         )
 
         for offset in [1, 4, 8, 12]:
-            loc = pd.Timestamp.now(tz="UTC") + pd.Timedelta(f"{offset}H")
+            loc = pd.Timestamp.now(tz="UTC") + pd.Timedelta(offset, "hours")
             locs = [loc.floor("30T"), loc.ceil("30T")]
             socs = [self.opt.loc[l]["soc"] for l in locs]
             soc = (loc - locs[0]) / (locs[1] - locs[0]) * (socs[1] - socs[0]) + socs[0]
@@ -1960,7 +1967,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("Comparing yesterday's tariffs")
         end = pd.Timestamp.now(tz="UTC").normalize()
-        start = end - pd.Timedelta("24H")
+        start = end - pd.Timedelta(24, "hours")
 
         solar = self._get_solar(start, end)
         consumption = self.load_consumption(start, end)
@@ -1998,7 +2005,7 @@ class PVOpt(hass.Hass):
                 )
             )
 
-        actual = self._cost_actual(start=start, end=end - pd.Timedelta("30T"))
+        actual = self._cost_actual(start=start, end=end - pd.Timedelta(30, "minutes"))
         self.log(
             f"  Actual:                                          {actual.sum():6.1f}p"
         )

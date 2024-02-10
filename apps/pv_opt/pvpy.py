@@ -152,7 +152,7 @@ class Tariff:
                 )
             ).ffill()
             mask = (df.index.time >= self.eco7_start.time()) & (
-                df.index.time < (self.eco7_start + pd.Timedelta("7H")).time()
+                df.index.time < (self.eco7_start + pd.Timedelta(7, "hours")).time()
             )
             df.loc[mask, "unit"] = df.loc[mask, "Night"]
             df = df["unit"].loc[start:end]
@@ -171,6 +171,7 @@ class Tariff:
 
                 if self.host.debug:
                     self.log(f">>> {df.index[-1].day}  {end.day}")
+
                 if pd.Timestamp.now(tz="UTC").hour > 11 and df.index[-1].day != end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
@@ -211,8 +212,8 @@ class Tariff:
                 while df.index[-1] < end and i < 7:
                     i += 1
                     extended_index = pd.date_range(
-                        df.index[-1] + pd.Timedelta("30T"),
-                        df.index[-1] + pd.Timedelta("24H"),
+                        df.index[-1] + pd.Timedelta(30, "minutes"),
+                        df.index[-1] + pd.Timedelta(24, "hours"),
                         freq="30T",
                     )
                     dfx = (
@@ -251,7 +252,7 @@ class Tariff:
 
                 if event_start <= end or event_end > start:
                     event_start = max(event_start, start)
-                    event_end = min(event_end - pd.Timedelta("30T"), end)
+                    event_end = min(event_end - pd.Timedelta(30, "minutes"), end)
                     df["unit"].loc[event_start:event_end] += event_value
 
         return df
@@ -494,12 +495,11 @@ class PVsystemModel:
 
         if soc_now is None:
             chg = [initial_soc / 100 * self.battery.capacity]
-            freq = pd.infer_freq(static_flows.index) / pd.Timedelta("60T")
+            freq = pd.infer_freq(static_flows.index) / pd.Timedelta(60, "minutes")
 
         else:
             chg = [soc_now[1] / 100 * self.battery.capacity]
-            freq = (soc_now[0] - df.index[0]) / pd.Timedelta("60T")
-        # freq = (pd.Timestamp.now().ceil("30T") - pd.Timestamp.now()) / pd.Timedelta("60T")
+            freq = (soc_now[0] - df.index[0]) / pd.Timedelta(60, "minutes")
 
         for i, flow in enumerate(battery_flows):
             if flow < 0:
@@ -524,7 +524,7 @@ class PVsystemModel:
                 )
             )
             if (soc_now is not None) and (i == 0):
-                freq = pd.infer_freq(static_flows.index) / pd.Timedelta("60T")
+                freq = pd.infer_freq(static_flows.index) / pd.Timedelta(60, "minutes")
 
         if soc_now is not None:
             chg[0] = [initial_soc / 100 * self.battery.capacity]
@@ -666,7 +666,10 @@ class PVsystemModel:
                             if pd.Timestamp.now() > slot.tz_localize(None):
                                 factors.append(
                                     (
-                                        (slot.tz_localize(None) + pd.Timedelta("30T"))
+                                        (
+                                            slot.tz_localize(None)
+                                            + pd.Timedelta(30, "minutes")
+                                        )
                                         - pd.Timestamp.now()
                                     ).total_seconds()
                                     / 1800
@@ -801,11 +804,14 @@ class PVsystemModel:
 
                     if (pd.Timestamp.now() > start_window.tz_localize(None)) and (
                         pd.Timestamp.now()
-                        < start_window.tz_localize(None) + pd.Timedelta("30T")
+                        < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
                     ):
                         str_log += "* "
                         factor = (
-                            (start_window.tz_localize(None) + pd.Timedelta("30T"))
+                            (
+                                start_window.tz_localize(None)
+                                + pd.Timedelta(30, "minutes")
+                            )
                             - pd.Timestamp.now()
                         ).total_seconds() / 1800
                     else:
@@ -924,11 +930,15 @@ class PVsystemModel:
 
                         if (pd.Timestamp.now() > start_window.tz_localize(None)) and (
                             pd.Timestamp.now()
-                            < start_window.tz_localize(None) + pd.Timedelta("30T")
+                            < start_window.tz_localize(None)
+                            + pd.Timedelta(30, "minutes")
                         ):
                             str_log += "* "
                             factor = (
-                                (start_window.tz_localize(None) + pd.Timedelta("30T"))
+                                (
+                                    start_window.tz_localize(None)
+                                    + pd.Timedelta(30, "minutes")
+                                )
                                 - pd.Timestamp.now()
                             ).total_seconds() / 1800
                         else:

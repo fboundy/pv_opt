@@ -350,7 +350,7 @@ class InverterController:
                 start_day = times["start"].day
 
             if start_day != times["end"].day:
-                times["end"] = times["end"].normalize() - pd.Timedelta("1T")
+                times["end"] = times["end"].normalize() - pd.Timedelta(1, "minutes")
                 self.log(f"End time clipped to {times['end'].strftime(TIMEFORMAT)}")
 
         write_flag = True
