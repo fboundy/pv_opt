@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.7.4"
+VERSION = "3.7.5"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -445,7 +445,7 @@ class PVOpt(hass.Hass):
         index = pd.date_range(
             start,
             end,
-            freq="30T",
+            freq="30min",
         )
         cols = ["grid_import", "grid_export"]
         grid = pd.DataFrame()
@@ -1310,7 +1310,7 @@ class PVOpt(hass.Hass):
             index=pd.date_range(
                 pd.Timestamp.utcnow().normalize(),
                 pd.Timestamp.utcnow().normalize() + pd.Timedelta(days=2),
-                freq="30T",
+                freq="30min",
                 inclusive="left",
             ),
         )
@@ -1925,7 +1925,7 @@ class PVOpt(hass.Hass):
     def load_consumption(self, start, end):
         self.log("Getting expected consumption data")
 
-        index = pd.date_range(start, end, inclusive="left", freq="30T")
+        index = pd.date_range(start, end, inclusive="left", freq="30min")
         consumption = pd.DataFrame(index=index, data={"consumption": 0})
 
         entity_ids = self.config["id_consumption_today"]
@@ -1947,6 +1947,12 @@ class PVOpt(hass.Hass):
                 self.get_config("consumption_grouping")
             )
             df.name = "consumption"
+
+            if self.debug:
+                self.log(">>> All consumption:")
+                self.log(f">>> {dfx}")
+                self.log(">>> Consumption grouped by time:")
+                self.log(f">>> {df}")
 
             temp = pd.DataFrame(index=index)
             temp["time"] = temp.index.time
@@ -2068,7 +2074,7 @@ class PVOpt(hass.Hass):
         dt = pd.date_range(
             start,
             end,
-            freq="30T",
+            freq="30min",
         )
 
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
