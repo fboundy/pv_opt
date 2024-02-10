@@ -412,7 +412,9 @@ class PVOpt(hass.Hass):
         )
 
     def _setup_agile_schedule(self):
-        start = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(1, "minutes")).to_pydatetime()
+        start = (
+            pd.Timestamp.now(tz="UTC") + pd.Timedelta(1, "minutes")
+        ).to_pydatetime()
         self.timer_handle = self.run_every(
             self._load_agile_cb,
             start=start,
@@ -1755,7 +1757,8 @@ class PVOpt(hass.Hass):
                 "state_class": "measurement",
                 "unit_of_measurement": "GBP",
                 "cost_today": round(
-                    (cost["cost"].loc[: midnight - pd.Timedelta(30, "minutes")].sum()) / 100,
+                    (cost["cost"].loc[: midnight - pd.Timedelta(30, "minutes")].sum())
+                    / 100,
                     2,
                 ),
                 "cost_tomorrow": round((cost["cost"].loc[midnight:].sum()) / 100, 2),

@@ -170,7 +170,8 @@ class Tariff:
                     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
                 if self.host.debug:
-                self.log(f">>> {df.index[-1].day}  {end.day}")
+                    self.log(f">>> {df.index[-1].day}  {end.day}")
+
                 if pd.Timestamp.now(tz="UTC").hour > 11 and df.index[-1].day != end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
@@ -665,7 +666,10 @@ class PVsystemModel:
                             if pd.Timestamp.now() > slot.tz_localize(None):
                                 factors.append(
                                     (
-                                        (slot.tz_localize(None) + pd.Timedelta(30, "minutes"))
+                                        (
+                                            slot.tz_localize(None)
+                                            + pd.Timedelta(30, "minutes")
+                                        )
                                         - pd.Timestamp.now()
                                     ).total_seconds()
                                     / 1800
@@ -804,7 +808,10 @@ class PVsystemModel:
                     ):
                         str_log += "* "
                         factor = (
-                            (start_window.tz_localize(None) + pd.Timedelta(30, "minutes"))
+                            (
+                                start_window.tz_localize(None)
+                                + pd.Timedelta(30, "minutes")
+                            )
                             - pd.Timestamp.now()
                         ).total_seconds() / 1800
                     else:
@@ -923,11 +930,15 @@ class PVsystemModel:
 
                         if (pd.Timestamp.now() > start_window.tz_localize(None)) and (
                             pd.Timestamp.now()
-                            < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
+                            < start_window.tz_localize(None)
+                            + pd.Timedelta(30, "minutes")
                         ):
                             str_log += "* "
                             factor = (
-                                (start_window.tz_localize(None) + pd.Timedelta(30, "minutes"))
+                                (
+                                    start_window.tz_localize(None)
+                                    + pd.Timedelta(30, "minutes")
+                                )
                                 - pd.Timestamp.now()
                             ).total_seconds() / 1800
                         else:
