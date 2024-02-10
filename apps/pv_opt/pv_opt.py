@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.7.3"
+VERSION = "3.7.4"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -50,6 +50,7 @@ SYSTEM_ARGS = [
     "log",
     "dependencies",
     "overwrite_ha_on_restart",
+    "debug",
 ]
 
 IMPEXP = ["import", "export"]
@@ -262,7 +263,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
-        self.debug = DEBUG
+        self.debug = DEBUG | self.args.get("debug", False)
         try:
             subver = int(VERSION.split(".")[2])
         except:
@@ -940,9 +941,6 @@ class PVOpt(hass.Hass):
                             ]
                             if j[0] in DEFAULT_CONFIG[item]["options"]
                         ]
-
-                        if self.debug:
-                            self.log(f">>> {DEFAULT_CONFIG[item]['options']}")
 
                         if np.min(val_types[int] | val_types[float]):
                             self.config[item] = values
@@ -1952,13 +1950,22 @@ class PVOpt(hass.Hass):
 
             temp = pd.DataFrame(index=index)
             temp["time"] = temp.index.time
-            temp = temp.merge(df, "left", left_on="time", right_index=True)[
+            consumption_mean = temp.merge(df, "left", left_on="time", right_index=True)[
                 "consumption"
             ] * (1 - self.get_config("day_of_week_weighting"))
 
-            y = self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
-            x = temp.to_numpy() + y.to_numpy()
-            consumption["consumption"] += pd.Series(x, index=temp.index)
+            consumption_dow = (
+                self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
+            )
+            if len(consumption_dow) != len(consumption_mean):
+                self.log(">>> Inconsistent lengths in consumption arrays")
+                self.log(f">>> dow : {consumption_dow}")
+                self.log(f">>> mean: {consumption_mean}")
+
+            consumption["consumption"] += pd.Series(
+                consumption_dow.to_numpy() + consumption_mean.to_numpy(),
+                index=consumption_mean.index,
+            )
             self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
 
         return consumption
