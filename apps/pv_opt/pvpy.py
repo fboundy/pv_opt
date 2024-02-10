@@ -100,6 +100,11 @@ class Tariff:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standard-unit-rates/"
             self.unit = requests.get(url, params=params).json()["results"]
 
+        if self.host.debug and "AGILE" not in code:
+            self.log(f">>> {code}: Unit Cost")
+            for x in self.unit:
+                self.log(f">>> {x}")
+
     def __str__(self):
         if self.export:
             str = f"Export Tariff: {self.name}"
@@ -118,9 +123,12 @@ class Tariff:
         return max([pd.Timestamp(x["valid_to"]) for x in self.unit])
 
     def to_df(self, start=None, end=None, **kwargs):
-        self.log(
-            f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}"
-        )
+        if self.host.debug:
+            self.log(f">>> {self.name}")
+            self.log(
+                f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}"
+            )
+
         use_day_ahead = kwargs.get("day_ahead", True)
         if start is None:
             if self.eco7:
@@ -204,10 +212,13 @@ class Tariff:
             if (
                 len(df) > 1
                 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30
-            ):
+            ) or len(df) == 1:
                 newindex = pd.date_range(df.index[0], end, freq="30T")
                 df = df.reindex(index=newindex).ffill().loc[start:]
             else:
+                if self.host.debug:
+                    self.log(">>> Index <= 30")
+
                 i = 0
                 while df.index[-1] < end and i < 7:
                     i += 1
