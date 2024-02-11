@@ -129,6 +129,38 @@ views:
               - entity: number.pvopt_optimise_frequency_minutes
                 name: Optimiser Freq (mins)
           - type: markdown
+            content: Consumption
+          - type: entities
+            entities:
+              - entity: switch.pvopt_use_consumption_history
+                name: Use Consumption History
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.pvopt_use_consumption_history
+                state: 'on'
+            card:
+              type: entities
+              entities:
+                - entity: number.pvopt_consumption_history_days
+                  name: Load History Days
+                - entity: number.pvopt_consumption_margin
+                  name: Load Margin
+                - entity: number.pvopt_day_of_week_weighting
+                  name: Weekday Weighting
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.pvopt_use_consumption_history
+                state: 'off'
+            card:
+              type: entities
+              entities:
+                - entity: number.pvopt_daily_consumption_kwh
+                  name: Daily Consumption (kWh)
+                - entity: switch.pvopt_shape_consumption_profile
+                  name: Shape Consumption Profile
+          - type: markdown
             content: Tuning Parameters
           - type: entities
             entities:
@@ -138,12 +170,6 @@ views:
                 name: Threshold per slot (p)
               - entity: number.pvopt_forced_power_group_tolerance
                 name: Power Resolution
-              - entity: number.pvopt_consumption_history_days
-                name: Load History Days
-              - entity: number.pvopt_consumption_margin
-                name: Load Margin
-              - entity: number.pvopt_day_of_week_weighting
-                name: Weekday Weighting                
           - type: markdown
             content: System Parameters
           - type: entities
