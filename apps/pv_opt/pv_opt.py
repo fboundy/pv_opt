@@ -1345,10 +1345,14 @@ class PVOpt(hass.Hass):
         self.static = self.static[self.time_now.floor("30T") :].fillna(0)
         # self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
+        x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
 
-        x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug).astype(
-            float
-        )
+        if self.debug:
+            self.log(f">>> soc_now: {self.soc_now}")
+            self.log(f">>> x: {x}")
+
+        x = x.astype(float)
+
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
         x = pd.concat(
             [
