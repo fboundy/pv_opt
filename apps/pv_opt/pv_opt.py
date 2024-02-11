@@ -1355,7 +1355,7 @@ class PVOpt(hass.Hass):
             )
 
         # x = x.astype(float)
-        x = pd.to_numeic(x, errors="coerce").interpolate()
+        x = pd.to_numeric(x, errors="coerce").interpolate()
 
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
         if self.debug:
