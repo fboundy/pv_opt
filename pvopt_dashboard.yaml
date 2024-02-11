@@ -158,7 +158,7 @@ views:
               entities:
                 - entity: number.pvopt_daily_consumption_kwh
                   name: Daily Consumption (kWh)
-                - entity: switch.pvopt_daily_consumption_profile
+                - entity: switch.pvopt_shape_consumption_profile
                   name: Shape Consumption Profile
           - type: markdown
             content: Tuning Parameters

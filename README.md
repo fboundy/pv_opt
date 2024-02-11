@@ -306,17 +306,29 @@ These are the main parameters that will control how PV Opt runs:
 | Solar Forecast | `select`| `select.pvopt_solar_forecast` | Solcast | Selects which Solcast to use (Most Likely, 10% or 90%)|
 | Optimser Frequency | minutes | `number.pvopt_optimise_frequency_minutes` | 10 | Frequency of Optimiser calculation |
 
+<h3>Consumption Parameters</h3>
+These parameters will define how PV Opt estimates daily consumption:
+
+| Parameter | Units | Entity | Default | Description |
+|:--|:--:| :-- | :--:|:--|
+| Use Consumption History|`on`/`off` | `switch.pvopt_use_consumption_history` | On | Toggles whether to use actual consumption history or an estimayted daily consumption
+| <b>Consumption History Parameters
+| Load History Days | days | `number.pvopt_consumption_history_days` | 7 | Number of daya of consumption history to use when predicting future load |
+| Load Margin | % | `number.pvopt_consumption_margin` | 10% | Margin to add to historic load for forecast (safety factor) |
+| Weekday Weighting| fraction | `number.pvopt_day_of_week_weighting` | 0.5 | Defines how much weighting to give to the day of the week when averaging the load. 0.0 will use the simple average of the last `n` days based on `load_history_days` and 1.0 will just used the same day of the week within that window. Values inbetween will weight the estimate accordingly. If every day is the same use a low number. If your usage varies daily use a high number.
+| <b>Daily Consumpion Parameters
+| Daily Consumption | kWh | `number.pvopt_daily_consumption_kwh` | 17 | Estimated daily consumption to use when predicting future load |
+| Shape Consumption Profile | `on`/`off` | `switch.pvopt_shape_consumption_profile` | On | Defines whether to shapoe the consumption to a typical daily profile (`on`) or to assume constant usage (`off`) |
+
+
 <h3>Tuning Parameters</h3>
 These parameters will tweak how PV Opt runs:
 
 | Parameter | Units | Entity | Default | Description |
 |:--|:--:| :-- | :--:|:--|
-| Load History Days | days | `number.pvopt_consumption_history_days` | 7 | Number of daya of consumption history to use when predicting future load |
-| Load Margin | % | `number.pvopt_consumption_margin` | 10% | Margin to add to historic load for forecast (safety factor) |
 | Pass threshold | % | `number.pvopt_pass_throshold_p` | 4p | The incremental cost saving that each iteration of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
 | Slot threshold | % | `number.pvopt_slop_throshold_p` | 1p | The incremental cost saving that each 30 minute slot of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
 | Power Resolution | W | `number.pvopt_forced_power_group_tolerance` | 100 | The resolution at which forced charging / discharging is reported. Changing this will change the reporting of the charge plan but not the actual detail of it. |
-| Weekday Weighting| fraction | `number.pvopt_day_of_week_weighting` | 0.5 | Defines how much weighting to give to the day of the week when averaging the load. 0.0 will use the simple average of the last `n` days based on `load_history_days` and 1.0 will just used the same day of the week within that window. Values inbetween will weight the estimate accordingly. If every day is the same use a low number. If your usage varies daily use a high number.
 
 
 <h2>Output</h2>

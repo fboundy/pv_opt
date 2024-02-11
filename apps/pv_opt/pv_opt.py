@@ -227,7 +227,7 @@ DEFAULT_CONFIG = {
             "mode": "slider",
         },
     },
-    "daily_consumption_profile": {"default": True, "domain": "switch"},
+    "shape_consumption_profile": {"default": True, "domain": "switch"},
     "consumption_grouping": {
         "default": "mean",
         "domain": "select",
@@ -1992,7 +1992,7 @@ class PVOpt(hass.Hass):
                 )
                 self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
         else:
-            if self.get_config("daily_consumption_profile"):
+            if self.get_config("shape_consumption_profile"):
                 daily = (
                     pd.DataFrame(CONSUMPTION_SHAPE)
                     .set_index("hour")

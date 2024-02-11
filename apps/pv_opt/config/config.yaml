@@ -76,7 +76,7 @@ pv_opt:
   # consumption_margin:
   #   - input_number.solar_opt_consumption_margin
   # daily_consumption_kwh: 17
-  # daily_consumption_profile: true
+  # shape_consumption_profile: true
   # ========================================
   # Octopus account parameters
   # ========================================
