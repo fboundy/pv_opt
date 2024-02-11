@@ -1350,10 +1350,19 @@ class PVOpt(hass.Hass):
         if self.debug:
             self.log(f">>> soc_now: {self.soc_now}")
             self.log(f">>> x: {x}")
+            self.log(
+                f">>> Original: {x.loc[x.loc[: self.static.index[0]].index[-1] :]}"
+            )
 
-        x = x.astype(float)
+        # x = x.astype(float)
+        x = pd.to_numeic(x, errors="coerce").interpolate()
 
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
+        if self.debug:
+            self.log(
+                f">>> Fixed   : {x.loc[x.loc[: self.static.index[0]].index[-1] :]}"
+            )
+
         x = pd.concat(
             [
                 x,
@@ -1944,13 +1953,14 @@ class PVOpt(hass.Hass):
         return df
 
     def load_consumption(self, start, end):
-        self.log("Getting expected consumption data")
+        self.log("Getting expected consumption data:")
 
         index = pd.date_range(start, end, inclusive="left", freq="30min")
         consumption = pd.DataFrame(index=index, data={"consumption": 0})
 
         if self.get_config("use_consumption_history"):
             entity_ids = self.config["id_consumption_today"]
+            days = int(self.get_config("consumption_history_days"))
 
             if not isinstance(entity_ids, list):
                 entity_ids = [entity_ids]
@@ -1958,10 +1968,21 @@ class PVOpt(hass.Hass):
             for entity_id in entity_ids:
                 df = self._get_hass_power_from_daily_kwh(
                     entity_id,
-                    days=int(self.get_config("consumption_history_days")),
+                    days=days,
                     log=self.debug,
                 )
 
+                actual_days = (df.index[-1] - df.index[0]).total_seconds() / 3600 / 24
+
+                self.log(
+                    f"  - Got {actual_days:0.1f} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
+                )
+                if int(actual_days) == days:
+                    str_days = "OK"
+                else:
+                    str_days = "Potential error. <<<"
+
+                self.log(f"  - {days} days was expected. {str_days}")
                 df = df * (1 + self.get_config("consumption_margin") / 100)
                 dfx = pd.Series(index=df.index, data=df.to_list())
                 # Group by time and take the mean
@@ -1980,23 +2001,38 @@ class PVOpt(hass.Hass):
                 temp["time"] = temp.index.time
                 consumption_mean = temp.merge(
                     df, "left", left_on="time", right_index=True
-                )["consumption"] * (1 - self.get_config("day_of_week_weighting"))
+                )["consumption"]
 
-                consumption_dow = (
-                    self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
-                )
-                if len(consumption_dow) != len(consumption_mean):
-                    self.log(">>> Inconsistent lengths in consumption arrays")
-                    self.log(f">>> dow : {consumption_dow}")
-                    self.log(f">>> mean: {consumption_mean}")
+                if days >= 7:
+                    consumption_dow = (
+                        self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
+                    )
+                    if len(consumption_dow) != len(consumption_mean):
+                        self.log(">>> Inconsistent lengths in consumption arrays")
+                        self.log(f">>> dow : {consumption_dow}")
+                        self.log(f">>> mean: {consumption_mean}")
 
-                consumption["consumption"] += pd.Series(
-                    consumption_dow.to_numpy() + consumption_mean.to_numpy(),
-                    index=consumption_mean.index,
-                )
+                    consumption["consumption"] += pd.Series(
+                        consumption_dow.to_numpy()
+                        + consumption_mean.to_numpy()
+                        * (1 - self.get_config("day_of_week_weighting")),
+                        index=consumption_mean.index,
+                    )
+                else:
+                    self.log(
+                        f"  - Ignoring 'Day of Week Weighting' because only {days} days of history is available"
+                    )
+                    consumption["consumption"] = consumption_mean
+
                 self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
         else:
+            daily_kwh = self.get_config("daily_consumption_kwh")
+            self.log(
+                f"  - Creating consumption based on daily estimate of {daily_kwh} kWh"
+            )
+
             if self.get_config("shape_consumption_profile"):
+                self.log("    and typical usage profile.")
                 daily = (
                     pd.DataFrame(CONSUMPTION_SHAPE)
                     .set_index("hour")
@@ -2004,9 +2040,7 @@ class PVOpt(hass.Hass):
                     .interpolate()
                     .iloc[:-1]
                 )
-                daily["consumption"] *= self.get_config("daily_consumption_kwh") / (
-                    daily["consumption"].sum() / 2000
-                )
+                daily["consumption"] *= daily_kwh / (daily["consumption"].sum() / 2000)
                 daily.index = pd.to_datetime(daily.index, unit="h").time
                 consumption["time"] = consumption.index.time
                 consumption = pd.DataFrame(
@@ -2015,10 +2049,13 @@ class PVOpt(hass.Hass):
                     ]
                 ).set_axis(["consumption"], axis=1)
             else:
+                self.log("    and flat usage profile.")
                 consumption["consumption"] = (
                     self.get_config("daily_consumption_kwh") * 1000 / 24
                 )
 
+            self.log("  - Consumption estimated OK")
+        self.log("")
         return consumption
 
     def _compare_tariffs(self):
