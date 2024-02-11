@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.7.5"
+VERSION = "3.8.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -39,6 +39,11 @@ BOTTLECAP_DAVE = {
     "domain": "event",
     "tariff_code": "tariff_code",
     "rates": "current_day_rates",
+}
+
+CONSUMPTION_SHAPE = {
+    "hour": [0, 0.5, 6, 8, 15.5, 17, 22, 24],
+    "consumption": [300, 200, 150, 500, 500, 750, 750, 300],
 }
 
 INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN"]
@@ -190,6 +195,7 @@ DEFAULT_CONFIG = {
     },
     "id_solcast_today": {"default": "sensor.solcast_pv_forecast_forecast_today"},
     "id_solcast_tomorrow": {"default": "sensor.solcast_pv_forecast_forecast_tomorrow"},
+    "use_consumption_history": {"default": True, "domain": "switch"},
     "consumption_history_days": {
         "default": 7,
         "domain": "number",
@@ -211,6 +217,17 @@ DEFAULT_CONFIG = {
             "mode": "slider",
         },
     },
+    "daily_consumption_kwh": {
+        "default": 17,
+        "domain": "number",
+        "attributes": {
+            "min": 1,
+            "max": 50,
+            "step": 1,
+            "mode": "slider",
+        },
+    },
+    "daily_consumption_profile": {"default": True, "domain": "switch"},
     "consumption_grouping": {
         "default": "mean",
         "domain": "select",
@@ -1928,51 +1945,75 @@ class PVOpt(hass.Hass):
         index = pd.date_range(start, end, inclusive="left", freq="30min")
         consumption = pd.DataFrame(index=index, data={"consumption": 0})
 
-        entity_ids = self.config["id_consumption_today"]
+        if self.get_config("use_consumption_history"):
+            entity_ids = self.config["id_consumption_today"]
 
-        if not isinstance(entity_ids, list):
-            entity_ids = [entity_ids]
+            if not isinstance(entity_ids, list):
+                entity_ids = [entity_ids]
 
-        for entity_id in entity_ids:
-            df = self._get_hass_power_from_daily_kwh(
-                entity_id,
-                days=int(self.get_config("consumption_history_days")),
-                log=self.debug,
-            )
+            for entity_id in entity_ids:
+                df = self._get_hass_power_from_daily_kwh(
+                    entity_id,
+                    days=int(self.get_config("consumption_history_days")),
+                    log=self.debug,
+                )
 
-            df = df * (1 + self.get_config("consumption_margin") / 100)
-            dfx = pd.Series(index=df.index, data=df.to_list())
-            # Group by time and take the mean
-            df = df.groupby(df.index.time).aggregate(
-                self.get_config("consumption_grouping")
-            )
-            df.name = "consumption"
+                df = df * (1 + self.get_config("consumption_margin") / 100)
+                dfx = pd.Series(index=df.index, data=df.to_list())
+                # Group by time and take the mean
+                df = df.groupby(df.index.time).aggregate(
+                    self.get_config("consumption_grouping")
+                )
+                df.name = "consumption"
 
-            if self.debug:
-                self.log(">>> All consumption:")
-                self.log(f">>> {dfx}")
-                self.log(">>> Consumption grouped by time:")
-                self.log(f">>> {df}")
+                if self.debug:
+                    self.log(">>> All consumption:")
+                    self.log(f">>> {dfx}")
+                    self.log(">>> Consumption grouped by time:")
+                    self.log(f">>> {df}")
 
-            temp = pd.DataFrame(index=index)
-            temp["time"] = temp.index.time
-            consumption_mean = temp.merge(df, "left", left_on="time", right_index=True)[
-                "consumption"
-            ] * (1 - self.get_config("day_of_week_weighting"))
+                temp = pd.DataFrame(index=index)
+                temp["time"] = temp.index.time
+                consumption_mean = temp.merge(
+                    df, "left", left_on="time", right_index=True
+                )["consumption"] * (1 - self.get_config("day_of_week_weighting"))
 
-            consumption_dow = (
-                self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
-            )
-            if len(consumption_dow) != len(consumption_mean):
-                self.log(">>> Inconsistent lengths in consumption arrays")
-                self.log(f">>> dow : {consumption_dow}")
-                self.log(f">>> mean: {consumption_mean}")
+                consumption_dow = (
+                    self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
+                )
+                if len(consumption_dow) != len(consumption_mean):
+                    self.log(">>> Inconsistent lengths in consumption arrays")
+                    self.log(f">>> dow : {consumption_dow}")
+                    self.log(f">>> mean: {consumption_mean}")
 
-            consumption["consumption"] += pd.Series(
-                consumption_dow.to_numpy() + consumption_mean.to_numpy(),
-                index=consumption_mean.index,
-            )
-            self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
+                consumption["consumption"] += pd.Series(
+                    consumption_dow.to_numpy() + consumption_mean.to_numpy(),
+                    index=consumption_mean.index,
+                )
+                self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
+        else:
+            if self.get_config("daily_consumption_profile"):
+                daily = (
+                    pd.DataFrame(CONSUMPTION_SHAPE)
+                    .set_index("hour")
+                    .reindex(np.arange(0, 24.5, 0.5))
+                    .interpolate()
+                    .iloc[:-1]
+                )
+                daily["consumption"] *= self.get_config("daily_consumption_kwh") / (
+                    daily["consumption"].sum() / 2000
+                )
+                daily.index = pd.to_datetime(daily.index, unit="h").time
+                consumption["time"] = consumption.index.time
+                consumption = pd.DataFrame(
+                    consumption.merge(daily, left_on="time", right_index=True)[
+                        "consumption_y"
+                    ]
+                ).set_axis(["consumption"], axis=1)
+            else:
+                consumption["consumption"] = (
+                    self.get_config("daily_consumption_kwh") * 1000 / 24
+                )
 
         return consumption
 

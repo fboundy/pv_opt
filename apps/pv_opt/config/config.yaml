@@ -70,11 +70,13 @@ pv_opt:
   # - input_select.solar_forecast_source
   
   # # consumption estimation
+  # use_consumption_history: true
   # consumption_history_days:
   #   - 7
   # consumption_margin:
   #   - input_number.solar_opt_consumption_margin
-  #  
+  # daily_consumption_kwh: 17
+  # daily_consumption_profile: true
   # ========================================
   # Octopus account parameters
   # ========================================
