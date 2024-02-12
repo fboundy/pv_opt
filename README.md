@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.8.4
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.8.5
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -123,7 +123,7 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
 
 3. Turn on <b>Auto update</b>
 
-<h3>9. Configure AppDaemon</h3>
+<h3>11. Configure AppDaemon</h3>
 
 1. Use `File Editor` (or one of the alternatives) to open `/addon_configs/a0d7b954_appdaemon/appdaemon.yaml`.
 
@@ -177,12 +177,11 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
 
 5. Click on <b>Configuration</b> at the top
 
-6. Click the 3 dots and <b>Edit in YAML</b> to add `numpy==1.25` and `pandas` as a Python package (note that `numpy` versions >1.25 appear to cause installation errors with appDaemon):
+6. Click the 3 dots and <b>Edit in YAML</b> to add `pandas` as a Python package:
 
    ```
    init_commands: []
    python_packages:
-     - numpy==1.25
      - pandas
    system_packages: []
 
@@ -242,7 +241,7 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
 
 That's it. AppDaemon is up and running. There is futher documentation for the on the [Add-on](https://github.com/hassio-addons/addon-appdaemon/blob/main/appdaemon/DOCS.md) and for [AppDaemon](https://appdaemon.readthedocs.io/en/latest/)
 
-<h3>Install PV Opt from HACS</h3>
+<h3>12. Install PV Opt from HACS</h3>
 
   0. Make sure HACS "Enable AppDaemon apps discovery & tracking" is enabled - under integrations in HA https://hacs.xyz/docs/categories/appdaemon_apps/
   1. Go to HACS

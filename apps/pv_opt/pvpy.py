@@ -382,8 +382,10 @@ class Contract:
         self.host = host
         if self.host:
             self.log = host.log
+            self.rlog = host.rlog
         else:
             self.log = print
+            self.rlog = print
 
         if imp is None and octopus_account is None:
             raise ValueError(
@@ -396,26 +398,26 @@ class Contract:
 
         else:
             url = f"https://api.octopus.energy/v1/accounts/{octopus_account.account_number}/"
-            self.log(f"Connecting to {url}")
+            self.rlog(f"Connecting to {url}")
             try:
                 r = requests.get(url, auth=(octopus_account.api_key, ""))
                 r.raise_for_status()  # Raise an exception for unsuccessful HTTP status codes
 
             except requests.exceptions.RequestException as e:
-                self.log(f"HTTP error occurred: {e}")
+                self.rlog(f"HTTP error occurred: {e}")
                 self.imp = None
                 return
 
             mpans = r.json()["properties"][0]["electricity_meter_points"]
             for mpan in mpans:
-                self.log(f"Getting details for MPAN {mpan['mpan']}")
+                self.rlog(f"Getting details for MPAN {mpan['mpan']}")
                 df = pd.DataFrame(mpan["agreements"])
                 df = df.set_index("valid_from")
                 df.index = pd.to_datetime(df.index)
                 df = df.sort_index()
                 tariff_code = df["tariff_code"].iloc[-1]
 
-                self.log(f"Retrieved most recent tariff code {tariff_code}")
+                self.rlog(f"Retrieved most recent tariff code {tariff_code}")
                 if mpan["is_export"]:
                     self.exp = Tariff(tariff_code, export=True, host=self.host)
                 else:
@@ -423,7 +425,7 @@ class Contract:
 
             if self.imp is None:
                 e = "Either a named import tariff or valid Octopus Account details much be provided"
-                self.log(e, level="ERROR")
+                self.rlog(e, level="ERROR")
                 raise ValueError(e)
 
     def __str__(self):
