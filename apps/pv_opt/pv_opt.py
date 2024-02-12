@@ -27,7 +27,14 @@ DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
 TIME_FORMAT = "%H:%M"
 
-REDACT_REGEX = ["[0-9]{2}m[0-9]{7}_[0-9]{13}", "a_[0-f]{8}"]
+REDACT_REGEX = [
+    "[0-9]{2}m[0-9]{7}_[0-9]{13}", # Serial_MPAN
+    "[0-9]{2}m[0-9]{7}", # Serial
+    "[0-9]{3}00[0-9]{8}", # MPAN
+    "a_[0-f]{8}", # Account Number
+    "A-[0-f]{8}",  # Account Number
+    "sk_live_[a-zA-Z0-9]{24}", # API
+    ]
 
 EVENT_TRIGGER = "PV_OPT"
 DEBUG_TRIGGER = "PV_DEBUG"
@@ -56,6 +63,7 @@ SYSTEM_ARGS = [
     "dependencies",
     "overwrite_ha_on_restart",
     "debug",
+    "redact_personal_data_from_log",
 ]
 
 IMPEXP = ["import", "export"]
@@ -295,7 +303,7 @@ class PVOpt(hass.Hass):
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self.device_name = self.args.pop("device_name", "solis")
-        self.redact = self.args.pop("edact_personal_data_from_log", True)
+        self.redact = self.args.pop("redact_personal_data_from_log", True)
 
         self._load_inverter()
 
@@ -349,16 +357,17 @@ class PVOpt(hass.Hass):
                     f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
                 )
 
-    def redact_for_log(self, entity_id):
+    def rlog(self, str, **kwargs):
         if self.redact:
-            e = entity_id
-            for pattern in REDACT_REGEX:
-                x = re.search(pattern, e)
-                if x:
-                    e = re.sub(pattern, "*" * len(x.group()), e)
-            return e
-        else:
-            return entity_id
+            try:
+                for pattern in REDACT_REGEX:
+                    x = re.search(pattern, str)
+                    if x:
+                        str = re.sub(pattern, "*" * len(x.group()), str)
+            except:
+                pass
+
+        self.log(str, **kwargs)
 
     def _estimate_capacity(self):
         if "id_battery_charge_power" in self.config:
@@ -552,10 +561,10 @@ class PVOpt(hass.Hass):
                 self._status("Disabled")
 
     def _load_contract(self):
-        self.log("")
-        self.log("Loading Contract:")
+        self.rlog("")
+        self.rlog("Loading Contract:")
         self._status("Loading Tariffs")
-        self.log("-----------------")
+        self.rlog("-----------------")
         self.tariff_codes = {}
         self.agile = False
 
@@ -564,7 +573,7 @@ class PVOpt(hass.Hass):
         while self.contract is None and i < n:
             if self.get_config("octopus_auto"):
                 try:
-                    self.log(f"Trying to auto detect Octopus tariffs:")
+                    self.rlog(f"Trying to auto detect Octopus tariffs:")
 
                     octopus_entities = [
                         name
@@ -583,8 +592,8 @@ class PVOpt(hass.Hass):
 
                     for imp_exp in IMPEXP:
                         for entity in entities[imp_exp]:
-                            self.log(
-                                f"    Found {imp_exp} entity {self.redact_for_log(entity)}"
+                            self.rlog(
+                                f"    Found {imp_exp} entity {entity}"
                             )
 
                     tariffs = {x: None for x in IMPEXP}
@@ -606,11 +615,11 @@ class PVOpt(hass.Hass):
                         exp=tariffs["export"],
                         host=self,
                     )
-                    self.log("Contract tariffs loaded OK")
+                    self.rlog("Contract tariffs loaded OK")
 
                 except Exception as e:
-                    self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
-                    self.log(
+                    self.rlog(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
+                    self.rlog(
                         "Failed to find tariff from Octopus Energy Integration",
                         level="WARNING",
                     )
@@ -624,7 +633,7 @@ class PVOpt(hass.Hass):
                         self.config["octopus_api_key"] is not None
                     ):
                         try:
-                            self.log(
+                            self.rlog(
                                 f"Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
                             )
                             self.octopus_account = pv.OctopusAccount(
@@ -638,14 +647,14 @@ class PVOpt(hass.Hass):
                                 host=self,
                             )
 
-                            self.log(
+                            self.rlog(
                                 "Tariffs loaded using Octopus Account details from API Key",
-                                level="WARN",
+                                level="WARNING",
                             )
 
                         except Exception as e:
-                            self.log(e, level="ERROR")
-                            self.log(
+                            self.rlog(e, level="ERROR")
+                            self.rlog(
                                 f"Unable to load Octopus Account details using API Key: {e} Trying other methods.",
                                 level="WARNING",
                             )
@@ -662,7 +671,7 @@ class PVOpt(hass.Hass):
                             str += (
                                 f" Export: {self.config['octopus_export_tariff_code']}"
                             )
-                        self.log(str)
+                        self.rlog(str)
 
                         tariffs = {x: None for x in IMPEXP}
                         for imp_exp in IMPEXP:
@@ -679,28 +688,28 @@ class PVOpt(hass.Hass):
                             exp=tariffs["export"],
                             host=self,
                         )
-                        self.log("Contract tariffs loaded OK from Tariff Codes")
+                        self.rlog("Contract tariffs loaded OK from Tariff Codes")
                     except Exception as e:
-                        self.log(f"Unable to load Tariff Codes {e}", level="ERROR")
+                        self.rlog(f"Unable to load Tariff Codes {e}", level="ERROR")
 
             if self.contract is None:
                 i += 1
-                self.log(
+                self.rlog(
                     f"Failed to load contact - Attempt {i} of {n}. Waiting 2 minutes to re-try"
                 )
                 time.sleep(12)
 
         if self.contract is None:
             e = f"Failed to load contract in {n} attempts. FATAL ERROR"
-            self.log(e)
+            self.rlog(e)
             raise ValueError(e)
 
         else:
             self._check_tariffs()
 
-            self.log("")
+            self.rlog("")
             self._load_saving_events()
-        self.log("Finished loading contract")
+        self.rlog("Finished loading contract")
 
     def _check_tariffs(self):
         tariff_error = False
@@ -745,8 +754,8 @@ class PVOpt(hass.Hass):
                 if ("octoplus_saving_session_events" in name)
             ][0]
             self.log("")
-            self.log(
-                f"Found Octopus Savings Events entity: {self.redact_for_log(saving_events_entity)}"
+            self.rlog(
+                f"Found Octopus Savings Events entity: {saving_events_entity}"
             )
 
             available_events = self.get_state(saving_events_entity, attribute="all")[
@@ -833,7 +842,7 @@ class PVOpt(hass.Hass):
 
     def _load_args(self, items=None):
         if self.debug:
-            self.log(self.args)
+            self.rlog(self.args)
 
         self.prefix = self.args.get("prefix", "solis")
 
@@ -843,11 +852,11 @@ class PVOpt(hass.Hass):
         change_entities = []
         self.yaml_config = {}
 
-        self.log("Reading arguments from YAML:")
-        self.log("-----------------------------------")
+        self.rlog("Reading arguments from YAML:")
+        self.rlog("-----------------------------------")
         if over_write:
-            self.log("")
-            self.log("  Over-write flag is set so YAML will over-write HA")
+            self.rlog("")
+            self.rlog("  Over-write flag is set so YAML will over-write HA")
 
         if items is None:
             items = [i for i in self.args if i not in SYSTEM_ARGS]
@@ -867,7 +876,7 @@ class PVOpt(hass.Hass):
 
             if values[0] is None:
                 self.config[item] = self.get_default_config(item)
-                self.log(
+                self.rlog(
                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Null entry found in YAML.",
                     level="WARNING",
                 )
@@ -875,7 +884,7 @@ class PVOpt(hass.Hass):
             # if the item starts with 'id_' then it must be an entity that exists:
             elif item == "alt_tariffs":
                 self.config[item] = values
-                self.log(
+                self.rlog(
                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value(s) in YAML"
                 )
                 self.yaml_config[item] = self.config[item]
@@ -887,28 +896,28 @@ class PVOpt(hass.Hass):
                     else:
                         self.config[item] = values
 
-                    self.log(
+                    self.rlog(
                         f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value(s) in YAML"
                     )
                     self.yaml_config[item] = self.config[item]
 
                 elif self.entity_exists(self.get_default_config(item)):
                     self.config[item] = self.get_default_config(item)
-                    self.log(
+                    self.rlog(
                         f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Entities listed in YAML {values} do not all exist in HA.",
                         level="WARNING",
                     )
                 else:
                     e = f"    {item:34s} : Neither the entities listed in the YAML {values[0]} nor the system default of {self.get_default_config(item)} exist in HA."
-                    self.log(e, level="ERROR")
+                    self.rlog(e, level="ERROR")
                     raise ValueError(e)
 
             else:
                 # The value should be read explicitly
                 if self.debug:
-                    self.log(f"{item}:")
+                    self.rlog(f"{item}:")
                     for value in self.args[item]:
-                        self.log(f"\t{value}")
+                        self.rlog(f"\t{value}")
 
                 arg_types = {
                     t: [isinstance(v, t) for v in values]
@@ -924,21 +933,21 @@ class PVOpt(hass.Hass):
                     )
                 ):
                     self.config[item] = values[0]
-                    self.log(
+                    self.rlog(
                         f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                     )
                     self.yaml_config[item] = self.config[item]
 
                 elif min(arg_types[str]):
                     if self.debug:
-                        self.log("\tFound a valid list of strings")
+                        self.rlog("\tFound a valid list of strings")
 
                     if (
                         isinstance(self.get_default_config(item), str)
                         and len(values) == 1
                     ):
                         self.config[item] = values[0]
-                        self.log(
+                        self.rlog(
                             f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                         )
                         self.yaml_config[item] = self.config[item]
@@ -961,7 +970,7 @@ class PVOpt(hass.Hass):
 
                         if np.min(val_types[int] | val_types[float]):
                             self.config[item] = values
-                            self.log(
+                            self.rlog(
                                 f"    {item:34s} = {str(sum(ha_values)):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
                             )
                         # if any of list but the last one are strings and the default for the item is a string
@@ -970,7 +979,7 @@ class PVOpt(hass.Hass):
                             self.config[item] = valid_strings[0][0]
                             if not "sensor" in valid_strings[0][1]:
                                 self.change_items[valid_strings[0][1]] = item
-                            self.log(
+                            self.rlog(
                                 f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
                             )
 
@@ -979,21 +988,21 @@ class PVOpt(hass.Hass):
                                 values[-1], self.get_default_config(item)
                             ):
                                 self.config[item] = values[-1]
-                                self.log(
+                                self.rlog(
                                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
                                 )
 
                             elif values[-1] in self.get_default_config(item):
-                                self.log(values)
+                                self.rlog(values)
                                 self.config[item] = values[-1]
-                                self.log(
+                                self.rlog(
                                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
                                 )
                         else:
                             if item in DEFAULT_CONFIG:
                                 self.config[item] = self.get_default_config(item)
 
-                                self.log(
+                                self.rlog(
                                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
                                     level="WARNING",
                                 )
@@ -1003,13 +1012,13 @@ class PVOpt(hass.Hass):
                             ):
                                 self.config[item] = self.get_default_config(item)
 
-                                self.log(
+                                self.rlog(
                                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: inverter brand default. Unable to read from HA entities listed in YAML. No default in YAML.",
                                     level="WARNING",
                                 )
                             else:
                                 self.config[item] = values[0]
-                                self.log(
+                                self.rlog(
                                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default value. No default defined."
                                 )
 
@@ -1017,10 +1026,10 @@ class PVOpt(hass.Hass):
                     arg_types[bool][0] or arg_types[int][0] or arg_types[float][0]
                 ):
                     if self.debug:
-                        self.log("\tFound a single default value")
+                        self.rlog("\tFound a single default value")
 
                     self.config[item] = values[0]
-                    self.log(
+                    self.rlog(
                         f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
                     )
                     self.yaml_config[item] = self.config[item]
@@ -1035,7 +1044,7 @@ class PVOpt(hass.Hass):
                     )
                 ):
                     if self.debug:
-                        self.log(
+                        self.rlog(
                             "\tFound a valid list of strings followed by a single default value"
                         )
                     ha_values = [self.get_ha_value(entity_id=v) for v in values[:-1]]
@@ -1046,7 +1055,7 @@ class PVOpt(hass.Hass):
                     # if they are all float or int
                     if np.min(val_types[int] | val_types[float]):
                         self.config[item] = sum(ha_values)
-                        self.log(
+                        self.rlog(
                             f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
                         )
                         # If these change then we need to trigger automatically
@@ -1056,20 +1065,20 @@ class PVOpt(hass.Hass):
 
                     else:
                         self.config[item] = values[-1]
-                        self.log(
+                        self.rlog(
                             f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
                         )
 
                 else:
                     self.config[item] = self.get_default_config(item)
-                    self.log(
+                    self.rlog(
                         f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Invalid arguments in YAML.",
                         level="ERROR",
                     )
 
-        self.log("")
-        self.log("Checking config:")
-        self.log("-----------------------")
+        self.rlog("")
+        self.rlog("Checking config:")
+        self.rlog("-----------------------")
         items_not_defined = (
             [i for i in DEFAULT_CONFIG if i not in self.config]
             + [i for i in self.inverter.config if i not in self.config]
@@ -1079,16 +1088,16 @@ class PVOpt(hass.Hass):
         if len(items_not_defined) > 0:
             for item in items_not_defined:
                 self.config[item] = self.get_default_config(item)
-                self.log(
+                self.rlog(
                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Not in YAML.",
                     level="WARNING",
                 )
         else:
-            self.log("All config items defined OK")
+            self.rlog("All config items defined OK")
 
-        self.log("")
+        self.rlog("")
 
-        # self.log(f">>> {self.yaml_config}")
+        # self.rlog(f">>> {self.yaml_config}")
 
         self._expose_configs(over_write)
 
