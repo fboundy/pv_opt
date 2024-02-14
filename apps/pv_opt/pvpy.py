@@ -257,11 +257,11 @@ class Tariff:
         if (self.host is not None) and ("unit" in df.columns):
             events = self.host.saving_events
             for id in events:
-                event_start = pd.Timestamp(events[id]["start"])
-                event_end = pd.Timestamp(events[id]["end"])
+                event_start = pd.Timestamp(events[id]["start"]).floor("30min")
+                event_end = pd.Timestamp(events[id]["end"]).ceil("30min")
                 event_value = int(events[id]["octopoints_per_kwh"]) / 8
 
-                if event_start <= end or event_end > start:
+                if event_start <= end or event_end > start and event_value > 0:
                     event_start = max(event_start, start)
                     event_end = min(event_end - pd.Timedelta(30, "minutes"), end)
                     df["unit"].loc[event_start:event_end] += event_value
