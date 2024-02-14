@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.8.6"
+VERSION = "3.8.7"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -1492,7 +1492,7 @@ class PVOpt(hass.Hass):
 
                     # If the current slot is a Hold SOC slot and we aren't holding then we need to
                     # enable Hold SOC
-                    if self.hold[0]["active"]:
+                    if self.hold and self.hold[0]["active"]:
                         if (
                             not status["hold_soc"]["active"]
                             or status["hold_soc"]["soc"] != self.hold[0]["soc"]
