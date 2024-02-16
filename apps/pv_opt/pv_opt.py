@@ -285,7 +285,7 @@ class PVOpt(hass.Hass):
         else:
             raise ValueError(f"No data returned from HASS entity {entity_id}")
             df = None
-            
+
         return df
 
     def initialize(self):
@@ -1356,10 +1356,20 @@ class PVOpt(hass.Hass):
 
         # Load Solcast
         solcast = self.load_solcast()
+        if solcast is None:
+            self.log("")
+            self.log("Unable to optimise without Solcast data.", level="ERROR")
+            return
+
         consumption = self.load_consumption(
             pd.Timestamp.utcnow().normalize(),
             pd.Timestamp.utcnow().normalize() + pd.Timedelta(days=2),
         )
+
+        if consumption is None:
+            self.log("")
+            self.log("Unable to optimise without consumption data.", level="ERROR")
+            return
 
         self.static = pd.concat([solcast, consumption], axis=1)
         self.time_now = pd.Timestamp.utcnow()
@@ -1395,12 +1405,24 @@ class PVOpt(hass.Hass):
             ]
         ).sort_index()
         self.initial_soc = x.interpolate().loc[self.static.index[0]]
+        if not isinstance(self.initial_soc, float):
+            self.log("")
+            self.log("Unable to optimise without consumption data.", level="ERROR")            
+            self._status("ERROR: No initial SOC")
+            return
+
         self.log(f"Initial SOC: {self.initial_soc}")
 
         self.log("Calculating Base flows")
         self.base = self.pv_system.flows(
             self.initial_soc, self.static, solar=self.get_config("solar_forecast")
         )
+
+        if len(self.base)==0:
+            self.log("")
+            self.log("Unable to calculate baseline perfoormance", level="ERROR")            
+            self._status("ERROR: Basline performance")
+            return
 
         self.base_cost = self.contract.net_cost(self.base)
         self.log(f"Base cost: {self.base_cost.sum():6.2f}p")
@@ -1944,10 +1966,12 @@ class PVOpt(hass.Hass):
             df = df.fillna(0)
             # self.static = pd.concat([self.static, df], axis=1)
             self.log("Solcast forecast loaded OK")
+            self.log("")
             return df
 
         except Exception as e:
             self.log(f"Error loading Solcast: {e}", level="ERROR")
+            self.log("")
             return
 
     def _get_hass_power_from_daily_kwh(
@@ -1994,14 +2018,19 @@ class PVOpt(hass.Hass):
                     log=self.debug,
                 )
 
-                actual_days = (df.index[-1] - df.index[0]).total_seconds() / 3600 / 24
+                if df is None:
+                    self._status("ERROR: No consumption history.")
+                    return 
+
+                actual_days = int(round((df.index[-1] - df.index[0]).total_seconds() / 3600 / 24,0))
 
                 self.log(
-                    f"  - Got {actual_days:0.1f} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
+                    f"  - Got {actual_days} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
                 )
                 if int(actual_days) == days:
                     str_days = "OK"
                 else:
+                    self._status(f"WARNING: Consumption < {days} days.")
                     str_days = "Potential error. <<<"
 
                 self.log(f"  - {days} days was expected. {str_days}")
