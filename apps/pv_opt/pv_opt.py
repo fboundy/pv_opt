@@ -633,6 +633,7 @@ class PVOpt(hass.Hass):
                         exp=tariffs["export"],
                         host=self,
                     )
+                    self.log("")
                     self.rlog("Contract tariffs loaded OK")
 
                 except Exception as e:
