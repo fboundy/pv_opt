@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.8.7"
+VERSION = "3.8.8"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -274,12 +274,17 @@ class PVOpt(hass.Hass):
 
         hist = self.get_history(entity_id=entity_id, days=days)
 
-        df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
-        df.index = pd.to_datetime(df.index, format="ISO8601")
+        if len(hist) >0:
+            df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
+            df.index = pd.to_datetime(df.index, format="ISO8601")
 
-        df = df.sort_index()
-        df = df[df != "unavailable"]
-        df = df[df != "unknown"]
+            df = df.sort_index()
+            df = df[df != "unavailable"]
+            df = df[df != "unknown"]
+
+        else:
+            raise ValueError(f"No data returned from HASS entity {entity_id}")
+            df = None
 
         return df
 
@@ -592,8 +597,16 @@ class PVOpt(hass.Hass):
 
                     for imp_exp in IMPEXP:
                         for entity in entities[imp_exp]:
+                            tariff_code = self.get_state(
+                                entity, attribute="all"
+                            )["attributes"][BOTTLECAP_DAVE["tariff_code"]]            
+                            average_rate = self.get_state(
+                                entity, attribute="all"
+                            )["attributes"]["average_rate"] 
+
+       
                             self.rlog(
-                                f"    Found {imp_exp} entity {entity}"
+                                f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code} Average Rate: {average_rate} GBP/kWh"
                             )
 
                     tariffs = {x: None for x in IMPEXP}
@@ -603,11 +616,16 @@ class PVOpt(hass.Hass):
                                 entities[imp_exp][0], attribute="all"
                             )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
 
-                            tariffs[imp_exp] = pv.Tariff(
-                                tariff_code, export=(imp_exp == "export"), host=self
-                            )
-                            if "AGILE" in tariff_code:
-                                self.agile = True
+                            average_rate = self.get_state(
+                                entity, attribute="all"
+                            )["attributes"]["average_rate"] 
+
+                            if average_rate > 0:
+                                tariffs[imp_exp] = pv.Tariff(
+                                    tariff_code, export=(imp_exp == "export"), host=self
+                                )
+                                if "AGILE" in tariff_code:
+                                    self.agile = True
 
                     self.contract = pv.Contract(
                         "current",
@@ -615,6 +633,7 @@ class PVOpt(hass.Hass):
                         exp=tariffs["export"],
                         host=self,
                     )
+                    self.log("")
                     self.rlog("Contract tariffs loaded OK")
 
                 except Exception as e:
@@ -1343,10 +1362,20 @@ class PVOpt(hass.Hass):
 
         # Load Solcast
         solcast = self.load_solcast()
+        if solcast is None:
+            self.log("")
+            self.log("Unable to optimise without Solcast data.", level="ERROR")
+            return
+
         consumption = self.load_consumption(
             pd.Timestamp.utcnow().normalize(),
             pd.Timestamp.utcnow().normalize() + pd.Timedelta(days=2),
         )
+
+        if consumption is None:
+            self.log("")
+            self.log("Unable to optimise without consumption data.", level="ERROR")
+            return
 
         self.static = pd.concat([solcast, consumption], axis=1)
         self.time_now = pd.Timestamp.utcnow()
@@ -1382,12 +1411,24 @@ class PVOpt(hass.Hass):
             ]
         ).sort_index()
         self.initial_soc = x.interpolate().loc[self.static.index[0]]
+        if not isinstance(self.initial_soc, float):
+            self.log("")
+            self.log("Unable to optimise without consumption data.", level="ERROR")            
+            self._status("ERROR: No initial SOC")
+            return
+
         self.log(f"Initial SOC: {self.initial_soc}")
 
         self.log("Calculating Base flows")
         self.base = self.pv_system.flows(
             self.initial_soc, self.static, solar=self.get_config("solar_forecast")
         )
+
+        if len(self.base)==0:
+            self.log("")
+            self.log("Unable to calculate baseline perfoormance", level="ERROR")            
+            self._status("ERROR: Basline performance")
+            return
 
         self.base_cost = self.contract.net_cost(self.base)
         self.log(f"Base cost: {self.base_cost.sum():6.2f}p")
@@ -1931,10 +1972,12 @@ class PVOpt(hass.Hass):
             df = df.fillna(0)
             # self.static = pd.concat([self.static, df], axis=1)
             self.log("Solcast forecast loaded OK")
+            self.log("")
             return df
 
         except Exception as e:
             self.log(f"Error loading Solcast: {e}", level="ERROR")
+            self.log("")
             return
 
     def _get_hass_power_from_daily_kwh(
@@ -1981,14 +2024,19 @@ class PVOpt(hass.Hass):
                     log=self.debug,
                 )
 
-                actual_days = (df.index[-1] - df.index[0]).total_seconds() / 3600 / 24
+                if df is None:
+                    self._status("ERROR: No consumption history.")
+                    return 
+
+                actual_days = int(round((df.index[-1] - df.index[0]).total_seconds() / 3600 / 24,0))
 
                 self.log(
-                    f"  - Got {actual_days:0.1f} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
+                    f"  - Got {actual_days} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
                 )
                 if int(actual_days) == days:
                     str_days = "OK"
                 else:
+                    self._status(f"WARNING: Consumption < {days} days.")
                     str_days = "Potential error. <<<"
 
                 self.log(f"  - {days} days was expected. {str_days}")
