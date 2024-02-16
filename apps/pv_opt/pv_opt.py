@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.8.8"
+VERSION = "3.8.9"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -30,7 +30,7 @@ TIME_FORMAT = "%H:%M"
 REDACT_REGEX = [
     "[0-9]{2}m[0-9]{7}_[0-9]{13}", # Serial_MPAN
     "[0-9]{2}m[0-9]{7}", # Serial
-    "[0-9]{3}00[0-9]{8}", # MPAN
+    "^$|\d{13}$", # MPAN
     "a_[0-f]{8}", # Account Number
     "A-[0-f]{8}",  # Account Number
     "sk_live_[a-zA-Z0-9]{24}", # API
@@ -599,12 +599,8 @@ class PVOpt(hass.Hass):
                         for entity in entities[imp_exp]:
                             tariff_code = self.get_state(
                                 entity, attribute="all"
-                            )["attributes"][BOTTLECAP_DAVE["tariff_code"]]            
-                            average_rate = self.get_state(
-                                entity, attribute="all"
-                            )["attributes"]["average_rate"] 
-
-       
+                            )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
+      
                             self.rlog(
                                 f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code} Average Rate: {average_rate} GBP/kWh"
                             )
@@ -613,14 +609,10 @@ class PVOpt(hass.Hass):
                     for imp_exp in IMPEXP:
                         if len(entities[imp_exp]) > 0:
                             tariff_code = self.get_state(
-                                entities[imp_exp][0], attribute="all"
-                            )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
-
-                            average_rate = self.get_state(
                                 entity, attribute="all"
-                            )["attributes"]["average_rate"] 
+                            )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
 
-                            if average_rate > 0:
+                            if tariff_code is not None:
                                 tariffs[imp_exp] = pv.Tariff(
                                     tariff_code, export=(imp_exp == "export"), host=self
                                 )
