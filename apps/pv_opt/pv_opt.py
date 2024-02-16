@@ -274,13 +274,18 @@ class PVOpt(hass.Hass):
 
         hist = self.get_history(entity_id=entity_id, days=days)
 
-        df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
-        df.index = pd.to_datetime(df.index, format="ISO8601")
+        if len(hist) >0:
+            df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
+            df.index = pd.to_datetime(df.index, format="ISO8601")
 
-        df = df.sort_index()
-        df = df[df != "unavailable"]
-        df = df[df != "unknown"]
+            df = df.sort_index()
+            df = df[df != "unavailable"]
+            df = df[df != "unknown"]
 
+        else:
+            raise ValueError(f"No data returned from HASS entity {entity_id}")
+            df = None
+            
         return df
 
     def initialize(self):
