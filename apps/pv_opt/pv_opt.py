@@ -592,8 +592,16 @@ class PVOpt(hass.Hass):
 
                     for imp_exp in IMPEXP:
                         for entity in entities[imp_exp]:
+                            tariff_code = self.get_state(
+                                entity, attribute="all"
+                            )["attributes"][BOTTLECAP_DAVE["tariff_code"]]            
+                            average_rate = self.get_state(
+                                entity, attribute="all"
+                            )["attributes"]["average_rate"] 
+
+       
                             self.rlog(
-                                f"    Found {imp_exp} entity {entity}"
+                                f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code} Average Rate: {average_rate} GBP/kWh"
                             )
 
                     tariffs = {x: None for x in IMPEXP}
