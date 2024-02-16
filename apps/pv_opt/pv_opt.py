@@ -616,11 +616,16 @@ class PVOpt(hass.Hass):
                                 entities[imp_exp][0], attribute="all"
                             )["attributes"][BOTTLECAP_DAVE["tariff_code"]]
 
-                            tariffs[imp_exp] = pv.Tariff(
-                                tariff_code, export=(imp_exp == "export"), host=self
-                            )
-                            if "AGILE" in tariff_code:
-                                self.agile = True
+                            average_rate = self.get_state(
+                                entity, attribute="all"
+                            )["attributes"]["average_rate"] 
+
+                            if average_rate > 0:
+                                tariffs[imp_exp] = pv.Tariff(
+                                    tariff_code, export=(imp_exp == "export"), host=self
+                                )
+                                if "AGILE" in tariff_code:
+                                    self.agile = True
 
                     self.contract = pv.Contract(
                         "current",
