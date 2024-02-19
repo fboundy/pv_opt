@@ -1717,9 +1717,10 @@ class PVOpt(hass.Hass):
 
             self.windows = pd.concat([windows, self.windows]).sort_values("start")
             tolerance = self.get_config("forced_power_group_tolerance")
-            self.windows["forced"] = (
-                (self.windows["forced"] / tolerance).round(0) * tolerance
-            ).astype(int)
+            if tolerance > 0:
+                self.windows["forced"] = (
+                    (self.windows["forced"] / tolerance).round(0) * tolerance
+                ).astype(int)
 
             self.windows["soc"] = self.windows["soc"].round(0).astype(int)
             self.windows["soc_end"] = self.windows["soc_end"].round(0).astype(int)
