@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.8.9"
+VERSION = "3.8.10"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -602,22 +602,25 @@ class PVOpt(hass.Hass):
                             )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
       
                             self.rlog(
-                                f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code} Average Rate: {average_rate} GBP/kWh"
+                                f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code}"
                             )
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
+                        self.log(f">>>{imp_exp}: {entities[imp_exp]}")
                         if len(entities[imp_exp]) > 0:
-                            tariff_code = self.get_state(
-                                entity, attribute="all"
-                            )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
+                            for entity in entities[imp_exp]:
+                                tariff_code = self.get_state(
+                                    entity, attribute="all"
+                                )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
+                                self.log(f">>> {tariff_code}")
 
-                            if tariff_code is not None:
-                                tariffs[imp_exp] = pv.Tariff(
-                                    tariff_code, export=(imp_exp == "export"), host=self
-                                )
-                                if "AGILE" in tariff_code:
-                                    self.agile = True
+                                if tariff_code is not None:
+                                    tariffs[imp_exp] = pv.Tariff(
+                                        tariff_code, export=(imp_exp == "export"), host=self
+                                    )
+                                    if "AGILE" in tariff_code:
+                                        self.agile = True
 
                     self.contract = pv.Contract(
                         "current",
@@ -1714,9 +1717,10 @@ class PVOpt(hass.Hass):
 
             self.windows = pd.concat([windows, self.windows]).sort_values("start")
             tolerance = self.get_config("forced_power_group_tolerance")
-            self.windows["forced"] = (
-                (self.windows["forced"] / tolerance).round(0) * tolerance
-            ).astype(int)
+            if tolerance > 0:
+                self.windows["forced"] = (
+                    (self.windows["forced"] / tolerance).round(0) * tolerance
+                ).astype(int)
 
             self.windows["soc"] = self.windows["soc"].round(0).astype(int)
             self.windows["soc_end"] = self.windows["soc_end"].round(0).astype(int)
