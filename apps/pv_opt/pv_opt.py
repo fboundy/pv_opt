@@ -602,22 +602,25 @@ class PVOpt(hass.Hass):
                             )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
       
                             self.rlog(
-                                f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code} Average Rate: {average_rate} GBP/kWh"
+                                f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code}"
                             )
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
+                        self.log(f">>>{imp_exp}: {entities[imp_exp]}")
                         if len(entities[imp_exp]) > 0:
-                            tariff_code = self.get_state(
-                                entity, attribute="all"
-                            )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
+                            for entity in entities[imp_exp]:
+                                tariff_code = self.get_state(
+                                    entity, attribute="all"
+                                )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
+                                self.log(f">>> {tariff_code}")
 
-                            if tariff_code is not None:
-                                tariffs[imp_exp] = pv.Tariff(
-                                    tariff_code, export=(imp_exp == "export"), host=self
-                                )
-                                if "AGILE" in tariff_code:
-                                    self.agile = True
+                                if tariff_code is not None:
+                                    tariffs[imp_exp] = pv.Tariff(
+                                        tariff_code, export=(imp_exp == "export"), host=self
+                                    )
+                                    if "AGILE" in tariff_code:
+                                        self.agile = True
 
                     self.contract = pv.Contract(
                         "current",
