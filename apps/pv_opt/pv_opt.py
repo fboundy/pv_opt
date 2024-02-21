@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.8.11"
+VERSION = "3.8.12"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
