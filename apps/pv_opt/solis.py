@@ -400,16 +400,22 @@ class InverterController:
                 entity_id = self.host.config["id_timed_charge_discharge_button"]
                 self.host.call_service("button/press", entity_id=entity_id)
                 time.sleep(0.5)
-                time_pressed = pd.Timestamp(self.host.get_state(entity_id))
+                try:
+                    time_pressed = pd.Timestamp(self.host.get_state(entity_id))
 
-                dt = (pd.Timestamp.now(self.host.tz) - time_pressed).total_seconds()
-                if dt < 10:
-                    self.log(f"Successfully pressed button {entity_id}")
+                    dt = (pd.Timestamp.now(self.host.tz) - time_pressed).total_seconds()
+                    if dt < 10:
+                        self.log(f"Successfully pressed button {entity_id}")
 
-                else:
+                    else:
+                        self.log(
+                            f"Failed to press button {entity_id}. Last pressed at {time_pressed.strftime(TIMEFORMAT)} ({dt:0.2f} seconds ago)"
+                        )
+                except:
                     self.log(
-                        f"Failed to press button {entity_id}. Last pressed at {time_pressed.strftime(TIMEFORMAT)} ({dt:0.2f} seconds ago)"
+                            f"Failed to press button {entity_id}: it appears to never have been pressed."
                     )
+
 
         else:
             self.log("Inverter already at correct time settings")
