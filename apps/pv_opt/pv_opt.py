@@ -274,7 +274,7 @@ class PVOpt(hass.Hass):
 
         hist = self.get_history(entity_id=entity_id, days=days)
 
-        if len(hist) >0:
+        if (hist is not None) and (len(hist) >0):
             df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
             df.index = pd.to_datetime(df.index, format="ISO8601")
 
@@ -283,7 +283,7 @@ class PVOpt(hass.Hass):
             df = df[df != "unknown"]
 
         else:
-            raise ValueError(f"No data returned from HASS entity {entity_id}")
+            self.log(f"No data returned from HASS entity {entity_id}", level="ERROR")
             df = None
 
         return df
@@ -1384,6 +1384,11 @@ class PVOpt(hass.Hass):
         # self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
+
+        if x is None:
+            self.log("")
+            self.log("Unable to get SOC at start of current window.", level="ERROR")
+            return
 
         if self.debug:
             self.log(f">>> soc_now: {self.soc_now}")
