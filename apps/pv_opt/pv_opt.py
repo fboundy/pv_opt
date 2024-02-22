@@ -819,7 +819,7 @@ class PVOpt(hass.Hass):
 
             # if the state is None return None
             if state is not None:
-                if (state in ['unknown', 'unavailable']) and (entity_id != 'button'):
+                if (state in ['unknown', 'unavailable']) and (entity_id[:6] != 'button'):
                     e = f"HA returned {state} for state of {entity_id}"
                     self._status(f"ERROR: {e}")
                     raise ValueError(e)
