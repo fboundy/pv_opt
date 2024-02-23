@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.8.10"
+VERSION = "3.8.14"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -274,7 +274,7 @@ class PVOpt(hass.Hass):
 
         hist = self.get_history(entity_id=entity_id, days=days)
 
-        if len(hist) >0:
+        if (hist is not None) and (len(hist) >0):
             df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
             df.index = pd.to_datetime(df.index, format="ISO8601")
 
@@ -283,7 +283,7 @@ class PVOpt(hass.Hass):
             df = df[df != "unknown"]
 
         else:
-            raise ValueError(f"No data returned from HASS entity {entity_id}")
+            self.log(f"No data returned from HASS entity {entity_id}", level="ERROR")
             df = None
 
         return df
@@ -819,16 +819,21 @@ class PVOpt(hass.Hass):
 
             # if the state is None return None
             if state is not None:
+                if (state in ['unknown', 'unavailable']) and (entity_id[:6] != 'button'):
+                    e = f"HA returned {state} for state of {entity_id}"
+                    self._status(f"ERROR: {e}")
+                    raise ValueError(e)
                 # if the state is 'on' or 'off' then it's a bool
-                if state.lower() in ["on", "off", "true", "false"]:
+                elif state.lower() in ["on", "off", "true", "false"]:
                     value = state.lower() in ["on", "true"]
 
                 # see if we can coerce it into an int 1st and then a floar
-                for t in [int, float]:
-                    try:
-                        value = t(state)
-                    except:
-                        pass
+                else:
+                    for t in [int, float]:
+                        try:
+                            value = t(state)
+                        except:
+                            pass
 
                 # if none of the above return a string
                 if value is None:
@@ -1379,6 +1384,11 @@ class PVOpt(hass.Hass):
         # self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
+
+        if x is None:
+            self.log("")
+            self.log("Unable to get SOC at start of current window.", level="ERROR")
+            return
 
         if self.debug:
             self.log(f">>> soc_now: {self.soc_now}")
