@@ -595,7 +595,7 @@ class PVsystemModel:
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
             axis=1,
         )
-        base_cost = contract.net_cost(df).sum()
+        base_cost = round(contract.net_cost(df).sum(),1)
         net_cost = []
         net_cost_opt = base_cost
 
@@ -674,6 +674,7 @@ class PVsystemModel:
                         start_window = window[0]
 
                         cost_at_min_price = round_trip_energy_required * min_price
+                        
                         str_log += f"<==> {start_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
                         str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
                         factors = []
@@ -744,22 +745,71 @@ class PVsystemModel:
                 self.log("No slots available")
                 done = True
 
-        z = pd.DataFrame(data={"net_cost": net_cost, "slot_count": slot_count})
-        z["slot_total"] = z["slot_count"].cumsum()
-        z["delta"] = z["net_cost"].diff()
-        max_delta = z["net_cost"].diff().iloc[1:].max()
-        if log:
-            self.log("")
-            self.log(f"Maximum 1st pass slot delta is {max_delta:0.1f}p")
-            self.log("")
+        # self.log("")
+        # self.log("Merging Charging Slots")
+        # self.log("----------------------")
+
+        # z = pd.DataFrame(data={"net_cost": net_cost, "slot_count": slot_count})
+        # z["slot_total"] = z["slot_count"].cumsum()
+        # z["delta"] = z["net_cost"].diff()
+        # self.log(z)
+        # # max_delta = z["net_cost"].diff().iloc[1:].max()
+        # slot_df =pd.DataFrame(slots).set_index(0)
+        # slot_df['delta'] = [b for a in [[x[1]] * x[0] for x in zip(z["slot_count"].to_list(),z["delta"].to_list())] for b in a]
+        # self.log(slot_df)
+        # slot_df = slot_df.groupby(slot_df.index).sum().merge(right=df['import'], left_index=True, right_index=True).sort_values(['delta','import'])
+
+        # self.log(slot_df)
+        # new_slots = slot_df.to_dict()[1]
+        # new_slots = [(x, new_slots[x]) for x in new_slots]
+
+        # i = 1
+        # net_cost = [base_cost]
+        # slot_threshold = self.host.get_config("slot_threshold_p")
+        # self.log(slot_threshold)
+        # self.log(base_cost)
+        # while i<=len(new_slots):
+        #     df = pd.concat(
+        #         [
+        #             prices,
+        #             consumption,
+        #             self.flows(
+        #                 initial_soc, static_flows, slots=new_slots[:i], **kwargs
+        #             ),
+        #         ],
+        #         axis=1,
+        #     )
+        #     net_cost.append(round(contract.net_cost(df).sum(), 1))
+        #     self.log(f"{i}: {new_slots[i-1]} {net_cost[-1]} {net_cost[-2]} {net_cost[-1]-net_cost[-2]}" )
+        #     i += 1
+
+        # slots = [x[0] for x in zip(new_slots, net_cost[1:], net_cost[:-1]) if x[2]-x[1] >=slot_threshold]
+        # self.log(slots)
+                
 
         df = pd.concat(
             [
                 prices,
-                self.flows(initial_soc, static_flows, slots=slots, **kwargs),
+                consumption,
+                self.flows(
+                    initial_soc, static_flows, slots=slots, **kwargs
+                ),
             ],
             axis=1,
         )
+        net_cost_opt = round(contract.net_cost(df).sum(), 1)
+
+        if base_cost - net_cost_opt <= self.host.get_config("pass_threshold_p"):
+            self.log(f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded")
+            slots = []
+            net_cost_opt = base_cost
+            df = pd.concat(
+                [
+                    prices,
+                    self.flows(initial_soc, static_flows, slots=slots, **kwargs),
+                ],
+                axis=1,
+            )
 
         slots_added = 999
         j = 0
@@ -899,9 +949,9 @@ class PVsystemModel:
                 slots = slots_pre
                 slots_added = 0
                 net_cost_opt = net_cost_pre
-                str_log += f": < threshold {self.host.get_config('pass_threshold_p')} => Excluded"
+                str_log += f": < Pass Threshold {self.host.get_config('pass_threshold_p'):0.1f}p => Slots Excluded"
             else:
-                str_log += f": > threshold {self.host.get_config('pass_threshold_p')} => Included"
+                str_log += f": > Pass Threshold {self.host.get_config('pass_threshold_p'):0.1f}p => Slots Included"
 
             if log:
                 self.log("")
@@ -1025,10 +1075,10 @@ class PVsystemModel:
                 if cost_delta > -self.host.get_config("pass_threshold_p"):
                     slots = slots_pre
                     slots_added = slots_added_pre
-                    str_log += f": < threshold ({self.host.get_config('pass_threshold_p')}) => Excluded"
+                    str_log += f": < Pass threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots excluded"
                     net_cost_opt = net_cost_pre
                 else:
-                    str_log += f": > threshold ({self.host.get_config('pass_threshold_p')}) => Included"
+                    str_log += f": > Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots included"
 
                 if log:
                     self.log("")
@@ -1037,29 +1087,42 @@ class PVsystemModel:
             if log:
                 self.log(f"Iteration {j:2d}: Slots added: {slots_added:3d}")
 
+        df = pd.concat(
+            [
+                prices,
+                self.flows(
+                    initial_soc, static_flows, slots=slots, **kwargs
+                ),
+            ],
+            axis=1,
+        )
         df.index = pd.to_datetime(df.index)
 
-        if not self.host.get_config("allow_cyclic"):
+        if (not self.host.get_config("allow_cyclic")) and (len(slots) > 0) and discharge:
             if log:
                 self.log("")
                 self.log("Removing cyclic charge/discharge")
             a = df["forced"][df["forced"] != 0].to_dict()
             new_slots = [(k, a[k]) for k in a]
+
             revised_slots = []
             skip_flag = False
-            for slot, next_slot in zip(new_slots[:-1], new_slots[1:]):
-                if (int(slot[1]) == self.inverter.charger_power) & (
-                    int(-next_slot[1]) == self.inverter.inverter_power
+            for i, x in enumerate(zip(new_slots[:-1], new_slots[1:])):
+
+                if (int(x[0][1]) == self.inverter.charger_power) & (
+                    int(-x[1][1]) == self.inverter.inverter_power
                 ):
                     skip_flag = True
                     if log:
                         self.log(
-                            f"  Skipping slots at {slot[0].strftime(TIME_FORMAT)} ({slot[1]}W) and {next_slot[0].strftime(TIME_FORMAT)} ({next_slot[1]}W)"
+                            f"  Skipping slots at {x[0][0].strftime(TIME_FORMAT)} ({x[0][1]}W) and {x[1][0].strftime(TIME_FORMAT)} ({x[1][1]}W)"
                         )
                 elif skip_flag:
                     skip_flag = False
                 else:
-                    revised_slots.append(slot)
+                    revised_slots.append(x[0])
+                    if i == len(new_slots)-2:
+                        revised_slots.append(x[1])
 
             df = pd.concat(
                 [

@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.9.0"
+VERSION = "3.9.1"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -1520,10 +1520,13 @@ class PVOpt(hass.Hass):
                 ):
                     # Next slot starts before the next optimiser run. This implies we are not currently in
                     # a charge or discharge slot
-
-                    self.log(
-                        f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
-                    )
+                    
+                    if len(self.windows > 0):
+                        self.log(
+                            f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
+                        )
+                    else:
+                        self.log("No charge/discharge windows planned.")
 
                     if self.charge_power > 0:
                         self.inverter.control_charge(
@@ -1545,7 +1548,7 @@ class PVOpt(hass.Hass):
 
                 elif (time_to_slot_start <= 0) and (
                     time_to_slot_start < self.get_config("optimise_frequency_minutes")
-                ):
+                ) and (len(self.windows) > 0):
                     # We are currently in a charge/discharge slot
 
                     # If the current slot is a Hold SOC slot and we aren't holding then we need to
@@ -1566,7 +1569,7 @@ class PVOpt(hass.Hass):
 
                     else:
                         self.log(
-                            f"Current charge/discharge windows ends in {time_to_slot_end:0.1f} minutes."
+                            f"Current charge/discharge window ends in {time_to_slot_end:0.1f} minutes."
                         )
 
                         if self.charge_power > 0:
@@ -1616,7 +1619,11 @@ class PVOpt(hass.Hass):
                     # We aren't in a charge/discharge slot and the next one doesn't start before the
                     # optimiser runs again
 
-                    str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes "
+                    if len(self.windows) > 0:
+                        str_log = f"Next {direction} window starts in {time_to_slot_start:0.1f} minutes "
+
+                    else:
+                        str_log = "No charge/discharge windows planned "
 
                     # If the next slot isn't soon then just check that current status matches what we see:
                     did_something = False
@@ -1643,25 +1650,26 @@ class PVOpt(hass.Hass):
                         self.inverter.control_charge(enable=False)
                         did_something = True
 
-                    if (
-                        direction == "charge"
-                        and self.charge_start_datetime > status["discharge"]["start"]
-                        and status["discharge"]["start"] != status["discharge"]["end"]
-                    ):
-                        str_log += " but inverter is has a discharge slot before then. Disabling discharge."
-                        self.log(str_log)
-                        self.inverter.control_discharge(enable=False)
-                        did_something = True
+                    if len(self.windows) > 0:                    
+                        if (
+                            direction == "charge"
+                            and self.charge_start_datetime > status["discharge"]["start"]
+                            and status["discharge"]["start"] != status["discharge"]["end"]
+                        ):
+                            str_log += " but inverter has a discharge slot before then. Disabling discharge."
+                            self.log(str_log)
+                            self.inverter.control_discharge(enable=False)
+                            did_something = True
 
-                    elif (
-                        direction == "discharge"
-                        and self.charge_start_datetime > status["charge"]["start"]
-                        and status["charge"]["start"] != status["charge"]["end"]
-                    ):
-                        str_log += " but inverter is has a charge slot before then. Disabling charge."
-                        self.log(str_log)
-                        self.inverter.control_charge(enable=False)
-                        did_something = True
+                        elif (
+                            direction == "discharge"
+                            and self.charge_start_datetime > status["charge"]["start"]
+                            and status["charge"]["start"] != status["charge"]["end"]
+                        ):
+                            str_log += " but inverter is has a charge slot before then. Disabling charge."
+                            self.log(str_log)
+                            self.inverter.control_charge(enable=False)
+                            did_something = True
 
                     if status["hold_soc"]["active"]:
                         self.inverter.hold_soc(enable=False)
@@ -1676,7 +1684,7 @@ class PVOpt(hass.Hass):
                 if did_something:
                     if self.get_config("update_cycle_seconds") is not None:
                         i = int(self.get_config("update_cycle_seconds") * 1.2)
-                        self.log(f"Wating for Modbus Read cycle: {i} seconds")
+                        self.log(f"Waiting for Modbus Read cycle: {i} seconds")
                         while i > 0:
                             self._status(f"Waiting for Modbus Read cycle: {i}")
                             time.sleep(1)
@@ -1781,6 +1789,7 @@ class PVOpt(hass.Hass):
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
             self.hold = []
+            self.windows = pd.DataFrame()
 
     def _log_inverter_status(self, status):
         self.log("")
