@@ -392,9 +392,11 @@ class Contract:
                 "Either a named import tariff or Octopus Account details much be provided"
             )
 
+        self.tariffs = {}
+
         if octopus_account is None:
-            self.imp = imp
-            self.exp = exp
+            self.tariffs["import"] = imp
+            self.tariffs["export"] = exp
 
         else:
             url = f"https://api.octopus.energy/v1/accounts/{octopus_account.account_number}/"
@@ -405,7 +407,7 @@ class Contract:
 
             except requests.exceptions.RequestException as e:
                 self.rlog(f"HTTP error occurred: {e}")
-                self.imp = None
+                self.tariffs["import"] = None
                 return
 
             mpans = r.json()["properties"][0]["electricity_meter_points"]
@@ -419,11 +421,11 @@ class Contract:
 
                 self.rlog(f"Retrieved most recent tariff code {tariff_code}")
                 if mpan["is_export"]:
-                    self.exp = Tariff(tariff_code, export=True, host=self.host)
+                    self.tariffs["export"] = Tariff(tariff_code, export=True, host=self.host)
                 else:
-                    self.imp = Tariff(tariff_code, host=self.host)
+                    self.tariffs["import"] = Tariff(tariff_code, host=self.host)
 
-            if self.imp is None:
+            if self.tariffs["import"] is None:
                 e = "Either a named import tariff or valid Octopus Account details much be provided"
                 self.rlog(e, level="ERROR")
                 raise ValueError(e)
@@ -431,7 +433,7 @@ class Contract:
     def __str__(self):
         str = f"Contract: {self.name}\n"
         str += f'{"-"*(11 + len(self.name))}\n\n'
-        for tariff in [self.imp, self.exp]:
+        for tariff in self.tariffs:
             str += f"{tariff.__str__()}\n"
         return str
 
@@ -458,14 +460,14 @@ class Contract:
             grid_imp = grid_flow.clip(0)
             grid_exp = grid_flow.clip(upper=0)
 
-        imp_df = self.imp.to_df(start, end, **kwargs)
+        imp_df = self.tariffs["import"].to_df(start, end, **kwargs)
         nc = imp_df["fixed"]
         if kwargs.get("log"):
-            self.log(f">>> Import{self.imp.to_df(start,end).to_string()}")
+            self.log(f">>> Import{self.tariffs['import'].to_df(start,end).to_string()}")
         nc += imp_df["unit"] * grid_imp / 2000
         if kwargs.get("log"):
-            self.log(f">>> Export{self.exp.to_df(start,end).to_string()}")
-        nc += self.exp.to_df(start, end, **kwargs)["unit"] * grid_exp / 2000
+            self.log(f">>> Export{self.tariffs['export'].to_df(start,end).to_string()}")
+        nc += self.tariffs["export"].to_df(start, end, **kwargs)["unit"] * grid_exp / 2000
 
         return nc
 
@@ -571,11 +573,11 @@ class PVsystemModel:
         max_iters = kwargs.pop("max_iters", 3)
 
         prices = pd.DataFrame()
-        for tariff in [contract.imp, contract.exp]:
+        for direction in contract.tariffs:
             prices = pd.concat(
                 [
                     prices,
-                    tariff.to_df(
+                    contract.tariffs[direction].to_df(
                         start=static_flows.index[0], end=static_flows.index[-1]
                     )["unit"],
                 ],
@@ -587,7 +589,7 @@ class PVsystemModel:
                 f"  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
             )
 
-        prices = prices.set_axis(["import", "export"], axis=1)
+        prices = prices.set_axis(contract.tariffs.keys(), axis=1)
 
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
@@ -739,6 +741,7 @@ class PVsystemModel:
                 else:
                     done = True
             else:
+                self.log("No slots available")
                 done = True
 
         z = pd.DataFrame(data={"net_cost": net_cost, "slot_count": slot_count})

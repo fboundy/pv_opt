@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.8.14"
+VERSION = "3.9.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -320,6 +320,7 @@ class PVOpt(hass.Hass):
 
         self.saving_events = {}
         self.contract = None
+        self.bottlecap_entities = {"import": None, "export": None}
 
         # Load arguments from the YAML file
         # If there are none then use the defaults in DEFAULT_CONFIG and DEFAULT_CONFIG_BY_BRAND
@@ -504,16 +505,16 @@ class PVOpt(hass.Hass):
         if self.debug:
             self.log(">>> Agile Callback Handler")
             self.log(
-                f">>> Contract end day: {self.contract.imp.end().day:2d} Today:{pd.Timestamp.now().day:2d}  {(self.contract.imp.end().day == pd.Timestamp.now().day)}"
+                f">>> Contract end day: {self.contract.tariffs['import'].end().day:2d} Today:{pd.Timestamp.now().day:2d}  {(self.contract.tariffs['import'].end().day == pd.Timestamp.now().day)}"
             )
             self.log(
                 f">>> Current hour:     {pd.Timestamp.now().hour:2d}           {pd.Timestamp.now().hour > 16}"
             )
-        if (self.contract.imp.end().day == pd.Timestamp.now().day) and (
+        if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
             pd.Timestamp.now().hour > 16
         ):
             self.log(
-                f"Contract end day: {self.contract.imp.end().day} Today:{pd.Timestamp.now().day}"
+                f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}"
             )
             self._load_contract()
 
@@ -602,23 +603,26 @@ class PVOpt(hass.Hass):
                             )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
       
                             self.rlog(
-                                f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code}"
+                                f"  Found {imp_exp} entity {entity}: Tariff code: {tariff_code}"
                             )
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
-                        self.log(f">>>{imp_exp}: {entities[imp_exp]}")
+                        if self.debug:
+                            self.log(f">>>{imp_exp}: {entities[imp_exp]}")
                         if len(entities[imp_exp]) > 0:
                             for entity in entities[imp_exp]:
                                 tariff_code = self.get_state(
                                     entity, attribute="all"
-                                )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)            
-                                self.log(f">>> {tariff_code}")
+                                )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)       
+                                if self.debug:     
+                                    self.log(f">>> {tariff_code}")
 
                                 if tariff_code is not None:
                                     tariffs[imp_exp] = pv.Tariff(
                                         tariff_code, export=(imp_exp == "export"), host=self
                                     )
+                                    self.bottlecap_entities[imp_exp]=entity
                                     if "AGILE" in tariff_code:
                                         self.agile = True
 
@@ -630,6 +634,7 @@ class PVOpt(hass.Hass):
                     )
                     self.log("")
                     self.rlog("Contract tariffs loaded OK")
+
 
                 except Exception as e:
                     self.rlog(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
@@ -719,15 +724,23 @@ class PVOpt(hass.Hass):
             raise ValueError(e)
 
         else:
-            self._check_tariffs()
+            # self._check_tariffs()
 
             self.rlog("")
             self._load_saving_events()
         self.rlog("Finished loading contract")
 
     def _check_tariffs(self):
+        if self.bottlecap_entities['import'] is not None:
+            self._check_tariffs_vs_bottlecap()            
+
+        self.log("")
+        self.log("Checking tariff start and end times:")
+        self.log("------------------------------------")        
         tariff_error = False
-        for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
+        for tariff in self.contract.tariffs:
+        # for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
+            t = self.contract.tariffs[tariff]
             try:
                 z = t.end().strftime(DATE_TIME_FORMAT_LONG)
                 if t.end() < pd.Timestamp.now(tz="UTC"):
@@ -742,14 +755,13 @@ class PVOpt(hass.Hass):
                 tariff_error = True
 
             self.log(
-                f"  {imp_exp.title()}: {t.name:40s} Start: {t.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
+                f"  {tariff.title()}: {t.name:40s} Start: {t.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
             )
             if "AGILE" in t.name:
                 self.agile = True
 
         if self.agile:
-            self.log("")
-            self.log("AGILE tariff detected. Rates will update at 16:00 daily")
+            self.log("  AGILE tariff detected. Rates will update at 16:00 daily")
 
     def _load_saving_events(self):
         if (
@@ -1343,11 +1355,11 @@ class PVOpt(hass.Hass):
 
         if self._check_tariffs():
             self.log("")
-            self.log("  - Tariff error detected. Attempting to re-load.")
+            self.log("  Tariff error detected. Attempting to re-load.")
             self.log("")
             self._load_contract()
         else:
-            self.log("  - Tariffs OK")
+            self.log("  Tariffs OK")
             self.log("")
 
         self.t0 = pd.Timestamp.now()
@@ -2228,5 +2240,29 @@ class PVOpt(hass.Hass):
         df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
         return df
 
+    def _check_tariffs_vs_bottlecap(self):
+        self.log("")
+        self.log("Checking tariff prices vs Octopus Energy Integration:")
+        self.log("-----------------------------------------------------")
+        for direction in self.contract.tariffs:
+            if self.bottlecap_entities[direction] is None:
+                str_log = "No OE Integration entity found"
+            else:
+                df = pd.DataFrame(self.get_state(self.bottlecap_entities[direction], attribute=("rates"))).set_index('start')['value_inc_vat']
+                df.index = pd.to_datetime(df.index)
+                df *= 100
+                df=pd.concat([df,self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1])['unit']],axis=1).set_axis(['bottlecap', 'pv_opt'], axis=1)
+                # self.log(df)
+
+                pvopt_price = df['pv_opt'].mean()
+                bottlecap_price = df['bottlecap'].mean()
+                df['delta'] = df['pv_opt'] - df['bottlecap']
+                str_log = f"Average Prices - PV_OPT: {pvopt_price:5.2f} p/kWh  OE Integration: {bottlecap_price:5.2f} p/kWh  Mean difference: {df['delta'].abs().mean():5.2f} p/kWh"
+                self.set_state(entity_id=f"sensor.{self.prefix}_tariff_{direction}_OK", state=round(df['delta'].abs().mean(),2) == 0)
+                if round(df['delta'].abs().mean(),2) > 0:
+                    str_log += " <<< ERROR"
+                    self._status("ERROR: Tariff inconsistency")
+
+            self.log(f"  {direction.title()}: {str_log}")
 
 # %%
