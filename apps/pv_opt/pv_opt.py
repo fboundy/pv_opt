@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.9.0"
+VERSION = "4.0.0-alpha-1"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -308,8 +308,9 @@ class PVOpt(hass.Hass):
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self.device_name = self.args.pop("device_name", "solis")
-        self.redact = self.args.pop("redact_personal_data_from_log", True)
+        self.inverter_sn = self.args.pop("inverter_sn", "")
 
+        self.redact = self.args.pop("redact_personal_data_from_log", True)
         self._load_inverter()
 
         self.change_items = {}
@@ -420,6 +421,8 @@ class PVOpt(hass.Hass):
             self.inverter = InverterController(
                 inverter_type=self.inverter_type, host=self
             )
+            self.log(f"  Device name:   {self.device_name}")
+            self.log(f"  Serial number: {self.inverter_sn}")
 
         else:
             e = f"Inverter type {self.inverter_type} is not yet supported. Only read-only mode with explicit config from the YAML will work."

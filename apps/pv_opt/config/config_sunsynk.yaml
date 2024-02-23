@@ -13,6 +13,7 @@ pv_opt:
   dependencies:
     - pvpy
     - solis
+    - sunsynk
 
   log: pv_opt_log
   prefix: pvopt
@@ -21,10 +22,12 @@ pv_opt:
 
 # User configuration ---  EDIT AWAY! ---
 
-  inverter_type: "SOLIS_SOLAX_MODBUS"
+  # inverter_type: "SOLIS_SOLAX_MODBUS"
+  inverter_type: "SUNSYNK_SOLARSYNC2"
   # inverter_type: "SOLIS_CORE_MODBUS"
   # inverter_type: SOLIS_SOLARMAN
   device_name: solis
+  inverter_sn: "000000"
 
   # If true the current config in HA will be over-written with that in the config.yaml. 
   overwrite_ha_on_restart: true
@@ -189,14 +192,44 @@ pv_opt:
 
   # id_inverter_mode: sensor.{device_name}_storage_control_mode
 
+ # ===============================================================================================================
+  # Brand / Integration Specific Config: SOLIS_SOLAX_MODBUS: https://github.com/wills106/homeassistant-solax-modbus
+  # ===============================================================================================================
+  #
+  #
+  # These are the default entities used with the Solis Solarman integration. You can change them here and over-ride the defaults
 
-# Tariff comparison
-  id_daily_solar: sensor.{device_name}_power_generation_today
-  alt_tariffs:
-    - name: Eco7_Agile
-      octopus_import_tariff_code: E-2R-VAR-22-11-01-G
-      octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+  # battery_voltage: sensor.{device_name}_battery_voltage
+  # maximum_dod_percent: 15
+  # update_cycle_seconds: 60
+  
+  # id_consumption_today: sensor.{device_name}_daily_house_backup_consumption
 
-    - name: Flux
-      octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
-      octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
+  # id_grid_power: sensor.{device_name}_meter_active_power
+  # id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
+  # id_battery_soc: sensor.{device_name}_battery_soc
+  # id_backup_mode_soc: 
+
+  # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
+  # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
+  # id_timed_charge_end_hours: sensor.{device_name}_timed_charge_end_hour
+  # id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
+  # id_timed_charge_current: sensor.{device_name}_timed_charge_current
+
+  # id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
+  # id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute
+  # id_timed_discharge_end_hours: sensor.{device_name}_timed_discharge_end_hour
+  # id_timed_discharge_end_minutes: sensor.{device_name}_timed_discharge_end_minute
+  # id_timed_discharge_current: sensor.{device_name}_timed_discharge_current
+
+  # id_inverter_mode: sensor.{device_name}_storage_control_mode
+  # Tariff comparison
+  # id_daily_solar: sensor.{device_name}_power_generation_today
+  # alt_tariffs:
+  #   - name: Eco7_Agile
+  #     octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+  #     octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+
+  #   - name: Flux
+  #     octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+  #     octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
