@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.9.1"
+VERSION = "3.9.2"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -724,7 +724,8 @@ class PVOpt(hass.Hass):
             raise ValueError(e)
 
         else:
-            # self._check_tariffs()
+            if self.contract.tariffs["export"] is None:
+                self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
 
             self.rlog("")
             self._load_saving_events()
@@ -738,27 +739,28 @@ class PVOpt(hass.Hass):
         self.log("Checking tariff start and end times:")
         self.log("------------------------------------")        
         tariff_error = False
-        for tariff in self.contract.tariffs:
+        for direction in self.contract.tariffs:
         # for imp_exp, t in zip(IMPEXP, [self.contract.imp, self.contract.exp]):
-            t = self.contract.tariffs[tariff]
-            try:
-                z = t.end().strftime(DATE_TIME_FORMAT_LONG)
-                if t.end() < pd.Timestamp.now(tz="UTC"):
-                    z = z + " <<< ERROR: Tariff end datetime in past"
+            tariff = self.contract.tariffs[direction]
+            if tariff is not None:
+                try:
+                    z = tariff.end().strftime(DATE_TIME_FORMAT_LONG)
+                    if tariff.end() < pd.Timestamp.now(tz="UTC"):
+                        z = z + " <<< ERROR: Tariff end datetime in past"
+                        tariff_error = True
+
+                except:
+                    z = "N/A"
+
+                if tariff.start() > pd.Timestamp.now(tz="UTC"):
+                    z = z + " <<< ERROR: Tariff start datetime in future"
                     tariff_error = True
 
-            except:
-                z = "N/A"
-
-            if t.start() > pd.Timestamp.now(tz="UTC"):
-                z = z + " <<< ERROR: Tariff start datetime in future"
-                tariff_error = True
-
-            self.log(
-                f"  {tariff.title()}: {t.name:40s} Start: {t.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
-            )
-            if "AGILE" in t.name:
-                self.agile = True
+                self.log(
+                    f"  {direction.title()}: {tariff.name:40s} Start: {tariff.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
+                )
+                if "AGILE" in tariff.name:
+                    self.agile = True
 
         if self.agile:
             self.log("  AGILE tariff detected. Rates will update at 16:00 daily")
@@ -2255,7 +2257,11 @@ class PVOpt(hass.Hass):
         self.log("-----------------------------------------------------")
         for direction in self.contract.tariffs:
             if self.bottlecap_entities[direction] is None:
-                str_log = "No OE Integration entity found"
+                str_log = "No OE Integration entity found."
+            
+            elif self.contract.tariffs[direction].name == "None":
+                str_log = "No export tariff."
+
             else:
                 df = pd.DataFrame(self.get_state(self.bottlecap_entities[direction], attribute=("rates"))).set_index('start')['value_inc_vat']
                 df.index = pd.to_datetime(df.index)

@@ -17,8 +17,9 @@ class Tariff:
         self,
         name,
         export=False,
-        fixed=None,
-        unit=None,
+        fixed=0,
+        unit=0,
+        valid_from = pd.Timestamp.now(tz="UTC").normalize() - pd.Timedelta(hours=24),
         day=None,
         night=None,
         eco7=False,
@@ -44,10 +45,11 @@ class Tariff:
             self.get_octopus(**kwargs)
 
         else:
-            self.fixed = fixed
-            self.unit = unit
-            self.day = day
-            self.night = night
+            self.fixed = [{'value_inc_vat': fixed, 'valid_from': valid_from}]
+            self.unit =  [{'value_inc_vat': unit, 'valid_from': valid_from}]
+            if eco7:
+                self.day = [{'value_inc_vat': day, 'valid_from': valid_from}]
+                self.night = [{'value_inc_vat': night, 'valid_from': valid_from}]
 
     def _oct_time(self, d):
         # print(d)
@@ -467,7 +469,8 @@ class Contract:
         nc += imp_df["unit"] * grid_imp / 2000
         if kwargs.get("log"):
             self.log(f">>> Export{self.tariffs['export'].to_df(start,end).to_string()}")
-        nc += self.tariffs["export"].to_df(start, end, **kwargs)["unit"] * grid_exp / 2000
+        if self.tariffs["export"] is not None:
+            nc += self.tariffs["export"].to_df(start, end, **kwargs)["unit"] * grid_exp / 2000
 
         return nc
 
@@ -574,22 +577,23 @@ class PVsystemModel:
 
         prices = pd.DataFrame()
         for direction in contract.tariffs:
-            prices = pd.concat(
-                [
-                    prices,
-                    contract.tariffs[direction].to_df(
-                        start=static_flows.index[0], end=static_flows.index[-1]
-                    )["unit"],
-                ],
-                axis=1,
-            )
+            if contract.tariffs[direction] is not None:
+                prices = pd.concat(
+                    [
+                        prices,
+                        contract.tariffs[direction].to_df(
+                            start=static_flows.index[0], end=static_flows.index[-1]
+                        )["unit"],
+                    ],
+                    axis=1,
+                )
 
         if log:
             self.log(
                 f"  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
             )
 
-        prices = prices.set_axis(contract.tariffs.keys(), axis=1)
+        prices = prices.set_axis([t for t in contract.tariffs.keys() if contract.tariffs[t] is not None], axis=1)
 
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
@@ -812,7 +816,12 @@ class PVsystemModel:
             )
 
         slots_added = 999
-        j = 0
+        # Only do the rest if there is an export tariff:
+        if prices['export'].sum() >0:
+            j = 0
+        else:
+            j = max_iters
+
 
         while (slots_added > 0) and (j < max_iters):
             slots_added = 0
