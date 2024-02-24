@@ -671,9 +671,7 @@ class PVsystemModel:
                         done = True
                     if len(x) > 0:
                         min_price = x["import"].min()
-                        # self.log(
-                        #     f">>> {min_price} {x.index[0].strftime(TIME_FORMAT)} - {x.index[-1].strftime(TIME_FORMAT)}"
-                        # )
+
                         window = x[x["import"] == min_price].index
                         start_window = window[0]
 
@@ -817,6 +815,7 @@ class PVsystemModel:
 
         slots_added = 999
         # Only do the rest if there is an export tariff:
+        # self.log(f">>>{prices['export'].sum()}")
         if prices['export'].sum() >0:
             j = 0
         else:
@@ -845,9 +844,6 @@ class PVsystemModel:
                 self.log(
                     f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh."
                 )
-                # self.log(
-                #     f">>> Charger power: {self.inverter.charger_power}. Inverter power: {self.inverter.inverter_power}"
-                # )
 
             i = 0
             available = (
@@ -906,7 +902,6 @@ class PVsystemModel:
                         * factor,
                     )
 
-                    # self.log(f">>> {forced_charge} {factor}")
                     slot = (
                         start_window,
                         forced_charge,

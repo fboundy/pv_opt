@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "3.9.2"
+VERSION = "3.9.3"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -1523,7 +1523,7 @@ class PVOpt(hass.Hass):
                     # Next slot starts before the next optimiser run. This implies we are not currently in
                     # a charge or discharge slot
                     
-                    if len(self.windows > 0):
+                    if len(self.windows) > 0:
                         self.log(
                             f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
                         )
