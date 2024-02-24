@@ -3,7 +3,7 @@ import time
 
 TIMEFORMAT = "%H:%M"
 INVERTER_DEFS = {
-    "SUNSYNK_SOLARSYNC2": {
+    "SUNSYNK_SOLARSYNK2": {
         # "modes": {
         #     1: "Selfuse - No Grid Charging",
         #     3: "Timed Charge/Discharge - No Grid Charging",
@@ -31,10 +31,10 @@ INVERTER_DEFS = {
         # raised
         "default_config": {
             "maximum_dod_percent": "sensor.{device_name}_{inverter sn}_battery_shutdown_cap",
-            "id_battery_soc": " sensor.{device_name}_{inverter sn}_battery_so",
+            "id_battery_soc": " sensor.{device_name}_{inverter sn}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_{inverter sn}_day_load_energy",
             "id_grid_import_today": "sensor.{device_name}_{inverter sn}_day_grid_import",
-            "id_grid_export_today": "sensor.{device_name}_{inverter sn}_day_grid_impor",
+            "id_grid_export_today": "sensor.{device_name}_{inverter sn}_day_grid_import",
             "supports_hold_soc": False,
             "update_cycle_seconds": 300,
         },

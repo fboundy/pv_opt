@@ -20,7 +20,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 #
 USE_TARIFF = True
 
-VERSION = "4.0.0-alpha-1"
+VERSION = "4.0.0-alpha-2"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -53,7 +53,7 @@ CONSUMPTION_SHAPE = {
     "consumption": [300, 200, 150, 500, 500, 750, 750, 300],
 }
 
-INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN"]
+INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN", "SUNSYNK_SOLARSYNK2"]
 
 SYSTEM_ARGS = [
     "module",
