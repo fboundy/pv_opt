@@ -16,8 +16,6 @@ import re
 # import pvpy as pv
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
-# %%
-#
 USE_TARIFF = True
 
 VERSION = "3.9.3"
