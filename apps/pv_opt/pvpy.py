@@ -140,7 +140,7 @@ class Tariff:
                 start = min([pd.Timestamp(x["valid_from"]) for x in self.unit])
 
         if end is None:
-            end = pd.Timestamp.now(tz=start.tzinfo).ceil("30T")
+            end = pd.Timestamp.now(tz=start.tzinfo).ceil("30min")
 
         # self.get_octopus(area=self.area, period_from=start, period_to=end)
 
@@ -158,7 +158,7 @@ class Tariff:
                 index=pd.date_range(
                     min([pd.Timestamp(x["valid_from"]) for x in self.day]),
                     end,
-                    freq="30T",
+                    freq="30min",
                 )
             ).ffill()
             mask = (df.index.time >= self.eco7_start.time()) & (
@@ -215,7 +215,7 @@ class Tariff:
                 len(df) > 1
                 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30
             ) or len(df) == 1:
-                newindex = pd.date_range(df.index[0], end, freq="30T")
+                newindex = pd.date_range(df.index[0], end, freq="30min")
                 df = df.reindex(index=newindex).ffill().loc[start:]
             else:
                 if self.host.debug:
@@ -227,7 +227,7 @@ class Tariff:
                     extended_index = pd.date_range(
                         df.index[-1] + pd.Timedelta(30, "minutes"),
                         df.index[-1] + pd.Timedelta(24, "hours"),
-                        freq="30T",
+                        freq="30min",
                     )
                     dfx = (
                         pd.concat([df, pd.DataFrame(index=extended_index)])
@@ -246,7 +246,7 @@ class Tariff:
                 .sort_index()
             )
             x.index = pd.to_datetime(x.index)
-            newindex = pd.date_range(x.index[0], df.index[-1], freq="30T")
+            newindex = pd.date_range(x.index[0], df.index[-1], freq="30min")
             x = x.reindex(newindex).sort_index()
             x = x.ffill().loc[df.index[0] :]
             df = pd.concat([df, x], axis=1).set_axis(["unit", "fixed"], axis=1)
@@ -313,7 +313,7 @@ class Tariff:
         price.index = price.index.tz_localize("CET")
         price.index = price.index.tz_convert("UTC")
         price = price[~price.index.duplicated()]
-        return price.resample("30T").ffill().loc[start:]
+        return price.resample("30min").ffill().loc[start:]
 
 
 class InverterModel:
@@ -671,9 +671,7 @@ class PVsystemModel:
                         done = True
                     if len(x) > 0:
                         min_price = x["import"].min()
-                        # self.log(
-                        #     f">>> {min_price} {x.index[0].strftime(TIME_FORMAT)} - {x.index[-1].strftime(TIME_FORMAT)}"
-                        # )
+
                         window = x[x["import"] == min_price].index
                         start_window = window[0]
 
@@ -817,6 +815,7 @@ class PVsystemModel:
 
         slots_added = 999
         # Only do the rest if there is an export tariff:
+        # self.log(f">>>{prices['export'].sum()}")
         if prices['export'].sum() >0:
             j = 0
         else:
@@ -845,9 +844,6 @@ class PVsystemModel:
                 self.log(
                     f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh."
                 )
-                # self.log(
-                #     f">>> Charger power: {self.inverter.charger_power}. Inverter power: {self.inverter.inverter_power}"
-                # )
 
             i = 0
             available = (
@@ -906,7 +902,6 @@ class PVsystemModel:
                         * factor,
                     )
 
-                    # self.log(f">>> {forced_charge} {factor}")
                     slot = (
                         start_window,
                         forced_charge,
