@@ -1523,9 +1523,10 @@ class PVOpt(hass.Hass):
                     self.charge_end_datetime - pd.Timestamp.now(self.tz)
                 ).total_seconds() / 60
 
+                # if len(self.windows) > 0:
                 if (time_to_slot_start > 0) and (
                     time_to_slot_start < self.get_config("optimise_frequency_minutes")
-                ):
+                ) and (len(self.windows) > 0):
                     # Next slot starts before the next optimiser run. This implies we are not currently in
                     # a charge or discharge slot
                     
