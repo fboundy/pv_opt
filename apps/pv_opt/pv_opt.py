@@ -271,7 +271,7 @@ class PVOpt(hass.Hass):
             self.log(f">>> Getting {days} days' history for {entity_id}")
             self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
 
-        hist = None:
+        hist = None
 
         i = 0
         while (hist is None) and (i < MAX_HASS_HISTORY_CALLS):
