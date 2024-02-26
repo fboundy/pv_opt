@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "3.9.3"
+VERSION = "3.9.4"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -39,6 +39,7 @@ DEBUG_TRIGGER = "PV_DEBUG"
 HOLD_TOLERANCE = 3
 MAX_ITERS = 10
 MAX_INVERTER_UPDATES = 2
+MAX_HASS_HISTORY_CALLS = 5
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -270,7 +271,14 @@ class PVOpt(hass.Hass):
             self.log(f">>> Getting {days} days' history for {entity_id}")
             self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
 
-        hist = self.get_history(entity_id=entity_id, days=days)
+        hist = None
+
+        i = 0
+        while (hist is None) and (i < MAX_HASS_HISTORY_CALLS):
+            hist = self.get_history(entity_id=entity_id, days=days)
+            if hist is None:
+                time.sleep(1)
+            i += 1
 
         if (hist is not None) and (len(hist) >0):
             df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
@@ -1515,9 +1523,10 @@ class PVOpt(hass.Hass):
                     self.charge_end_datetime - pd.Timestamp.now(self.tz)
                 ).total_seconds() / 60
 
+                # if len(self.windows) > 0:
                 if (time_to_slot_start > 0) and (
                     time_to_slot_start < self.get_config("optimise_frequency_minutes")
-                ):
+                ) and (len(self.windows) > 0):
                     # Next slot starts before the next optimiser run. This implies we are not currently in
                     # a charge or discharge slot
                     
@@ -2019,16 +2028,18 @@ class PVOpt(hass.Hass):
             log=log,
         )
 
-        df.index = pd.to_datetime(df.index)
-        df = pd.to_numeric(df, errors="coerce")
-        df = (
-            df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30T")
-        ).ffill().fillna(0).diff(-1) * 2000
-        df = df.fillna(0)
-        if start is not None:
-            df = df.loc[start:]
-        if end is not None:
-            df = df.loc[:end]
+        if df is not None:
+            df.index = pd.to_datetime(df.index)
+            df = pd.to_numeric(df, errors="coerce")
+            df = (
+                df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30T")
+            ).ffill().fillna(0).diff(-1) * 2000
+            df = df.fillna(0)
+            if start is not None:
+                df = df.loc[start:]
+            if end is not None:
+                df = df.loc[:end]
+
         return df
 
     def load_consumption(self, start, end):
@@ -2245,8 +2256,10 @@ class PVOpt(hass.Hass):
 
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
         df = self.hass2df(entity_id, days=days).astype(float).resample("30T").ffill()
-        df.index = pd.to_datetime(df.index)
-        df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
+        if df is not None:
+            df.index = pd.to_datetime(df.index)
+            df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
+
         return df
 
     def _check_tariffs_vs_bottlecap(self):

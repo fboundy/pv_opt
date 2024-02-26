@@ -186,11 +186,12 @@ class Tariff:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
                         self.day_ahead = self.get_day_ahead(df.index[0])
-                        self.day_ahead = self.day_ahead.sort_index()
-                        self.log("")
-                        self.log(
-                            f"Retrieved day ahead forecast for period {self.day_ahead.index[0].strftime(TIME_FORMAT)} - {self.day_ahead.index[-1].strftime(TIME_FORMAT)} for tariff {self.name}"
-                        )
+                        if self.day_ahead is not None:
+                            self.day_ahead = self.day_ahead.sort_index()
+                            self.log("")
+                            self.log(
+                                f"Retrieved day ahead forecast for period {self.day_ahead.index[0].strftime(TIME_FORMAT)} - {self.day_ahead.index[-1].strftime(TIME_FORMAT)} for tariff {self.name}"
+                            )
 
                     if self.day_ahead is not None:
                         mask = (self.day_ahead.index.hour >= 16) & (
