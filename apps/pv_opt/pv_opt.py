@@ -1408,7 +1408,7 @@ class PVOpt(hass.Hass):
         self.static = pd.concat([solcast, consumption], axis=1)
         self.time_now = pd.Timestamp.utcnow()
 
-        self.static = self.static[self.time_now.floor("30T") :].fillna(0)
+        self.static = self.static[self.time_now.floor("30min") :].fillna(0)
         # self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
@@ -1975,7 +1975,7 @@ class PVOpt(hass.Hass):
 
         for offset in [1, 4, 8, 12]:
             loc = pd.Timestamp.now(tz="UTC") + pd.Timedelta(offset, "hours")
-            locs = [loc.floor("30T"), loc.ceil("30T")]
+            locs = [loc.floor("30min"), loc.ceil("30min")]
             socs = [self.opt.loc[l]["soc"] for l in locs]
             soc = (loc - locs[0]) / (locs[1] - locs[0]) * (socs[1] - socs[0]) + socs[0]
             entity_id = f"sensor.{self.prefix}_soc_h{offset}"
@@ -2040,7 +2040,7 @@ class PVOpt(hass.Hass):
             df.index = pd.to_datetime(df.index)
             df = pd.to_numeric(df, errors="coerce")
             df = (
-                df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30T")
+                df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30min")
             ).ffill().fillna(0).diff(-1) * 2000
             df = df.fillna(0)
             if start is not None:
@@ -2176,7 +2176,7 @@ class PVOpt(hass.Hass):
         initial_soc = (
             self.hass2df(self.config["id_battery_soc"], days=2, log=self.debug)
             .astype(float)
-            .resample("30T")
+            .resample("30min")
             .mean()
         ).loc[start]
 
@@ -2263,7 +2263,7 @@ class PVOpt(hass.Hass):
         )
 
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
-        df = self.hass2df(entity_id, days=days).astype(float).resample("30T").ffill()
+        df = self.hass2df(entity_id, days=days).astype(float).resample("30min").ffill()
         if df is not None:
             df.index = pd.to_datetime(df.index)
             df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
