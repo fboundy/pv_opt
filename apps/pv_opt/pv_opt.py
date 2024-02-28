@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "3.9.4"
+VERSION = "3.9.5"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -582,6 +582,10 @@ class PVOpt(hass.Hass):
 
         i = 0
         n = 5
+
+        old_contract = self.contract
+        self.contract = None
+
         while self.contract is None and i < n:
             if self.get_config("octopus_auto"):
                 try:
@@ -727,7 +731,11 @@ class PVOpt(hass.Hass):
         if self.contract is None:
             e = f"Failed to load contract in {n} attempts. FATAL ERROR"
             self.rlog(e)
-            raise ValueError(e)
+            if old_contract is None:
+                raise ValueError(e)
+            else:
+                self.log("Reverting to previous contract", level="ERROR")            
+                self.contract = old_contract
 
         else:
             if self.contract.tariffs["export"] is None:
