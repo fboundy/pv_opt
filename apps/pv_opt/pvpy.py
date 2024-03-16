@@ -8,8 +8,6 @@ from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 TIME_FORMAT = "%d/%m %H:%M"
-COST_DELTA_THRESHOLD = -4.0
-COST_DELTA_THRESHOLD_SLOT = -1.0
 
 
 class Tariff:
@@ -986,17 +984,13 @@ class PVsystemModel:
 
                 cost_delta = net_cost_opt - net_cost_pre
                 str_log = f"Discharge net cost delta:{(-cost_delta):5.1f}p"
-                if cost_delta > -self.host.get_config("pass_threshold_p"):
+                if cost_delta > -self.host.get_config("discharge_threshold_p"):
                     slots = slots_pre
                     slots_added = slots_added_pre
-                    str_log += (
-                        f": < Pass threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots excluded"
-                    )
+                    str_log += f": < Discharge threshold ({self.host.get_config('discharge_threshold_p'):0.1f}p) => Slots excluded"
                     net_cost_opt = net_cost_pre
                 else:
-                    str_log += (
-                        f": > Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots included"
-                    )
+                    str_log += f": > Discharge Threshold ({self.host.get_config('discharge_threshold_p'):0.1f}p) => Slots included"
 
                 if log:
                     self.log("")

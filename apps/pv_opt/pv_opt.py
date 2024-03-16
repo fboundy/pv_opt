@@ -124,6 +124,16 @@ DEFAULT_CONFIG = {
         },
         "domain": "number",
     },
+    "discharge_threshold_p": {
+        "default": 5.0,
+        "attributes": {
+            "min": 0.0,
+            "max": 1000.0,
+            "step": 5,
+            "mode": "box",
+        },
+        "domain": "number",
+    },
     "octopus_auto": {"default": True, "domain": "switch"},
     "battery_capacity_wh": {
         "default": 10000,
