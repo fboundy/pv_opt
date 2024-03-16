@@ -791,7 +791,7 @@ class PVOpt(hass.Hass):
                 if (state in ["unknown", "unavailable"]) and (entity_id[:6] != "button"):
                     e = f"HA returned {state} for state of {entity_id}"
                     self._status(f"ERROR: {e}")
-                    raise ValueError(e)
+                    self.log(e, level="ERROR")
                 # if the state is 'on' or 'off' then it's a bool
                 elif state.lower() in ["on", "off", "true", "false"]:
                     value = state.lower() in ["on", "true"]
