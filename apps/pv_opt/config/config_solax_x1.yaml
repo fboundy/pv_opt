@@ -1,0 +1,115 @@
+# Internal configuration --- DO NOT EDIT ---
+pvpy:
+  module: pvpy
+  global: true
+
+inverters:
+  module: inverters
+  global: true
+
+pv_opt:
+  module: pv_opt
+  class: PVOpt
+  dependencies:
+    - pvpy
+    - solis
+    - sunsynk
+    - solax
+
+  log: pv_opt_log
+  prefix: pvopt
+  # debug: True
+
+
+# User configuration ---  EDIT AWAY! ---
+
+  inverter_type: "SOLAX_X1"
+  device_name: solax
+  # inverter_sn: "000000"  # enter {sunsynk_serial} from solarsynk2 addon
+
+  # If true the current config in HA will be over-written with that in the config.yaml. 
+  overwrite_ha_on_restart: true
+  # redact_personal_data_from_log: false
+
+  consumption_history_days: 7
+
+  # ========================================
+  # Plant parameters
+  # ========================================
+
+  # All parameters can be a number or point to an entity UNLESS they start with 'id_'. All of
+  # these are required but will be defaulted if not specified
+
+  # battery_capacity_wh: 10000
+  # inverter_efficiency_percent: 97 # Default: 97
+  # charger_efficiency_percent: 91 # Default: 91
+  # maximum_dod_percent: 15
+  # charger_power_watts: 3500
+  # inverter_power_watts: 3600
+  # inverter_loss_watts: 100
+  
+  # ========================================
+  # Solcast configuration
+  # ========================================
+  #
+  # id_solcast_today: sensor.solcast_pv_forecast_forecast_today
+  # id_solcast_tomorrow: sensor.solcast_pv_forecast_forecast_tomorrow
+
+  # ========================================
+  # Solar and consumption forecast parameters
+  # ========================================
+  #
+  # Valid options are:
+  #
+  # Solcast         - the Solcast mid-case forecast [Default]
+  # Solcast_p90     - the Solcast high estimate
+  # Solcast_p10     - the Solcast high estimate
+  #
+  # Set this using an "input_select" helper and it can be varied on the fly
+
+  # solar_forecast:
+  # - input_select.solar_forecast_source
+  
+  # # consumption estimation
+  # use_consumption_history: true
+  # consumption_history_days:
+  #   - 7
+  # consumption_margin:
+  #   - input_number.solar_opt_consumption_margin
+  # daily_consumption_kwh: 17
+  # shape_consumption_profile: true
+  # ========================================
+  # Octopus account parameters
+  # ========================================
+
+  # octopus_auto: False # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+
+  # octopus_account: !secret octopus_account
+  # octopus_api_key: !secret octopus_api_key
+
+  # The following Can be omitted if either of the above options is working correctly:
+
+  # octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+  # octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+
+  # octopus_import_tariff_code: E-1R-AGILE-FLEX-22-11-25-G 
+  # octopus_export_tariff_code: E-1R-OUTGOING-LITE-FIX-12M-23-09-12-G
+
+  # octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+  # octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
+  
+
+  # ===============================================================================================================
+  # Brand / Integration Specific Config: SUNSYNK_SOLARSYNK2: 
+  # ===============================================================================================================
+  #
+  #
+  # These are the default entities used with the Sunsynk Solarsynk2 integration. You can change them here and over-ride the defaults
+
+  "maximum_dod_percent":  "number.{device_name}_battery_minimum_capacity"
+  "id_battery_soc": " sensor.{device_name}_battery_capacity"
+  "id_consumption": "sensor.{device_name}_house_load"
+  "id_grid_import_today": "sensor.{device_name}_today_s_import_energy"
+  "id_grid_export_today": "sensor.{device_name}_today_s_export_energy"
+  "supports_hold_soc": false
+  "update_cycle_seconds": 300
