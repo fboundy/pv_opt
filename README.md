@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.9.5
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.10.0
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -325,7 +325,8 @@ These parameters will tweak how PV Opt runs:
 
 | Parameter | Units | Entity | Default | Description |
 |:--|:--:| :-- | :--:|:--|
-| Pass threshold | % | `number.pvopt_pass_throshold_p` | 4p | The incremental cost saving that each iteration of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
+| Pass threshold | % | `number.pvopt_pass_throshold_p` | 4p | The incremental cost saving that each iteration of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge windows. |
+| Discharge threshold | % | `number.pvopt_discharge_throshold_p` | 5p | The incremental cost saving that each iteration of the discharge optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal discharge windows. |
 | Slot threshold | % | `number.pvopt_slop_throshold_p` | 1p | The incremental cost saving that each 30 minute slot of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
 | Power Resolution | W | `number.pvopt_forced_power_group_tolerance` | 100 | The resolution at which forced charging / discharging is reported. Changing this will change the reporting of the charge plan but not the actual detail of it. |
 
