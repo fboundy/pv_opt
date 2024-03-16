@@ -380,8 +380,12 @@ class PVOpt(hass.Hass):
 
     def rlog(self, str, **kwargs):
         if self.redact:
+            patterns = REDACT_REGEX
+            if self.inverter_sn is not None:
+                patterns.append(self.inverter_sn)
+
             try:
-                for pattern in REDACT_REGEX:
+                for pattern in patterns:
                     x = re.search(pattern, str)
                     if x:
                         str = re.sub(pattern, "*" * len(x.group()), str)
