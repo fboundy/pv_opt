@@ -20,17 +20,15 @@ pv_opt:
 
 
 # User configuration ---  EDIT AWAY! ---
+  # ========================================
+  # System parameters
+  # ========================================
 
-  inverter_type: "SOLIS_SOLAX_MODBUS"
-  # inverter_type: "SOLIS_CORE_MODBUS"
-  # inverter_type: SOLIS_SOLARMAN
-  device_name: solis
 
   # If true the current config in HA will be over-written with that in the config.yaml. 
   overwrite_ha_on_restart: true
   # redact_personal_data_from_log: false
 
-  consumption_history_days: 7
   read_only: false
 
   # ========================================
@@ -72,8 +70,7 @@ pv_opt:
   
   # # consumption estimation
   # use_consumption_history: true
-  # consumption_history_days:
-  #   - 7
+  # consumption_history_days: 7
   # consumption_margin:
   #   - input_number.solar_opt_consumption_margin
   # daily_consumption_kwh: 17
@@ -105,6 +102,9 @@ pv_opt:
   #
   # These are the default entities used with the Solis Solax Modbus integration. You can change them here and over-ride the defaults
 
+  # inverter_type: SOLIS_SOLAX_MODBUS
+  # device_name: solis
+  
   # battery_voltage: sensor.{device_name}_battery_voltage
   # update_cycle_seconds: 15
   # maximum_dod_percent: number.{device_name}_battery_minimum_soc 
@@ -135,6 +135,9 @@ pv_opt:
   #
   # These are the default entities used with the Solis Core Modbus integration. You can change them here and over-ride the defaults
 
+  # inverter_type: SOLIS_CORE_MODBUS
+  # device_name: solis
+  
   # modbus_hub: "{device_name}"
   # modbus_slave: 1
   # battery_voltage: sensor.{device_name}_battery_voltage
@@ -166,6 +169,9 @@ pv_opt:
   #
   # These are the default entities used with the Solis Solarman integration. You can change them here and over-ride the defaults
 
+  # inverter_type: SOLIS_SOLARMAN
+  # device_name: solis
+
   # battery_voltage: sensor.{device_name}_battery_voltage
   # maximum_dod_percent: 15
   # update_cycle_seconds: 60
@@ -192,13 +198,42 @@ pv_opt:
   # id_inverter_mode: sensor.{device_name}_storage_control_mode
 
 
-# Tariff comparison
-  id_daily_solar: sensor.{device_name}_power_generation_today
-  alt_tariffs:
-    - name: Eco7_Agile
-      octopus_import_tariff_code: E-2R-VAR-22-11-01-G
-      octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+  # ===============================================================================================================
+  # Brand / Integration Specific Config: SOLAX_X1: 
+  # ===============================================================================================================
+  #
+  #
+  # These are the default entities used with the Sunsynk Solarsynk2 integration. You can change them here and over-ride the defaults
 
-    - name: Flux
-      octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
-      octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
+  # inverter_type: "SOLAX_X1"  
+  # device_name: solax
+
+  # "maximum_dod_percent":  "number.{device_name}_battery_minimum_capacity"
+  # "id_battery_soc": " sensor.{device_name}_battery_capacity"
+  # "id_consumption": "sensor.{device_name}_house_load"
+  # "id_grid_import_today": "sensor.{device_name}_today_s_import_energy"
+  # "id_grid_export_today": "sensor.{device_name}_today_s_export_energy"
+  # "supports_hold_soc": false
+  # "update_cycle_seconds": 300
+
+
+  # ===============================================================================================================
+  # Brand / Integration Specific Config: SUNSYNK_SOLARSYNK2: 
+  # ===============================================================================================================
+  #
+  #
+  # These are the default entities used with the Sunsynk Solarsynk2 integration. You can change them here and over-ride the defaults
+
+  # inverter_type: "SUNSYNK_SOLARSYNK2"
+  # device_name: solarsynk
+  # inverter_sn: "000000"  # enter {sunsynk_serial} from solarsynk2 addon
+
+  # "maximum_dod_percent":  "sensor.{device_name}_{inverter_sn}_battery_shutdown_cap"
+  # "id_battery_soc": " sensor.{device_name}_{inverter_sn}_battery_soc"
+  # "id_consumption_today": "sensor.{device_name}_{inverter_sn}_day_load_energy"
+  # "id_grid_import_today": "sensor.{device_name}_{inverter_sn}_day_grid_import"
+  # "id_grid_export_today": "sensor.{device_name}_{inverter_sn}_day_grid_import"
+  # "supports_hold_soc": false
+  # "update_cycle_seconds": 300
+
+

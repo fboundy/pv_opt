@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "4.0.0-alpha-4"
+VERSION = "4.0.0-alpha-5"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -27,7 +27,9 @@ TIME_FORMAT = "%H:%M"
 
 REDACT_REGEX = [
     "[0-9]{2}m[0-9]{7}_[0-9]{13}",  # Serial_MPAN
+    "[0-9]{2}e[0-9]{7}_[0-9]{13}",  # Serial_MPAN
     "[0-9]{2}m[0-9]{7}",  # Serial
+    "[0-9]{2}e[0-9]{7}",  # Serial
     "^$|\d{13}$",  # MPAN
     "a_[0-f]{8}",  # Account Number
     "A-[0-f]{8}",  # Account Number
@@ -320,11 +322,15 @@ class PVOpt(hass.Hass):
         self.mqtt = self.get_plugin_api("MQTT")
         self._load_tz()
         self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
+        self.redact_patterns = REDACT_REGEX
 
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self.device_name = self.args.pop("device_name", "solis")
+
         self.inverter_sn = self.args.pop("inverter_sn", "")
+        if self.inverter_sn != "":
+            self.redact_patterns.append(self.inverter_sn)
 
         self.redact = self.args.pop("redact_personal_data_from_log", True)
         self._load_inverter()
@@ -335,8 +341,11 @@ class PVOpt(hass.Hass):
         self.handles = {}
         self.mqtt_handles = {}
 
+        self.mpans = []
+
         self.saving_events = {}
         self.contract = None
+
         self.bottlecap_entities = {"import": None, "export": None}
 
         # Load arguments from the YAML file
@@ -380,12 +389,8 @@ class PVOpt(hass.Hass):
 
     def rlog(self, str, **kwargs):
         if self.redact:
-            patterns = REDACT_REGEX
-            if self.inverter_sn is not None:
-                patterns.append(self.inverter_sn)
-
             try:
-                for pattern in patterns:
+                for pattern in self.redact_patterns:
                     x = re.search(pattern, str)
                     if x:
                         str = re.sub(pattern, "*" * len(x.group()), str)
