@@ -203,18 +203,18 @@ pv_opt:
   # ===============================================================================================================
   #
   #
-  # These are the default entities used with the Sunsynk Solarsynk2 integration. You can change them here and over-ride the defaults
+  # These are the default entities used with the Solax X1integration. You can change them here and over-ride the defaults
 
-  # inverter_type: "SOLAX_X1"  
+  # inverter_type: SOLAX_X1  
   # device_name: solax
 
-  # "maximum_dod_percent":  "number.{device_name}_battery_minimum_capacity"
-  # "id_battery_soc": " sensor.{device_name}_battery_capacity"
-  # "id_consumption": "sensor.{device_name}_house_load"
-  # "id_grid_import_today": "sensor.{device_name}_today_s_import_energy"
-  # "id_grid_export_today": "sensor.{device_name}_today_s_export_energy"
-  # "supports_hold_soc": false
-  # "update_cycle_seconds": 300
+  # maximum_dod_percent:  number.{device_name}_battery_minimum_capacity
+  # id_battery_soc:  sensor.{device_name}_battery_capacity
+  # id_consumption: sensor.{device_name}_house_load
+  # id_grid_import_today: sensor.{device_name}_today_s_import_energy
+  # id_grid_export_today: sensor.{device_name}_today_s_export_energy
+  # supports_hold_soc: false
+  # update_cycle_seconds: 300
 
 
   # ===============================================================================================================
@@ -224,16 +224,16 @@ pv_opt:
   #
   # These are the default entities used with the Sunsynk Solarsynk2 integration. You can change them here and over-ride the defaults
 
-  # inverter_type: "SUNSYNK_SOLARSYNK2"
+  # inverter_type: SUNSYNK_SOLARSYNK2
   # device_name: solarsynk
-  # inverter_sn: "000000"  # enter {sunsynk_serial} from solarsynk2 addon
+  # inverter_sn: 000000  # enter {sunsynk_serial} from solarsynk2 addon
 
-  # "maximum_dod_percent":  "sensor.{device_name}_{inverter_sn}_battery_shutdown_cap"
-  # "id_battery_soc": " sensor.{device_name}_{inverter_sn}_battery_soc"
-  # "id_consumption_today": "sensor.{device_name}_{inverter_sn}_day_load_energy"
-  # "id_grid_import_today": "sensor.{device_name}_{inverter_sn}_day_grid_import"
-  # "id_grid_export_today": "sensor.{device_name}_{inverter_sn}_day_grid_import"
-  # "supports_hold_soc": false
-  # "update_cycle_seconds": 300
+  # maximum_dod_percent:  sensor.{device_name}_{inverter_sn}_battery_shutdown_cap
+  # id_battery_soc:  sensor.{device_name}_{inverter_sn}_battery_soc
+  # id_consumption_today: sensor.{device_name}_{inverter_sn}_day_load_energy
+  # id_grid_import_today: sensor.{device_name}_{inverter_sn}_day_grid_import
+  # id_grid_export_today: sensor.{device_name}_{inverter_sn}_day_grid_import
+  # supports_hold_soc: false
+  # update_cycle_seconds: 300
 
 
