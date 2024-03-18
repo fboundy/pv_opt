@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "3.10.0"
+VERSION = "3.11.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -90,6 +90,16 @@ DEFAULT_CONFIG = {
             "min": 5,
             "max": 30,
             "step": 5,
+            "mode": "slider",
+        },
+        "domain": "number",
+    },
+    "solcast_confidence_level": {
+        "default": 50,
+        "attributes": {
+            "min": 10,
+            "max": 90,
+            "step": 10,
             "mode": "slider",
         },
         "domain": "number",
@@ -207,7 +217,7 @@ DEFAULT_CONFIG = {
     },
     "solar_forecast": {
         "default": "Solcast",
-        "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90"]},
+        "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90", "Weighted"]},
         "domain": "select",
     },
     "id_solcast_today": {"default": "sensor.solcast_pv_forecast_forecast_today"},
@@ -1294,6 +1304,7 @@ class PVOpt(hass.Hass):
 
         # Load Solcast
         solcast = self.load_solcast()
+
         if solcast is None:
             self.log("")
             self.log("Unable to optimise without Solcast data.", level="ERROR")
@@ -1356,7 +1367,8 @@ class PVOpt(hass.Hass):
         self.base = self.pv_system.flows(
             self.initial_soc,
             self.static,
-            solar=self.get_config("solar_forecast"),
+            # solar="self.get_config("solar_forecast")",
+            solar="weighted",
         )
 
         if len(self.base) == 0:
@@ -1378,7 +1390,8 @@ class PVOpt(hass.Hass):
             self.initial_soc,
             self.static,
             self.contract,
-            solar=self.get_config("solar_forecast"),
+            # solar="self.get_config("solar_forecast")",
+            solar="weighted",
             discharge=self.get_config("forced_discharge"),
             max_iters=MAX_ITERS,
         )
@@ -1885,6 +1898,17 @@ class PVOpt(hass.Hass):
             df = df.set_index("period_start")
             df.index = pd.to_datetime(df.index, utc=True)
             df = df.set_axis(["Solcast", "Solcast_p10", "Solcast_p90"], axis=1)
+
+            confidence_level = self.get_config("solcast_confidence_level")
+            weighting = {
+                "Solcast_p10": max(50 - confidence_level, 0) / 40,
+                "Solcast": 1 - abs(confidence_level - 50) / 40,
+                "Solcast_p90": max(confidence_level - 50, 0) / 40,
+            }
+
+            df["weighted"] = 0
+            for w in weighting:
+                df["weighted"] += df[w] * weighting[w]
 
             df *= 1000
             df = df.fillna(0)
