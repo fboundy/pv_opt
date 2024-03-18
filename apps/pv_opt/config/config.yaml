@@ -3,6 +3,10 @@ pvpy:
   module: pvpy
   global: true
 
+solis:
+  module: solis
+  global: true
+
 inverters:
   module: inverters
   global: true
