@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "3.11.0"
+VERSION = "3.12.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -80,10 +80,10 @@ MQTT_CONFIGS = {
 }
 
 DEFAULT_CONFIG = {
-    "forced_charge": {"default": True, "domain": "switch"},
     "forced_discharge": {"default": True, "domain": "switch"},
     "read_only": {"default": True, "domain": "switch"},
     "allow_cyclic": {"default": False, "domain": "switch"},
+    "use_solar": {"default": True, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
         "attributes": {
@@ -376,11 +376,10 @@ class PVOpt(hass.Hass):
         if not self.get_config("read_only"):
             self.inverter.enable_timed_mode()
 
-        if self.get_config("forced_charge"):
-            self.log("")
-            self.log("Running initial Optimisation:")
-            self.optimise()
-            self._setup_schedule()
+        self.log("")
+        self.log("Running initial Optimisation:")
+        self.optimise()
+        self._setup_schedule()
 
         if self.debug:
             self.log(f"PV Opt Initialisation complete. Listen_state Handles:")
@@ -525,7 +524,7 @@ class PVOpt(hass.Hass):
         elif pd.Timestamp.now(tz="UTC").hour == 0:
             self._load_contract()
 
-    def get_config(self, item):
+    def get_config(self, item, default=None):
         if item in self.config_state:
             return self._value_from_state(self.config_state[item])
 
@@ -545,24 +544,19 @@ class PVOpt(hass.Hass):
                     return self.config[item]
             else:
                 return self.config[item]
+        else:
+            return default
 
     def _setup_schedule(self):
-        if self.get_config("forced_charge"):
-            start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}T").to_pydatetime()
-            self.timer_handle = self.run_every(
-                self.optimise_time,
-                start=start_opt,
-                interval=self.get_config("optimise_frequency_minutes") * 60,
-            )
-            self.log(
-                f"Optimiser will run every {self.get_config('optimise_frequency_minutes')} minutes from {start_opt.strftime('%H:%M')} or on {EVENT_TRIGGER} Event"
-            )
-
-        else:
-            if self.timer_handle and self.timer_running(self.timer_handle):
-                self.cancel_timer(self.timer_handle)
-                self.log("Optimer Schedule Disabled")
-                self._status("Disabled")
+        start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}T").to_pydatetime()
+        self.timer_handle = self.run_every(
+            self.optimise_time,
+            start=start_opt,
+            interval=self.get_config("optimise_frequency_minutes") * 60,
+        )
+        self.log(
+            f"Optimiser will run every {self.get_config('optimise_frequency_minutes')} minutes from {start_opt.strftime('%H:%M')} or on {EVENT_TRIGGER} Event"
+        )
 
     def _load_contract(self):
         self.rlog("")
@@ -1877,6 +1871,13 @@ class PVOpt(hass.Hass):
             self.write_to_hass(entity=entity_id, state=soc, attributes=attributes)
 
     def load_solcast(self):
+        if not self.get_config("use_solar", True):
+            df = pd.DataFrame(
+                index=pd.date_range(pd.Timestamp.now(tz="UTC").normalize(), periods=96, freq="30min"),
+                data={"Solcast": 0, "Solcast_p10": 0, "Solcast_p90": 0, "weighted": 0},
+            )
+            return df
+
         if self.debug:
             self.log("Getting Solcast data")
         try:
