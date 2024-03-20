@@ -36,6 +36,7 @@ pv_opt:
 
   consumption_history_days: 7
   read_only: false
+  debug: false
 
   # ========================================
   # Plant parameters
