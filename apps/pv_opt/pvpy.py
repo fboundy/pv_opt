@@ -269,10 +269,10 @@ class Tariff:
                         if i["CombinedName"] == "CET/CEST time":
                             if len(i["Value"]) > 10:
                                 time = f"T{i['Value'][:2]}:00"
-                                print(time)
+                                # print(time)
                         else:
                             if len(i["Name"]) > 8:
-                                print(i["Name"])
+                                # print(i["Name"])
                                 data.append(float(i["Value"].replace(",", ".")))
                                 index.append(
                                     pd.Timestamp(
@@ -804,9 +804,13 @@ class PVsystemModel:
             done = available.sum() == 0
 
             while not done:
-                x = df[available][df["import"] < max_export_price][df["forced"] < self.inverter.charger_power][
-                    df["forced"] >= 0
-                ].copy()
+                x = (
+                    df.loc[available]
+                    .loc[df["import"] < max_export_price]
+                    .loc[df["forced"] < self.inverter.charger_power]
+                    .loc[df["forced"] >= 0]
+                    .copy()
+                )
                 i += 1
                 done = i > a0
 

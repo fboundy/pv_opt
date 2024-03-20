@@ -548,7 +548,7 @@ class PVOpt(hass.Hass):
 
     def _setup_schedule(self):
         if self.get_config("forced_charge"):
-            start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}T").to_pydatetime()
+            start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}min").to_pydatetime()
             self.timer_handle = self.run_every(
                 self.optimise_time,
                 start=start_opt,
@@ -1244,8 +1244,8 @@ class PVOpt(hass.Hass):
                 value = state == "on"
 
         if value is None:
-            time_value = pd.to_datetime(state, errors="ignore", format="%H:%M")
-            if time_value != state:
+            time_value = pd.to_datetime(state, errors="coerce", format="%H:%M")
+            if time_value != pd.NaT:
                 value = state
 
         if value is None:
@@ -1681,8 +1681,8 @@ class PVOpt(hass.Hass):
             self.windows["hold_soc"] = ""
             if self.config["supports_hold_soc"]:
                 self.log("Checking for Hold SOC slots")
-                self.windows["hold_soc"].loc[
-                    (self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE
+                self.windows.loc[
+                    (self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE, "hold_soc"
                 ] = "<="
 
             self.log("")
