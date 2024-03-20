@@ -9,8 +9,9 @@ INVERTER_DEFS = {
             "Self-Use - No Grid Charging": 1,
             "Timed Charge/Discharge - No Grid Charging": 3,
             "Backup/Reserve - No Grid Charging": 17,
-            "Self-Use": 33,
             "SelfUse": 33,
+            "Self-Use - No Timed Charge/Discharge": 33,
+            "Self-Use": 35,
             "Timed Charge/Discharge": 35,
             "Off-Grid Mode": 37,
             "Battery Awaken": 41,
@@ -426,10 +427,13 @@ class InverterController:
             status = self._solis_core_mode_switch()
 
         switches = status["switches"]
+        if self.host.debug:
+            self.log(f">>> kwargs: {kwargs}")
+            self.log(">>> Solis switch status:")
+
         for switch in switches:
             if switch in kwargs:
                 if self.host.debug:
-                    self.log("Solis switch status:")
                     self.log(f">>> {switch}: {kwargs[switch]}")
                 switches[switch] = kwargs[switch]
 
@@ -443,6 +447,12 @@ class InverterController:
             modes = {INVERTER_DEFS[self.type]["codes"].get(mode): mode for mode in entity_modes}
             # mode = INVERTER_DEFS[self.type]["modes"].get(code)
             mode = modes.get(code)
+            if self.host.debug:
+                self.log(f">>> Inverter Code: {code}")
+                self.log(f">>> Entity modes: {entity_modes}")
+                self.log(f">>> Modes: {modes}")
+                self.log(f">>> Inverter Mode: {mode}")
+
             if mode is not None:
                 if self.host.get_state(entity_id=entity_id) != mode:
                     self.host.call_service("select/select_option", entity_id=entity_id, option=mode)
@@ -459,6 +469,9 @@ class InverterController:
         else:
             modes = INVERTER_DEFS[self.type]["modes"]
             code = {modes[m]: m for m in modes}[inverter_mode]
+        if self.host.debug:
+            self.log(f">>> Inverter Mode: {inverter_mode}")
+            self.log(f">>> Inverter Code: {code}")
 
         bits = INVERTER_DEFS[self.type]["bits"]
         switches = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
