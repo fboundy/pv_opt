@@ -283,7 +283,7 @@ class InverterController:
         if diff > tolerance:
             changed = True
             try:
-                self.host.call_service("number/set_value", entity_id=entity_id, value=value)
+                self.host.call_service("number/set_value", entity_id=entity_id, value=str(value))
 
                 time.sleep(0.5)
                 new_state = float(self.host.get_state(entity_id=entity_id))
@@ -316,7 +316,7 @@ class InverterController:
         power = kwargs.get("power")
 
         if times["start"] is not None:
-            times["start"] = times["start"].floor("1T")
+            times["start"] = times["start"].floor("1min")
 
         if not enable:
             self.log(f"Disabling inverter timed {direction}")
