@@ -1238,8 +1238,8 @@ class PVOpt(hass.Hass):
                 value = state == "on"
 
         if value is None:
-            time_value = pd.to_datetime(state, errors="ignore", format="%H:%M")
-            if time_value != state:
+            time_value = pd.to_datetime(state, errors="coerce", format="%H:%M")
+            if time_value != pd.NaT:
                 value = state
 
         if value is None:
@@ -1675,8 +1675,10 @@ class PVOpt(hass.Hass):
             self.windows["hold_soc"] = ""
             if self.config["supports_hold_soc"]:
                 self.log("Checking for Hold SOC slots")
-                self.windows["hold_soc"].loc[
-                    (self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE
+                self.windows.loc[
+                    ((self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE)
+                    & (self.windows["soc"] > self.get_config("maximum_dod_percent")),
+                    "hold_soc",
                 ] = "<="
 
             self.log("")
