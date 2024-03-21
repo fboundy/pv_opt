@@ -1682,7 +1682,9 @@ class PVOpt(hass.Hass):
             if self.config["supports_hold_soc"]:
                 self.log("Checking for Hold SOC slots")
                 self.windows.loc[
-                    (self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE, "hold_soc"
+                    ((self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE)
+                    & (self.windows["soc"] > self.get_config("maximum_dod_percent")),
+                    "hold_soc",
                 ] = "<="
 
             self.log("")
