@@ -1,0 +1,23 @@
+alias: Restart AppDaemon on HA Restart
+description: ""
+trigger:
+  - event: start
+    platform: homeassistant
+condition: []
+action:
+  - service: hassio.addon_stop
+    data:
+      addon: a0d7b954_appdaemon
+  - delay:
+      hours: 0
+      minutes: 1
+      seconds: 0
+      milliseconds: 0
+  - wait_template: >
+      {{(states('sensor.solcast_pv_forecast_forecast_today')| float(-1)>0) and
+      (states('sensor.solis_battery_soc')| float(-1)>0)}}
+    continue_on_timeout: true
+  - service: hassio.addon_start
+    data:
+      addon: a0d7b954_appdaemon
+mode: single

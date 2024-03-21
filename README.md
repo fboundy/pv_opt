@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.11.2
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.11.3
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -271,6 +271,35 @@ Once downloaded AppDaemon should see the app and attempt to load it using the de
   16:53:23  WARNING:     forced_discharge    = True   Source: system default. Not in YAML.
   16:53:23  WARNING:     read_only           = True   Source: system default. Not in YAML.
   ```
+
+<h3>13. Add an Automation to Restart AppDAemon when HA Restarts (Optional)</h3>
+
+Restarts between Home Assistant and Add-Ons are not synchronised so it is helpful to set up an Automation to restart AppDAemon if HA is restarted. An example is shown below and included in this repo as `ha_restart_automation.yaml`. The `wait_template` section ensures that key integrations (in this case Solcast and Solax) have numeric values before AppDaemon is started.
+
+    alias: Restart AppDaemon on HA Restart
+    description: ""
+    trigger:
+      - event: start
+        platform: homeassistant
+    condition: []
+    action:
+      - service: hassio.addon_stop
+        data:
+          addon: a0d7b954_appdaemon
+      - delay:
+          hours: 0
+          minutes: 1
+          seconds: 0
+          milliseconds: 0
+      - wait_template: >
+          {{(states('sensor.solcast_pv_forecast_forecast_today')| float(-1)>0) and
+          (states('sensor.solis_battery_soc')| float(-1)>0)}}
+        continue_on_timeout: true
+      - service: hassio.addon_start
+        data:
+          addon: a0d7b954_appdaemon
+    mode: single
+
 
 <h2>Configuration</h2>
 
