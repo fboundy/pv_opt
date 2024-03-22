@@ -3,6 +3,10 @@ pvpy:
   module: pvpy
   global: true
 
+solis:
+  module: solis
+  global: true
+
 inverters:
   module: inverters
   global: true
@@ -30,6 +34,7 @@ pv_opt:
   # redact_personal_data_from_log: false
 
   read_only: false
+  debug: false
 
   # ========================================
   # Plant parameters

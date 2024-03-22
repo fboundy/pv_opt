@@ -12,6 +12,12 @@ Once installed it should require miminal configuration. Other inverters/integrat
 
 It has been tested primarily with Octopus tariffs but other tariffs can be manually implemented.
 
+<h2>Don't Buy Me a Beer or a Coffee...</h2>
+
+Although I'm very partial to both, a better home for anything you might like to contribute would be the Mountain Rescue Team that I am currently a probationer (trainee) with. The Team comprises 40 unpaid volunteers and is on call 24/7 365 days a year in all weathers. You can donate via JustGiving by clicking on this link: 
+
+   [![](https://images.justgiving.com/image/3857db4a-711b-4b08-8158-b6f4e1dbfa54.jpg?template=size200x200)](https://link.justgiving.com/v1/charity/donate/charityId/779549)
+
 <h2>Pre-requisites</h2>
 
 This app is not stand-alone it requires the following:
@@ -265,6 +271,35 @@ Once downloaded AppDaemon should see the app and attempt to load it using the de
   16:53:23  WARNING:     forced_discharge    = True   Source: system default. Not in YAML.
   16:53:23  WARNING:     read_only           = True   Source: system default. Not in YAML.
   ```
+
+<h3>13. Add an Automation to Restart AppDAemon when HA Restarts (Optional)</h3>
+
+Restarts between Home Assistant and Add-Ons are not synchronised so it is helpful to set up an Automation to restart AppDAemon if HA is restarted. An example is shown below and included in this repo as `ha_restart_automation.yaml`. The `wait_template` section ensures that key integrations (in this case Solcast and Solax) have numeric values before AppDaemon is started.
+
+    alias: Restart AppDaemon on HA Restart
+    description: ""
+    trigger:
+      - event: start
+        platform: homeassistant
+    condition: []
+    action:
+      - service: hassio.addon_stop
+        data:
+          addon: a0d7b954_appdaemon
+      - delay:
+          hours: 0
+          minutes: 1
+          seconds: 0
+          milliseconds: 0
+      - wait_template: >
+          {{(states('sensor.solcast_pv_forecast_forecast_today')| float(-1)>0) and
+          (states('sensor.solis_battery_soc')| float(-1)>0)}}
+        continue_on_timeout: true
+      - service: hassio.addon_start
+        data:
+          addon: a0d7b954_appdaemon
+    mode: single
+
 
 <h2>Configuration</h2>
 

@@ -96,6 +96,16 @@ DEFAULT_CONFIG = {
         },
         "domain": "number",
     },
+    "solcast_confidence_level": {
+        "default": 50,
+        "attributes": {
+            "min": 10,
+            "max": 90,
+            "step": 10,
+            "mode": "slider",
+        },
+        "domain": "number",
+    },
     "slot_threshold_p": {
         "default": 1.0,
         "attributes": {
@@ -209,7 +219,7 @@ DEFAULT_CONFIG = {
     },
     "solar_forecast": {
         "default": "Solcast",
-        "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90"]},
+        "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90", "Weighted"]},
         "domain": "select",
     },
     "id_solcast_today": {"default": "sensor.solcast_pv_forecast_forecast_today"},
@@ -311,12 +321,15 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
-        self.debug = DEBUG | self.args.get("debug", False)
+
+        self.debug = DEBUG
         try:
             subver = int(VERSION.split(".")[2])
         except:
             self.log("Pre-release version. Enabling debug logging")
             self.debug = True
+
+        self.debug = self.args.get("debug", self.debug)
 
         self.adapi = self.get_ad_api()
         self.mqtt = self.get_plugin_api("MQTT")
@@ -550,7 +563,7 @@ class PVOpt(hass.Hass):
 
     def _setup_schedule(self):
         if self.get_config("forced_charge"):
-            start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}T").to_pydatetime()
+            start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}min").to_pydatetime()
             self.timer_handle = self.run_every(
                 self.optimise_time,
                 start=start_opt,
@@ -1246,8 +1259,8 @@ class PVOpt(hass.Hass):
                 value = state == "on"
 
         if value is None:
-            time_value = pd.to_datetime(state, errors="ignore", format="%H:%M")
-            if time_value != state:
+            time_value = pd.to_datetime(state, errors="coerce", format="%H:%M")
+            if time_value != pd.NaT:
                 value = state
 
         if value is None:
@@ -1306,6 +1319,7 @@ class PVOpt(hass.Hass):
 
         # Load Solcast
         solcast = self.load_solcast()
+
         if solcast is None:
             self.log("")
             self.log("Unable to optimise without Solcast data.", level="ERROR")
@@ -1368,7 +1382,8 @@ class PVOpt(hass.Hass):
         self.base = self.pv_system.flows(
             self.initial_soc,
             self.static,
-            solar=self.get_config("solar_forecast"),
+            # solar="self.get_config("solar_forecast")",
+            solar="weighted",
         )
 
         if len(self.base) == 0:
@@ -1390,7 +1405,8 @@ class PVOpt(hass.Hass):
             self.initial_soc,
             self.static,
             self.contract,
-            solar=self.get_config("solar_forecast"),
+            # solar="self.get_config("solar_forecast")",
+            solar="weighted",
             discharge=self.get_config("forced_discharge"),
             max_iters=MAX_ITERS,
         )
@@ -1680,8 +1696,10 @@ class PVOpt(hass.Hass):
             self.windows["hold_soc"] = ""
             if self.config["supports_hold_soc"]:
                 self.log("Checking for Hold SOC slots")
-                self.windows["hold_soc"].loc[
-                    (self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE
+                self.windows.loc[
+                    ((self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE)
+                    & (self.windows["soc"] > self.get_config("maximum_dod_percent")),
+                    "hold_soc",
                 ] = "<="
 
             self.log("")
@@ -1897,6 +1915,17 @@ class PVOpt(hass.Hass):
             df = df.set_index("period_start")
             df.index = pd.to_datetime(df.index, utc=True)
             df = df.set_axis(["Solcast", "Solcast_p10", "Solcast_p90"], axis=1)
+
+            confidence_level = self.get_config("solcast_confidence_level")
+            weighting = {
+                "Solcast_p10": max(50 - confidence_level, 0) / 40,
+                "Solcast": 1 - abs(confidence_level - 50) / 40,
+                "Solcast_p90": max(confidence_level - 50, 0) / 40,
+            }
+
+            df["weighted"] = 0
+            for w in weighting:
+                df["weighted"] += df[w] * weighting[w]
 
             df *= 1000
             df = df.fillna(0)
