@@ -9,6 +9,41 @@ from datetime import datetime
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 TIME_FORMAT = "%d/%m %H:%M"
 
+AGILE_FACTORS = {
+    "import": {
+        "A": (2.1, 0, 13),
+        "B": (2.0, 0, 14),
+        "C": (2.0, 0, 12),
+        "D": (2.2, 0, 13),
+        "E": (2.1, 0, 12),
+        "F": (2.1, 0, 12),
+        "G": (2.1, 0, 12),
+        "H": (2.1, 0, 12),
+        "J": (2.2, 0, 12),
+        "K": (2.2, 0, 12),
+        "L": (2.3, 0, 11),
+        "M": (2.0, 0, 13),
+        "N": (2.1, 0, 13),
+        "P": (2.4, 0, 12),
+    },
+    "export": {
+        "A": (0.95, 1.09, 7.04),
+        "B": (0.94, 0.78, 6.27),
+        "C": (0.95, 1.30, 5.93),
+        "D": (0.97, 1.26, 5.97),
+        "E": (0.94, 0.77, 6.50),
+        "F": (0.95, 0.87, 4.88),
+        "G": (0.96, 1.10, 5.89),
+        "H": (0.94, 0.93, 7.05),
+        "J": (0.94, 1.09, 7.41),
+        "K": (0.94, 0.97, 5.46),
+        "L": (0.93, 0.83, 7.14),
+        "M": (0.96, 0.72, 5.78),
+        "N": (0.97, 0.90, 3.85),
+        "P": (0.96, 1.36, 2.68),
+    },
+}
+
 
 class Tariff:
     def __init__(
@@ -183,12 +218,18 @@ class Tariff:
                             )
 
                     if self.day_ahead is not None:
+                        if self.export:
+                            factors = AGILE_FACTORS['export'][self.area]
+                        else:
+                            factors = AGILE_FACTORS['import'][self.area]
+
                         mask = (self.day_ahead.index.hour >= 16) & (self.day_ahead.index.hour < 19)
+
                         agile = (
                             pd.concat(
                                 [
-                                    self.day_ahead[mask] * 0.186 + 16.5,
-                                    self.day_ahead[~mask] * 0.229 - 0.6,
+                                    self.day_ahead[mask] * factors[0] + factors[1]+factors[2]
+                                    self.day_ahead[~mask] * factors[0] + factors[1]
                                 ]
                             )
                             .sort_index()
