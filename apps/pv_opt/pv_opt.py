@@ -12,13 +12,12 @@ import numpy as np
 from numpy import nan
 import re
 
-
 # import pvpy as pv
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "4.0.0-alpha-6"
+VERSION = "3.11.4"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
