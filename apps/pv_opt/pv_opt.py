@@ -2084,6 +2084,18 @@ class PVOpt(hass.Hass):
             )
 
         actual = self._cost_actual(start=start, end=end - pd.Timedelta(30, "minutes"))
+
+        entity_id = f"sensor.{self.prefix}_opt_cost_actual"
+        self.set_state(
+            state=round(actual.sum() / 100, 2),
+            entity_id=entity_id,
+            attributes={
+                "state_class": "measurement",
+                "device_class": "monetary",
+                "unit_of_measurement": "GBP",
+                "friendly_name": f"PV Opt Comparison Actual",
+            },
+        )
         self.log(f"  Actual:                                          {actual.sum():6.1f}p")
 
         cols = [
@@ -2116,7 +2128,6 @@ class PVOpt(hass.Hass):
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison {contract.name}",
             } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
-            # | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")}
 
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(
