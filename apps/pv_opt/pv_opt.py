@@ -319,12 +319,15 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
-        self.debug = DEBUG | self.args.get("debug", False)
+
+        self.debug = DEBUG
         try:
             subver = int(VERSION.split(".")[2])
         except:
             self.log("Pre-release version. Enabling debug logging")
             self.debug = True
+
+        self.debug = self.args.get("debug", self.debug)
 
         self.adapi = self.get_ad_api()
         self.mqtt = self.get_plugin_api("MQTT")
