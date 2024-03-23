@@ -40,7 +40,9 @@ INVERTER_DEFS = {
         },
         # Brand Conguration: Exposed as inverter.brand_config and can be over-written using arguments
         # from the config.yaml file but not rquired outside of this module
-        "brand_config": {},
+        "brand_config": {
+            "battery_voltage": "sensor.{device_name}_battery_voltage_charge",
+        },
     },
 }
 

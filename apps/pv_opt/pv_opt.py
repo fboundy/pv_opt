@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "4.0.0-alpha-6"
+VERSION = "4.0.0-alpha-7"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -942,7 +942,7 @@ class PVOpt(hass.Hass):
                 if (
                     len(values) == 1
                     and isinstance(values[0], str)
-                    and (pd.to_datetime(values[0], errors="ignore", format="%H:%M") != values[0])
+                    and (pd.to_datetime(values[0], errors="coerce", format="%H:%M") != pd.NaT)
                 ):
                     self.config[item] = values[0]
                     self.rlog(
