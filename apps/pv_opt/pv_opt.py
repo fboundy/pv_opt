@@ -307,6 +307,8 @@ class PVOpt(hass.Hass):
             df = df.sort_index()
             df = df[df != "unavailable"]
             df = df[df != "unknown"]
+            df = pd.to_numeric(df, errors="coerce")
+            df = df.dropna()
 
         else:
             self.log(f"No data returned from HASS entity {entity_id}", level="ERROR")
@@ -1940,7 +1942,6 @@ class PVOpt(hass.Hass):
 
         if df is not None:
             df.index = pd.to_datetime(df.index)
-            df = pd.to_numeric(df, errors="coerce")
             df = (df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30min")).ffill().fillna(0).diff(-1) * 2000
             df = df.fillna(0)
             if start is not None:
