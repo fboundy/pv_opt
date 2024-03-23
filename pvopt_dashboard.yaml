@@ -124,10 +124,24 @@ views:
                 name: Allow Cyclic Charge/Discharge
               - entity: switch.pvopt_read_only
                 name: Read Only Mode
-              - entity: number.pvopt_solcast_confidence_level
-                name: Solcast Confidence Level
               - entity: number.pvopt_optimise_frequency_minutes
                 name: Optimiser Freq (mins)
+          - type: markdown
+            content: Solar
+          - type: entities
+            entities:
+              - entity: switch.pvopt_use_solar
+                name: Use Solar
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: switch.pvopt_use_solar
+                state: 'on'
+            card:
+              type: entities
+              entities:
+                - entity: number.pvopt_solcast_confidence_level
+                  name: Solcast Confidence Level                
           - type: markdown
             content: Consumption
           - type: entities
