@@ -932,7 +932,7 @@ class PVOpt(hass.Hass):
                 if (
                     len(values) == 1
                     and isinstance(values[0], str)
-                    and (pd.to_datetime(values[0], errors="ignore", format="%H:%M") != values[0])
+                    and (pd.to_datetime(values[0], errors="coerce", format="%H:%M") != pd.NaT)
                 ):
                     self.config[item] = values[0]
                     self.rlog(
