@@ -528,7 +528,7 @@ class PVOpt(hass.Hass):
         elif pd.Timestamp.now(tz="UTC").hour == 0:
             self._load_contract()
 
-    def get_config(self, item):
+    def get_config(self, item, default=None):
         if item in self.config_state:
             return self._value_from_state(self.config_state[item])
 
@@ -548,6 +548,8 @@ class PVOpt(hass.Hass):
                     return self.config[item]
             else:
                 return self.config[item]
+        else:
+            return default
 
     def _setup_schedule(self):
         if self.get_config("forced_charge"):
