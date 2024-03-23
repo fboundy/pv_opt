@@ -9,6 +9,41 @@ from datetime import datetime
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 TIME_FORMAT = "%d/%m %H:%M"
 
+AGILE_FACTORS = {
+    "import": {
+        "A": (0.21, 0, 13),
+        "B": (0.20, 0, 14),
+        "C": (0.20, 0, 12),
+        "D": (0.22, 0, 13),
+        "E": (0.21, 0, 12),
+        "F": (0.21, 0, 12),
+        "G": (0.21, 0, 12),
+        "H": (0.21, 0, 12),
+        "J": (0.22, 0, 12),
+        "K": (0.22, 0, 12),
+        "L": (0.23, 0, 11),
+        "M": (0.20, 0, 13),
+        "N": (0.21, 0, 13),
+        "P": (0.24, 0, 12),
+    },
+    "export": {
+        "A": (0.095, 1.09, 7.04),
+        "B": (0.094, 0.78, 6.27),
+        "C": (0.095, 1.30, 5.93),
+        "D": (0.097, 1.26, 5.97),
+        "E": (0.094, 0.77, 6.50),
+        "F": (0.095, 0.87, 4.88),
+        "G": (0.096, 1.10, 5.89),
+        "H": (0.094, 0.93, 7.05),
+        "J": (0.094, 1.09, 7.41),
+        "K": (0.094, 0.97, 5.46),
+        "L": (0.093, 0.83, 7.14),
+        "M": (0.096, 0.72, 5.78),
+        "N": (0.097, 0.90, 3.85),
+        "P": (0.096, 1.36, 2.68),
+    },
+}
+
 
 class Tariff:
     def __init__(
@@ -183,12 +218,18 @@ class Tariff:
                             )
 
                     if self.day_ahead is not None:
+                        if self.export:
+                            factors = AGILE_FACTORS["export"][self.area]
+                        else:
+                            factors = AGILE_FACTORS["import"][self.area]
+
                         mask = (self.day_ahead.index.hour >= 16) & (self.day_ahead.index.hour < 19)
+
                         agile = (
                             pd.concat(
                                 [
-                                    self.day_ahead[mask] * 0.186 + 16.5,
-                                    self.day_ahead[~mask] * 0.229 - 0.6,
+                                    (self.day_ahead[mask] * factors[0] + factors[1] + factors[2]),
+                                    (self.day_ahead[~mask] * factors[0] + factors[1]),
                                 ]
                             )
                             .sort_index()
@@ -197,6 +238,7 @@ class Tariff:
                         )
 
                         df = pd.concat([df, agile])
+                        # self.log(df)
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (len(df) > 1 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30) or len(df) == 1:

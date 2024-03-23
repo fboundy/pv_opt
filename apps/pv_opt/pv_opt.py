@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "3.11.2"
+VERSION = "3.11.3"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -528,7 +528,7 @@ class PVOpt(hass.Hass):
         elif pd.Timestamp.now(tz="UTC").hour == 0:
             self._load_contract()
 
-    def get_config(self, item):
+    def get_config(self, item, default=None):
         if item in self.config_state:
             return self._value_from_state(self.config_state[item])
 
@@ -548,6 +548,8 @@ class PVOpt(hass.Hass):
                     return self.config[item]
             else:
                 return self.config[item]
+        else:
+            return default
 
     def _setup_schedule(self):
         if self.get_config("forced_charge"):
@@ -930,7 +932,7 @@ class PVOpt(hass.Hass):
                 if (
                     len(values) == 1
                     and isinstance(values[0], str)
-                    and (pd.to_datetime(values[0], errors="ignore", format="%H:%M") != values[0])
+                    and (pd.to_datetime(values[0], errors="coerce", format="%H:%M") != pd.NaT)
                 ):
                     self.config[item] = values[0]
                     self.rlog(
@@ -1698,7 +1700,7 @@ class PVOpt(hass.Hass):
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
-            self.charge_current = self.charge_power / self.get_config("battery_voltage")
+            self.charge_current = self.charge_power / self.get_config("battery_voltage", default=50)
             self.charge_start_datetime = self.windows["start"].iloc[0]
             self.charge_end_datetime = self.windows["end"].iloc[0]
             self.hold = [
