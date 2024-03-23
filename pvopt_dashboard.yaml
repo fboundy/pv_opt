@@ -116,8 +116,6 @@ views:
             content: Control Parameters
           - type: entities
             entities:
-              - entity: switch.pvopt_forced_charge
-                name: Optimise Charging
               - entity: switch.pvopt_forced_discharge
                 name: Optimise Discharging
               - entity: switch.pvopt_allow_cyclic
