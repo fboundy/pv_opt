@@ -32,11 +32,16 @@ pv_opt:
 
   # If true the current config in HA will be over-written with that in the config.yaml. 
   overwrite_ha_on_restart: true
+
+  # If true the personal data will be redacted from the log files. 
   # redact_personal_data_from_log: false
 
-  consumption_history_days: 7
-  read_only: false
-  debug: false
+  # ========================================
+  # Basic parameters
+  # ========================================
+  read_only: false # If true the inverter will not be controlled
+  forced_discharge: true # Enable forced discharging
+  allow_cyclinc: false # Enable alternate charge/discharge windows
 
   # ========================================
   # Plant parameters
@@ -56,33 +61,25 @@ pv_opt:
   # ========================================
   # Solcast configuration
   # ========================================
+   # use_solar: true
   #
   # id_solcast_today: sensor.solcast_pv_forecast_forecast_today
   # id_solcast_tomorrow: sensor.solcast_pv_forecast_forecast_tomorrow
-
-  # ========================================
-  # Solar and consumption forecast parameters
-  # ========================================
-  #
-  # Valid options are:
-  #
-  # Solcast         - the Solcast mid-case forecast [Default]
-  # Solcast_p90     - the Solcast high estimate
-  # Solcast_p10     - the Solcast high estimate
-  #
-  # Set this using an "input_select" helper and it can be varied on the fly
-
-  # solar_forecast:
-  # - input_select.solar_forecast_source
+  # solar_confidence_level: 50
   
-  # # consumption estimation
+  # ========================================
+  # Consumption forecast parameters
+  # ========================================
+  #
   # use_consumption_history: true
   # consumption_history_days:
   #   - 7
   # consumption_margin:
   #   - input_number.solar_opt_consumption_margin
+  #
   # daily_consumption_kwh: 17
   # shape_consumption_profile: true
+
   # ========================================
   # Octopus account parameters
   # ========================================
@@ -198,12 +195,19 @@ pv_opt:
 
 
 # Tariff comparison
-  # id_daily_solar: sensor.{device_name}_power_generation_today
-  # alt_tariffs:
-  #   - name: Eco7_Agile
-  #     octopus_import_tariff_code: E-2R-VAR-22-11-01-G
-  #     octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+  id_daily_solar: sensor.{device_name}_power_generation_today
+  alt_tariffs:
+    - name: Agile_Fix
+      octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
+      octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
 
-  #   - name: Flux
-  #     octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
-  #     octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
+    # - name: Eco7_Agile
+    #   octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+    #   octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
+
+    - name: Eco7_Fix
+      octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+      octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
+    - name: Flux
+      octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+      octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
