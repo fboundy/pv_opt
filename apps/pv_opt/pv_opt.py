@@ -1700,7 +1700,7 @@ class PVOpt(hass.Hass):
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
-            self.charge_current = self.charge_power / self.get_config("battery_voltage")
+            self.charge_current = self.charge_power / self.get_config("battery_voltage", default=50)
             self.charge_start_datetime = self.windows["start"].iloc[0]
             self.charge_end_datetime = self.windows["end"].iloc[0]
             self.hold = [
