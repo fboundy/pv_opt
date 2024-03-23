@@ -337,7 +337,8 @@ These are the main parameters that will control how PV Opt runs:
 | Optimise Charging | `on`/`off` | `switch.pvopt_forced_charge` | On | Controls whether the app will calculate an Optimised plan. If `off` only the Base forecast will be updated.
 | Optimise Discharging | `on`/`off` | `switch.pvopt_forced_discharge` | On | Controls whether the app will allow for forced discharge as well as charge
 | Allow Cyclic | `on`/`off` | `switch.pvopt_allow_cyclic` | On | Controls whether the app will allow cycles of alternating charge/discharge |
-| Solar Forecast | `select`| `select.pvopt_solar_forecast` | Solcast | Selects which Solcast to use (Most Likely, 10% or 90%)|
+| Use Solar |  `on`/`off` | `switch.pvopt_use_solar` | On | Controls whether the app will use the Solcast solar forecast. If set to Off no solar will be used but battery charging can still be optimised for a time-of use tariff. 
+| Solcast Confidence Level | `number`| `number.pvopt_solcast_confidence_level` | Solcast | Selects which the Confidence Level for the Solcast forecast. Levels between 10% and 50% are weighted from the Solcast 10% and 50% forecasts. Levels between 50% and 90% are weighted from the Solcast 50% and 10% forecasts.|
 | Optimser Frequency | minutes | `number.pvopt_optimise_frequency_minutes` | 10 | Frequency of Optimiser calculation |
 
 <h3>Consumption Parameters</h3>
