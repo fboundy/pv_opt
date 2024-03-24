@@ -286,7 +286,7 @@ def importName(modulename, name):
 
 
 class PVOpt(hass.Hass):
-    def hass2df(self, entity_id, days=2, log=False):
+    def hass2df(self, entity_id, days=2, log=False, freq=None):
         if log:
             self.log(f">>> Getting {days} days' history for {entity_id}")
             self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
@@ -309,6 +309,11 @@ class PVOpt(hass.Hass):
             df = df[df != "unknown"]
             df = pd.to_numeric(df, errors="coerce")
             df = df.dropna()
+            if isinstance(freq, str):
+                try:
+                    df = df.resample(freq).mean().interpolate()
+                except:
+                    pass
 
         else:
             self.log(f"No data returned from HASS entity {entity_id}", level="ERROR")
@@ -2062,10 +2067,10 @@ class PVOpt(hass.Hass):
         consumption = self.load_consumption(start, end)
         static = pd.concat([solar, consumption], axis=1).set_axis(["solar", "consumption"], axis=1)
 
-        initial_soc = (
-            self.hass2df(self.config["id_battery_soc"], days=2, log=self.debug).astype(float).resample("30min").mean()
-        ).loc[start]
+        initial_soc_df = self.hass2df(self.config["id_battery_soc"], days=2, log=True, freq="30min")
 
+        self.log(f">>> {initial_soc_df.dropna()}")
+        initial_soc = initial_soc_df.loc[start]
         base = self.pv_system.flows(initial_soc, static, solar="solar")
 
         contracts = [self.contract]
