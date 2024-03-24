@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "3.12.1"
+VERSION = "3.13.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -128,9 +128,19 @@ DEFAULT_CONFIG = {
         "default": 4.0,
         "attributes": {
             "min": 0.0,
-            "max": 10.0,
+            "max": 1.0,
             "step": 0.5,
             "mode": "slider",
+        },
+        "domain": "number",
+    },
+    "plunge_threshold_p_kwh": {
+        "default": 2.0,
+        "attributes": {
+            "min": -5.0,
+            "max": 10.0,
+            "step": 0.5,
+            "mode": "box",
         },
         "domain": "number",
     },
