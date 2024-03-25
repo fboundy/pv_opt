@@ -63,6 +63,7 @@ SYSTEM_ARGS = [
     "overwrite_ha_on_restart",
     "debug",
     "redact_personal_data_from_log",
+    "list_entities",
 ]
 
 IMPEXP = ["import", "export"]
@@ -77,6 +78,12 @@ MQTT_CONFIGS = {
     "number": {
         "mode": "slider",
     },
+}
+
+DOMAIN_ATTRIBUTES = {
+    "number": ["min", "max", "step"],
+    "sensor": [],
+    "select": ["options"],
 }
 
 DEFAULT_CONFIG = {
@@ -354,6 +361,10 @@ class PVOpt(hass.Hass):
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self.device_name = self.args.pop("device_name", "solis")
+
+        if self.debug or self.args.get("list_entities", True):
+            self._list_entities()
+
         self.redact = self.args.pop("redact_personal_data_from_log", True)
 
         self._load_inverter()
@@ -2223,6 +2234,37 @@ class PVOpt(hass.Hass):
                     self._status("ERROR: Tariff inconsistency")
 
             self.log(f"  {direction.title()}: {str_log}")
+
+    def ulog(self, strlog):
+        self.log("")
+        self.log(strlog)
+        self.log("-" * len(strlog))
+        self.log("")
+
+    def _list_entities(self, domains=["select", "number", "sensor"]):
+        domains = [d for d in domains if d in ["select", "number", "sensor"]]
+        self.ulog(f"Available entities for device {self.device_name}:")
+        for domain in domains:
+            states = self.get_state(domain)
+            states = {k: states[k] for k in states if self.device_name in k}
+            for entity_id in states:
+                x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
+                x = f"  {x:60s}"
+
+                if domain != "select":
+                    x += f"{str(states[entity_id]['state']):>20s} {states[entity_id]['attributes'].get('unit_of_measurement','')}"
+
+                self.log(x)
+
+                if domain == "number":
+                    x = "  - "
+                    for attribute in DOMAIN_ATTRIBUTES[domain]:
+                        x = f"{x} {attribute}: {states[entity_id]['attributes'][attribute]} "
+                    self.log(x)
+                elif domain == "select":
+                    for option in states[entity_id]["attributes"]["options"]:
+                        self.log(f"{option:>83s}")
+        self.log("")
 
 
 # %%
