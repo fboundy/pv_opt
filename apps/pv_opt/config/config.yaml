@@ -31,12 +31,17 @@ pv_opt:
 
   # If true the current config in HA will be over-written with that in the config.yaml. 
   overwrite_ha_on_restart: true
+  list_entities: true
 
   # If true the personal data will be redacted from the log files. 
   # redact_personal_data_from_log: false
 
-  read_only: false
-  debug: true
+  # ========================================
+  # Basic parameters
+  # ========================================
+  read_only: false # If true the inverter will not be controlled
+  forced_discharge: true # Enable forced discharging
+  allow_cycling: false # Enable alternate charge/discharge windows
 
   # ========================================
   # Plant parameters
