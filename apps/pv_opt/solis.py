@@ -237,14 +237,25 @@ class InverterController:
             self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
+    def hold_soc_zero(self, enable, soc=None):
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+            self._solis_control_charge_discharge(
+                "charge",
+                enable=enable,
+                start=pd.Timestamp.now(tz=self.tz).floor("1min"),
+                end=pd.Timestamp.now(tz=self.tz).ceil("30min"),
+                power=0,
+            )
+
     def hold_soc(self, enable, soc=None):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+
             if enable:
                 self._solis_set_mode_switch(SelfUse=True, Timed=False, GridCharge=True, Backup=True)
             else:
                 self.enable_timed_mode()
 
-            # Waiyt for a second to make sure the mode is correct
+            # Wait for a second to make sure the mode is correct
             time.sleep(1)
 
             if soc is None:

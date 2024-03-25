@@ -23,6 +23,7 @@ pv_opt:
   # debug: True
 
 
+
 # User configuration ---  EDIT AWAY! ---
 
   inverter_type: "SOLIS_SOLAX_MODBUS"
