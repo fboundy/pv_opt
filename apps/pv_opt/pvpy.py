@@ -429,8 +429,11 @@ class Contract:
                 self.tariffs["import"] = None
                 return
 
-            mpans = r.json()["properties"][0]["electricity_meter_points"]
-            for mpan in mpans:
+            self.host.mpans = r.json()["properties"][0]["electricity_meter_points"]
+            for mpan in self.mpans:
+                self.redact_patterns.append(mpan["mpan"])
+
+            for mpan in self.host.mpans:
                 self.rlog(f"Getting details for MPAN {mpan['mpan']}")
                 df = pd.DataFrame(mpan["agreements"])
                 df = df.set_index("valid_from")
