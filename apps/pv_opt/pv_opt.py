@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "3.13.0"
+VERSION = "4.0.0-alpha-7"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -27,7 +27,9 @@ TIME_FORMAT = "%H:%M"
 
 REDACT_REGEX = [
     "[0-9]{2}m[0-9]{7}_[0-9]{13}",  # Serial_MPAN
+    "[0-9]{2}e[0-9]{7}_[0-9]{13}",  # Serial_MPAN
     "[0-9]{2}m[0-9]{7}",  # Serial
+    "[0-9]{2}e[0-9]{7}",  # Serial
     "^$|\d{13}$",  # MPAN
     "a_[0-f]{8}",  # Account Number
     "A-[0-f]{8}",  # Account Number
@@ -52,7 +54,7 @@ CONSUMPTION_SHAPE = {
     "consumption": [300, 200, 150, 500, 500, 750, 750, 300],
 }
 
-INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN"]
+INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN", "SUNSYNK_SOLARSYNK2", "SOLAX_X1"]
 
 SYSTEM_ARGS = [
     "module",
@@ -350,12 +352,17 @@ class PVOpt(hass.Hass):
         self.mqtt = self.get_plugin_api("MQTT")
         self._load_tz()
         self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
+        self.redact_patterns = REDACT_REGEX
 
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self.device_name = self.args.pop("device_name", "solis")
-        self.redact = self.args.pop("redact_personal_data_from_log", True)
 
+        self.inverter_sn = self.args.pop("inverter_sn", "")
+        if self.inverter_sn != "":
+            self.redact_patterns.append(self.inverter_sn)
+
+        self.redact = self.args.pop("redact_personal_data_from_log", True)
         self._load_inverter()
 
         self.change_items = {}
@@ -364,8 +371,11 @@ class PVOpt(hass.Hass):
         self.handles = {}
         self.mqtt_handles = {}
 
+        self.mpans = []
+
         self.saving_events = {}
         self.contract = None
+
         self.bottlecap_entities = {"import": None, "export": None}
 
         # Load arguments from the YAML file
@@ -409,7 +419,7 @@ class PVOpt(hass.Hass):
     def rlog(self, str, **kwargs):
         if self.redact:
             try:
-                for pattern in REDACT_REGEX:
+                for pattern in self.redact_patterns:
                     x = re.search(pattern, str)
                     if x:
                         str = re.sub(pattern, "*" * len(x.group()), str)
@@ -459,6 +469,8 @@ class PVOpt(hass.Hass):
             InverterController = importName(f"{inverter_brand}", "InverterController")
             self.log(f"Inverter type: {self.inverter_type}: inverter module: {inverter_brand}.py")
             self.inverter = InverterController(inverter_type=self.inverter_type, host=self)
+            self.log(f"  Device name:   {self.device_name}")
+            self.log(f"  Serial number: {self.inverter_sn}")
 
         else:
             e = f"Inverter type {self.inverter_type} is not yet supported. Only read-only mode with explicit config from the YAML will work."
