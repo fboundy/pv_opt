@@ -1511,7 +1511,12 @@ class PVOpt(hass.Hass):
                     if self.hold and self.hold[0]["active"]:
                         if not status["hold_soc"]["active"] or status["hold_soc"]["soc"] != self.hold[0]["soc"]:
                             self.log(f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%")
-                            self.inverter.hold_soc(enable=True, soc=self.hold[0]["soc"])
+                            self.inverter.hold_soc(
+                                enable=True,
+                                soc=self.hold[0]["soc"],
+                                start=self.charge_start_datetime,
+                                end=self.charge_end_datetime,
+                            )
                         else:
                             self.log(f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%")
 
@@ -2234,37 +2239,6 @@ class PVOpt(hass.Hass):
                     self._status("ERROR: Tariff inconsistency")
 
             self.log(f"  {direction.title()}: {str_log}")
-
-    def ulog(self, strlog):
-        self.log("")
-        self.log(strlog)
-        self.log("-" * len(strlog))
-        self.log("")
-
-    def _list_entities(self, domains=["select", "number", "sensor"]):
-        domains = [d for d in domains if d in ["select", "number", "sensor"]]
-        self.ulog(f"Available entities for device {self.device_name}:")
-        for domain in domains:
-            states = self.get_state(domain)
-            states = {k: states[k] for k in states if self.device_name in k}
-            for entity_id in states:
-                x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
-                x = f"  {x:60s}"
-
-                if domain != "select":
-                    x += f"{str(states[entity_id]['state']):>20s} {states[entity_id]['attributes'].get('unit_of_measurement','')}"
-
-                self.log(x)
-
-                if domain == "number":
-                    x = "  - "
-                    for attribute in DOMAIN_ATTRIBUTES[domain]:
-                        x = f"{x} {attribute}: {states[entity_id]['attributes'][attribute]} "
-                    self.log(x)
-                elif domain == "select":
-                    for option in states[entity_id]["attributes"]["options"]:
-                        self.log(f"{option:>83s}")
-        self.log("")
 
 
 # %%

@@ -226,6 +226,8 @@ class InverterController:
     def enable_timed_mode(self):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True, Backup=False)
+        else:
+            self._unknown_inverter()
 
     def control_charge(self, enable, **kwargs):
         if enable:
@@ -237,17 +239,27 @@ class InverterController:
             self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
-    def hold_soc_zero(self, enable, soc=None):
+    def hold_soc(self, enable, soc=None, **kwargs):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+            start = kwargs.get("start", pd.Timestamp.now(tz=self.tz).floor("1min"))
+            end = kwargs.get("end", pd.Timestamp.now(tz=self.tz).ceil("30min"))
             self._solis_control_charge_discharge(
                 "charge",
                 enable=enable,
-                start=pd.Timestamp.now(tz=self.tz).floor("1min"),
-                end=pd.Timestamp.now(tz=self.tz).ceil("30min"),
+                start=start
+                end=end,
                 power=0,
             )
+        else:
+            self._unknown_inverter()
 
-    def hold_soc(self, enable, soc=None):
+    def _unknown_inverter(self):
+        e = f"Unknown inverter type {self.type}"
+        self.log(e, level="ERROR")
+        self.host.status(e)
+        raise Exception(e)
+
+    def hold_soc_old(self, enable, soc=None):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
 
             if enable:
@@ -266,16 +278,16 @@ class InverterController:
             self.log(f"Setting Backup SOC to {soc}%")
             if self.type == "SOLIS_SOLAX_MODBUS":
                 changed, written = self._write_and_poll_value(entity_id=entity_id, value=soc)
-            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+            # elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+            else:
                 changed, written = self.solis_write_holding_register(
                     address=INVERTER_DEFS(self.type)["registers"]["backup_mode_soc"],
                     value=soc,
                     entity_id=entity_id,
                 )
-            else:
-                e = "Unknown inverter type"
-                self.log(e, level="ERROR")
-                raise Exception(e)
+
+        else:
+            self._unknown_inverter()
 
     @property
     def status(self):
