@@ -432,6 +432,15 @@ class PVOpt(hass.Hass):
             for id in self.handles:
                 self.log(f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}")
 
+    def _check_for_io(self):
+        self.log("")
+        self.log("Checking for Intelligent Octopus")
+        self.log("--------------------------------")
+        self.log("")
+        entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
+        self.log(f">>> {entity_id}")
+        self.log(f">>> {self.get_state(entity_id)}")
+
     def rlog(self, str, **kwargs):
         if self.redact:
             try:
@@ -761,6 +770,8 @@ class PVOpt(hass.Hass):
 
             self.rlog("")
             self._load_saving_events()
+            self._check_for_io()
+
         self.rlog("Finished loading contract")
 
     def _check_tariffs(self):
@@ -804,6 +815,9 @@ class PVOpt(hass.Hass):
             ][0]
             self.log("")
             self.rlog(f"Found Octopus Savings Events entity: {saving_events_entity}")
+            octopus_account = self.get_state(entity_id=saving_events_entity, attribute="")
+            self.log(f">>> {octopus_account}")
+            self.config["octopus_account"] = octopus_account
 
             available_events = self.get_state(saving_events_entity, attribute="all")["attributes"]["available_events"]
 
