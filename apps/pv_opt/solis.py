@@ -256,7 +256,7 @@ class InverterController:
             self._solis_control_charge_discharge(
                 "charge",
                 enable=enable,
-                start=start
+                start=start,
                 end=end,
                 power=0,
             )
