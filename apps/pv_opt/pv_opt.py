@@ -431,7 +431,7 @@ class PVOpt(hass.Hass):
         sensor_entities = self.get_state("sensor")
         self.zappi_entities = [k for k in sensor_entities if "zappi" in k if "charge_added_session" in k]
         if len(self.zappi_entities) > 0:
-            for entity_id in self.self.io_entities:
+            for entity_id in self.io_entities:
                 self.rlog(f"  {entity_id}")
         else:
             self.log("No Zappi sensors found")
