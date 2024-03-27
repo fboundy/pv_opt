@@ -2181,7 +2181,9 @@ class PVOpt(hass.Hass):
                 "device_class": "monetary",
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison {contract.name}",
-            } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
+                "net_base": round(net_base.sum() / 100, 2),
+                # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
+            }
 
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
@@ -2268,6 +2270,31 @@ class PVOpt(hass.Hass):
             else:
                 self.log(underline * len(strlog))
 
+        self.log("")
+
+    def _list_entities(self, domains=["select", "number", "sensor"]):
+        domains = [d for d in domains if d in ["select", "number", "sensor"]]
+        self.ulog(f"Available entities for device {self.device_name}:")
+        for domain in domains:
+            states = self.get_state(domain)
+            states = {k: states[k] for k in states if self.device_name in k}
+            for entity_id in states:
+                x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
+                x = f"  {x:60s}"
+
+                if domain != "select":
+                    x += f"{str(states[entity_id]['state']):>20s} {states[entity_id]['attributes'].get('unit_of_measurement','')}"
+
+                self.log(x)
+
+                if domain == "number":
+                    x = "  - "
+                    for attribute in DOMAIN_ATTRIBUTES[domain]:
+                        x = f"{x} {attribute}: {states[entity_id]['attributes'][attribute]} "
+                    self.log(x)
+                elif domain == "select":
+                    for option in states[entity_id]["attributes"]["options"]:
+                        self.log(f"{option:>83s}")
         self.log("")
 
     def hass2df(self, entity_id, days=2, log=False, freq=None):
