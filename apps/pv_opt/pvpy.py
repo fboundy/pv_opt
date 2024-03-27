@@ -158,7 +158,9 @@ class Tariff:
             self.log(f">>> {self.name}")
             self.log(f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}")
 
-        use_day_ahead = kwargs.get("day_ahead", True)
+        time_now = pd.Timestamp.now(tz="UTC")
+        use_day_ahead = kwargs.get("day_ahead", ((start > time_now) or (end > time_now)))
+
         if start is None:
             if self.eco7:
                 start = min([pd.Timestamp(x["valid_from"]) for x in self.day])
@@ -601,7 +603,7 @@ class PVsystemModel:
 
         if log:
             self.log(
-                f"  Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
+                f"Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
             )
 
         prices = prices.set_axis([t for t in contract.tariffs.keys() if contract.tariffs[t] is not None], axis=1)
