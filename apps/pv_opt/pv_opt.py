@@ -12,13 +12,10 @@ import numpy as np
 from numpy import nan
 import re
 
+VERSION = "3.12.4"
 
-# import pvpy as pv
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
-USE_TARIFF = True
-
-VERSION = "3.12.3"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -678,7 +675,7 @@ class PVOpt(hass.Hass):
                                 level="WARNING",
                             )
 
-            if self.contract is None or USE_TARIFF:
+            if self.contract is None:
                 if (
                     "octopus_import_tariff_code" in self.config
                     and self.config["octopus_import_tariff_code"] is not None
