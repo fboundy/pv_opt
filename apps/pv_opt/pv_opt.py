@@ -18,7 +18,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 USE_TARIFF = True
 
-VERSION = "3.13.0"
+VERSION = "3.13.0-ev-beta-1"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -404,6 +404,7 @@ class PVOpt(hass.Hass):
         # self._estimate_capacity()
         self._load_pv_system_model()
         self._load_contract()
+        self._check_for_zappi()
 
         if self.get_config("alt_tariffs") is not None:
             self._compare_tariffs()
@@ -434,13 +435,51 @@ class PVOpt(hass.Hass):
                 self.log(f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}")
 
     def _check_for_io(self):
-        self.log("")
-        self.log("Checking for Intelligent Octopus")
-        self.log("--------------------------------")
-        self.log("")
+        self.ulog("Checking for Intelligent Octopus")
         entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
-        self.log(f">>> {entity_id}")
-        self.log(f">>> {self.get_state(entity_id)}")
+        self.rlog(f">>> {entity_id}")
+        io_dispatches = self.get_state(entity_id)
+        self.log(f">>> IO entity state:  {io_dispatches}")
+        self.io = io_dispatches is not None
+        if self.io:
+            self.rlog(f"IO entity {entity_id} found")
+            self.log("")
+            self.io_entity = entity_id
+
+    def _get_io(self):
+        self.ulog("Intelligent Octopus Status")
+        self.io_dispatch_active = self.get_state(self.io_entity)
+        self.log(f"  Active: {self.io_dispatch_active}")
+        self.log("")
+        self.io_dispatch_attrib = self.get_state(self.io_entity, attribute="all")
+        for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
+            self.log(f" {k:20s} {self.io_dispatch_attrib[k]}")
+
+        for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" in x]:
+            self.log(f"  {k:20s} {'Start':20s} {'End':20s} {'Charge':12s} {'Source':12s}")
+            self.log(f"  {'-'*20} {'-'*20} {'-'*20} {'-'*12} {'-'*12} ")
+            for z in self.io_dispatch_attrib[k]:
+                self.log(
+                    f"  {z['start'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['end'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['charge_in_kwh']:12.3f}  {z['source']:12s}"
+                )
+            self.log("")
+
+    def _check_for_zappi(self):
+        self.ulog("Checking for Zappi Sensors")
+        sensor_entities = self.get_state("sensor")
+        self.zappi_entities = [k for k in sensor_entities if "zappi" in k if "charge_added_session" in k]
+        if len(self.zappi_entities) > 0:
+            for entity_id in self.self.io:
+                self.rlog(f"  {entity_id}")
+        else:
+            self.log("No Zappi sensors found")
+        self.log("")
+
+    def _get_zappi(self, **kwargs):
+        for entity_id in self.zappi_entities:
+            df = self.hass2df(entity_id=entity_id, **kwargs)
+            self.rlog(f">>> Zappi entity {entity_id}")
+            self.log(f">>> {df}")
 
     def rlog(self, str, **kwargs):
         if self.redact:
@@ -816,7 +855,7 @@ class PVOpt(hass.Hass):
             ][0]
             self.log("")
             self.rlog(f"Found Octopus Savings Events entity: {saving_events_entity}")
-            octopus_account = self.get_state(entity_id=saving_events_entity, attribute="")
+            octopus_account = self.get_state(entity_id=saving_events_entity, attribute="account_id")
             self.log(f">>> {octopus_account}")
             self.config["octopus_account"] = octopus_account
 
@@ -1355,6 +1394,9 @@ class PVOpt(hass.Hass):
         else:
             self.log("  Tariffs OK")
             self.log("")
+
+        if self.io:
+            self._get_io
 
         self.t0 = pd.Timestamp.now()
         self.static = pd.DataFrame(
@@ -2022,7 +2064,7 @@ class PVOpt(hass.Hass):
         return df
 
     def load_consumption(self, start, end):
-        self.log("Getting expected consumption data:")
+        self.log(f"Getting expected consumption data for period {start}:{end}")
 
         index = pd.date_range(start, end, inclusive="left", freq="30min")
         consumption = pd.DataFrame(index=index, data={"consumption": 0})
@@ -2095,6 +2137,10 @@ class PVOpt(hass.Hass):
                     consumption["consumption"] = consumption_mean
 
                 self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
+
+                if len(self.zappi_entities) > 0:
+                    self._get_zappi(days=days, log=True, freq="30min")
+
         else:
             daily_kwh = self.get_config("daily_consumption_kwh")
             self.log(f"  - Creating consumption based on daily estimate of {daily_kwh} kWh")
@@ -2239,6 +2285,7 @@ class PVOpt(hass.Hass):
         self.log("Checking tariff prices vs Octopus Energy Integration:")
         self.log("-----------------------------------------------------")
         for direction in self.contract.tariffs:
+            err = False
             if self.bottlecap_entities[direction] is None:
                 str_log = "No OE Integration entity found."
 
@@ -2276,8 +2323,11 @@ class PVOpt(hass.Hass):
                 if round(df["delta"].abs().mean(), 2) > 0:
                     str_log += " <<< ERROR"
                     self._status("ERROR: Tariff inconsistency")
+                    err = True
 
             self.log(f"  {direction.title()}: {str_log}")
+            if err:
+                self.log(self.contract[direction])
 
     def ulog(self, strlog):
         self.log("")

@@ -625,17 +625,15 @@ class PVsystemModel:
                 self.log("")
 
             plunge_threshold = self.host.get_config("plunge_threshold_p_kwh")
-            self.log(f">>> {plunge_threshold}")
             plunge = df["import"][df["import"] < plunge_threshold]
-            self.log(f">>> {plunge}")
             slots = [(p, self.inverter.charger_power) for p in plunge.index.to_list()]
-            self.log(f">>> {slots}")
             df = pd.concat(
                 [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
                 axis=1,
             )
             plunge_cost = round(contract.net_cost(df).sum(), 1)
-            self.log(f">>> Plunge cost: {plunge_cost}")
+            self.log(f"Plunge cost: {plunge_cost}")
+            self.log("")
             base_cost = plunge_cost
 
         # --------------------------------------------------------------------------------------------
