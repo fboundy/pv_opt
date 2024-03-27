@@ -30,7 +30,8 @@ pv_opt:
   device_name: solis
 
   # If true the current config in HA will be over-written with that in the config.yaml. 
-  overwrite_ha_on_restart: false
+  overwrite_ha_on_restart: true
+  list_entities: true
 
   # If true the personal data will be redacted from the log files. 
   # redact_personal_data_from_log: false

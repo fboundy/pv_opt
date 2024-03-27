@@ -41,6 +41,7 @@ MAX_ITERS = 10
 MAX_INVERTER_UPDATES = 2
 MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
+ONLINE_RETRIES = 12
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -64,6 +65,7 @@ SYSTEM_ARGS = [
     "overwrite_ha_on_restart",
     "debug",
     "redact_personal_data_from_log",
+    "list_entities",
 ]
 
 IMPEXP = ["import", "export"]
@@ -78,6 +80,12 @@ MQTT_CONFIGS = {
     "number": {
         "mode": "slider",
     },
+}
+
+DOMAIN_ATTRIBUTES = {
+    "number": ["min", "max", "step"],
+    "sensor": [],
+    "select": ["options"],
 }
 
 DEFAULT_CONFIG = {
@@ -129,9 +137,19 @@ DEFAULT_CONFIG = {
         "default": 4.0,
         "attributes": {
             "min": 0.0,
-            "max": 10.0,
+            "max": 1.0,
             "step": 0.5,
             "mode": "slider",
+        },
+        "domain": "number",
+    },
+    "plunge_threshold_p_kwh": {
+        "default": 2.0,
+        "attributes": {
+            "min": -5.0,
+            "max": 10.0,
+            "step": 0.5,
+            "mode": "box",
         },
         "domain": "number",
     },
@@ -310,9 +328,27 @@ class PVOpt(hass.Hass):
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self.device_name = self.args.pop("device_name", "solis")
+
         self.redact = self.args.pop("redact_personal_data_from_log", True)
 
         self._load_inverter()
+
+        retry_count = 0
+        while (not self.inverter.is_online()) and (retry_count < ONLINE_RETRIES):
+            self.log("Inverter controller appears not to be running. Waiting 5 secomds to re-try")
+            time.sleep(5)
+            retry_count += 1
+
+        if not self.inverter.is_online():
+            e = "Unable to get expected response from Inverter Controller for {self.inverter_type}"
+            self._status(e)
+            self.log(e, level="ERROR")
+            raise Exception(e)
+        else:
+            self.log("Inverter appears to be online")
+
+        if self.debug or self.args.get("list_entities", True):
+            self._list_entities()
 
         self.change_items = {}
         self.config_state = {}
