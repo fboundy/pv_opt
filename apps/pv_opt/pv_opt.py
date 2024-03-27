@@ -42,6 +42,7 @@ HOLD_TOLERANCE = 3
 MAX_ITERS = 10
 MAX_INVERTER_UPDATES = 2
 MAX_HASS_HISTORY_CALLS = 5
+OVERWRITE_ATTEMPTS = 5
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -1192,9 +1193,18 @@ class PVOpt(hass.Hass):
                         self.log(f"  {'-----------':40s}  {'---------':42s}  ----------  ----------")
                         over_write_log = True
 
-                    self.log(f"  {item:40s}  {entity_id:42s}  {state:10s}  {new_state:10s}")
-                    state = new_state
-                    self.set_state(state=state, entity_id=entity_id)
+                    str_log = f"  {item:40s}  {entity_id:42s}  {state:10s}  {new_state:10s}"
+                    over_write_count = 0
+                    while (state != new_state) and (over_write_count < OVERWRITE_ATTEMPTS):
+                        self.set_state(state=new_state, entity_id=entity_id)
+                        time.sleep(0.1)
+                        state = self.get_state(entity_id)
+                        over_write_count += 1
+
+                    if state == new_state:
+                        self.log(f"{str_log} OK")
+                    else:
+                        self.log(f"{str_log} <<< FAILED!", level="WARN")
 
             else:
                 state = self.get_state(entity_id)
