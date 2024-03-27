@@ -30,7 +30,7 @@ pv_opt:
   device_name: solis
 
   # If true the current config in HA will be over-written with that in the config.yaml. 
-  overwrite_ha_on_restart: true
+  overwrite_ha_on_restart: false
 
   # If true the personal data will be redacted from the log files. 
   # redact_personal_data_from_log: false
@@ -40,7 +40,7 @@ pv_opt:
   # ========================================
   read_only: false # If true the inverter will not be controlled
   forced_discharge: true # Enable forced discharging
-  allow_cyclinc: false # Enable alternate charge/discharge windows
+  allow_cyclic: false # Enable alternate charge/discharge windows
 
   # ========================================
   # Plant parameters
@@ -71,7 +71,7 @@ pv_opt:
   # ========================================
   #
   # use_consumption_history: true
-  consumption_history_days: 7
+  consumption_history_days: 2
   #
   # daily_consumption_kwh: 17
   # shape_consumption_profile: true
