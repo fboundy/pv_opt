@@ -766,47 +766,6 @@ class PVsystemModel:
                 self.log("No slots available")
                 done = True
 
-        # self.log("")
-        # self.log("Merging Charging Slots")
-        # self.log("----------------------")
-
-        # z = pd.DataFrame(data={"net_cost": net_cost, "slot_count": slot_count})
-        # z["slot_total"] = z["slot_count"].cumsum()
-        # z["delta"] = z["net_cost"].diff()
-        # self.log(z)
-        # # max_delta = z["net_cost"].diff().iloc[1:].max()
-        # slot_df =pd.DataFrame(slots).set_index(0)
-        # slot_df['delta'] = [b for a in [[x[1]] * x[0] for x in zip(z["slot_count"].to_list(),z["delta"].to_list())] for b in a]
-        # self.log(slot_df)
-        # slot_df = slot_df.groupby(slot_df.index).sum().merge(right=df['import'], left_index=True, right_index=True).sort_values(['delta','import'])
-
-        # self.log(slot_df)
-        # new_slots = slot_df.to_dict()[1]
-        # new_slots = [(x, new_slots[x]) for x in new_slots]
-
-        # i = 1
-        # net_cost = [base_cost]
-        # slot_threshold = self.host.get_config("slot_threshold_p")
-        # self.log(slot_threshold)
-        # self.log(base_cost)
-        # while i<=len(new_slots):
-        #     df = pd.concat(
-        #         [
-        #             prices,
-        #             consumption,
-        #             self.flows(
-        #                 initial_soc, static_flows, slots=new_slots[:i], **kwargs
-        #             ),
-        #         ],
-        #         axis=1,
-        #     )
-        #     net_cost.append(round(contract.net_cost(df).sum(), 1))
-        #     self.log(f"{i}: {new_slots[i-1]} {net_cost[-1]} {net_cost[-2]} {net_cost[-1]-net_cost[-2]}" )
-        #     i += 1
-
-        # slots = [x[0] for x in zip(new_slots, net_cost[1:], net_cost[:-1]) if x[2]-x[1] >=slot_threshold]
-        # self.log(slots)
-
         df = pd.concat(
             [
                 prices,

@@ -12,13 +12,10 @@ import numpy as np
 from numpy import nan
 import re
 
+VERSION = "3.13.0-ev-beta-2"
 
-# import pvpy as pv
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
-USE_TARIFF = True
-
-VERSION = "3.13.0-ev-beta-2"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -726,7 +723,7 @@ class PVOpt(hass.Hass):
                                 level="WARNING",
                             )
 
-            if self.contract is None or USE_TARIFF:
+            if self.contract is None:
                 if (
                     "octopus_import_tariff_code" in self.config
                     and self.config["octopus_import_tariff_code"] is not None
@@ -2246,7 +2243,9 @@ class PVOpt(hass.Hass):
                 "device_class": "monetary",
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison {contract.name}",
-            } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
+                "net_base": round(net_base.sum() / 100, 2),
+                # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
+            }
 
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
