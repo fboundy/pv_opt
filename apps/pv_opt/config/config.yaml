@@ -24,7 +24,6 @@ pv_opt:
 
 
 # User configuration ---  EDIT AWAY! ---
-
   inverter_type: "SOLIS_SOLAX_MODBUS"
   # inverter_type: "SOLIS_CORE_MODBUS"
   # inverter_type: SOLIS_SOLARMAN
@@ -73,10 +72,7 @@ pv_opt:
   # ========================================
   #
   # use_consumption_history: true
-  # consumption_history_days:
-  #   - 7
-  # consumption_margin:
-  #   - input_number.solar_opt_consumption_margin
+  consumption_history_days: 7
   #
   # daily_consumption_kwh: 17
   # shape_consumption_profile: true
