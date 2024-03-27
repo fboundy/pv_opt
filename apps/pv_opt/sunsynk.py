@@ -34,15 +34,13 @@ INVERTER_DEFS = {
             "id_battery_soc": " sensor.{device_name}_{inverter sn}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_{inverter sn}_day_load_energy",
             "id_grid_import_today": "sensor.{device_name}_{inverter sn}_day_grid_import",
-            "id_grid_export_today": "sensor.{device_name}_{inverter sn}_day_grid_import",
+            "id_grid_export_today": "sensor.{device_name}_{inverter sn}_day_grid_export",
             "supports_hold_soc": False,
             "update_cycle_seconds": 300,
         },
         # Brand Conguration: Exposed as inverter.brand_config and can be over-written using arguments
         # from the config.yaml file but not rquired outside of this module
-        "brand_config": {
-
-        },
+        "brand_config": {},
     },
 }
 
@@ -62,28 +60,16 @@ class InverterController:
         ):
             for item in defs:
                 if isinstance(defs[item], str):
-                    conf[item] = defs[item].replace(
-                        "{device_name}", self.host.device_name
-                    )
-                    conf[item] = defs[item].replace(
-                        "{inverter_sn}", self.host.inverter_sn
-                    )                    
+                    conf[item] = defs[item].replace("{device_name}", self.host.device_name)
+                    conf[item] = defs[item].replace("{inverter_sn}", self.host.inverter_sn)
                 elif isinstance(defs[item], list):
-                    conf[item] = [
-                        z.replace("{device_name}", self.host.device_name)
-                        for z in defs[item]
-                    ]
-                    conf[item] = [
-                        z.replace("{inverter_sn}", self.host.inverter_sn)
-                        for z in defs[item]
-                    ]
+                    conf[item] = [z.replace("{device_name}", self.host.device_name) for z in defs[item]]
+                    conf[item] = [z.replace("{inverter_sn}", self.host.inverter_sn) for z in defs[item]]
                 else:
                     conf[item] = defs[item]
 
     def enable_timed_mode(self):
-        if (
-            self.type == "SUNSYNK_SOLARSYNC2"
-        ):
+        if self.type == "SUNSYNK_SOLARSYNC2":
             pass
 
     def control_charge(self, enable, **kwargs):
@@ -97,13 +83,9 @@ class InverterController:
         self._control_charge_discharge("discharge", enable, **kwargs)
 
     def hold_soc(self, enable, soc=None):
-        if (
-            self.type == "SUNSYNK_SOLARSYNC2"
-        ):
+        if self.type == "SUNSYNK_SOLARSYNC2":
             if enable:
-                self._solis_set_mode_switch(
-                    SelfUse=True, Timed=False, GridCharge=True, Backup=True
-                )
+                self._solis_set_mode_switch(SelfUse=True, Timed=False, GridCharge=True, Backup=True)
             else:
                 self.enable_timed_mode()
 
@@ -117,9 +99,7 @@ class InverterController:
 
             self.log(f"Setting Backup SOC to {soc}%")
             if self.type == "SOLIS_SOLAX_MODBUS":
-                changed, written = self._write_and_poll_value(
-                    entity_id=entity_id, value=soc
-                )
+                changed, written = self._write_and_poll_value(entity_id=entity_id, value=soc)
             elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self.solis_write_holding_register(
                     address=INVERTER_DEFS(self.type)["registers"]["backup_mode_soc"],
@@ -134,9 +114,7 @@ class InverterController:
     @property
     def status(self):
         status = None
-        if (
-            self.type == "SUNSYNK_SOLARSYNC2"
-        ):
+        if self.type == "SUNSYNK_SOLARSYNC2":
             status = "Status"
 
         return status
@@ -150,9 +128,5 @@ class InverterController:
         pass
 
     def _control_charge_discharge(self, direction, enable, **kwargs):
-        if (
-            self.type == "SOLIS_SOLAX_MODBUS"
-        ):
+        if self.type == "SOLIS_SOLAX_MODBUS":
             pass
-
-
