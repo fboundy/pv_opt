@@ -69,7 +69,7 @@ class InverterController:
                     conf[item] = defs[item]
 
     def enable_timed_mode(self):
-        if self.type == "SUNSYNK_SOLARSYNC2":
+        if self.type == "SUNSYNK_SOLARSYNK2":
             pass
 
     def control_charge(self, enable, **kwargs):
@@ -83,7 +83,7 @@ class InverterController:
         self._control_charge_discharge("discharge", enable, **kwargs)
 
     def hold_soc(self, enable, soc=None):
-        if self.type == "SUNSYNK_SOLARSYNC2":
+        if self.type == "SUNSYNK_SOLARSYNK2":
             if enable:
                 self._solis_set_mode_switch(SelfUse=True, Timed=False, GridCharge=True, Backup=True)
             else:
@@ -114,7 +114,7 @@ class InverterController:
     @property
     def status(self):
         status = None
-        if self.type == "SUNSYNK_SOLARSYNC2":
+        if self.type == "SUNSYNK_SOLARSYNK2":
             status = "Status"
 
         return status
