@@ -366,6 +366,24 @@ These parameters will tweak how PV Opt runs:
 | Slot threshold | % | `number.pvopt_slop_throshold_p` | 1p | The incremental cost saving that each 30 minute slot of the optimiser needs to show to be included. Reducing the threshold may marginally reduce the predicted cost but have more marginal charge/discharge windows. |
 | Power Resolution | W | `number.pvopt_forced_power_group_tolerance` | 100 | The resolution at which forced charging / discharging is reported. Changing this will change the reporting of the charge plan but not the actual detail of it. |
 
+<h3>Alternative Tariffs</h3>
+PV Opt can also check what each day would have cost using any combination of Octopus tariffs. Run over time this can give you an idea of whether it would be worth switching. To  enable this simply add a block like this to `config.yaml`:
+
+    id_daily_solar: sensor.{device_name}_power_generation_today
+    alt_tariffs:
+      - name: Agile_Fix
+        octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
+        octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
+
+      - name: Eco7_Fix
+        octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+        octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
+
+      - name: Flux
+        octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+        octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
+
+In this example three alternatives are tested. For each tariff pair the Base and Optimised net cost for yesterday are calculated and saved to an entity called `sensor.pvopt_opt_cost_name`. The state of this entity is the optimised cost and the base cost is saved as the `net_base` attribute.
 
 <h2>Output</h2>
 

@@ -4,6 +4,7 @@ import time
 TIMEFORMAT = "%H:%M"
 INVERTER_DEFS = {
     "SOLIS_SOLAX_MODBUS": {
+        "online": "number.{device_name}_battery_minimum_soc",
         "codes": {
             "SelfUse - No Grid Charging": 1,
             "Self-Use - No Grid Charging": 1,
@@ -84,6 +85,7 @@ INVERTER_DEFS = {
         },
     },
     "SOLIS_CORE_MODBUS": {
+        "online": "sensor.{device_name}_overdischarge_soc",
         "bits": [
             "SelfUse",
             "Timed",
@@ -222,6 +224,14 @@ class InverterController:
                     conf[item] = [z.replace("{device_name}", self.host.device_name) for z in defs[item]]
                 else:
                     conf[item] = defs[item]
+
+    def is_online(self):
+        entity_id = INVERTER_DEFS[self.type].get("online", (None, None))
+        if entity_id is not None:
+            entity_id = entity_id.replace("{device_name}", self.host.device_name)
+            return self.host.get_state(entity_id) not in ["unknown", "unavailable"]
+        else:
+            return True
 
     def enable_timed_mode(self):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
