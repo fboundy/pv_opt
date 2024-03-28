@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "4.0.0-alpha-10"
+VERSION = "4.0.0-solax-x1-beta-10"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -1498,6 +1498,7 @@ class PVOpt(hass.Hass):
                             start=self.charge_start_datetime,
                             end=self.charge_end_datetime,
                             power=self.charge_power,
+                            target_soc=self.charge_target_soc,
                         )
                         self.inverter.control_discharge(enable=False)
 
@@ -1507,6 +1508,7 @@ class PVOpt(hass.Hass):
                             start=self.charge_start_datetime,
                             end=self.charge_end_datetime,
                             power=self.charge_power,
+                            target_soc=self.charge_target_soc,
                         )
                         self.inverter.control_charge(enable=False)
 
@@ -1540,6 +1542,7 @@ class PVOpt(hass.Hass):
                                 start=start,
                                 end=self.charge_end_datetime,
                                 power=self.charge_power,
+                                target_soc=self.charge_target_soc,
                             )
 
                             if status["discharge"]["active"]:
@@ -1558,6 +1561,7 @@ class PVOpt(hass.Hass):
                                 start=start,
                                 end=self.charge_end_datetime,
                                 power=self.charge_power,
+                                target_soc=self.charge_target_soc,
                             )
 
                             if status["charge"]["active"]:
@@ -1734,6 +1738,7 @@ class PVOpt(hass.Hass):
             self.charge_current = self.charge_power / self.get_config("battery_voltage", default=50)
             self.charge_start_datetime = self.windows["start"].iloc[0]
             self.charge_end_datetime = self.windows["end"].iloc[0]
+            self.charge_target_soc = self.windows["soc_end"].iloc[0]
             self.hold = [
                 {
                     "active": self.windows["hold_soc"].iloc[i] == "<=",
@@ -1745,7 +1750,8 @@ class PVOpt(hass.Hass):
         else:
             self.log(f"No charging slots")
             self.charge_current = 0
-            self.charge_power = 0
+            self.charge_target_soc = 0
+            self.windows["end"].iloc[0]
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
             self.hold = []
