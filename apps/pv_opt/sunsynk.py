@@ -4,6 +4,7 @@ import time
 TIMEFORMAT = "%H:%M"
 INVERTER_DEFS = {
     "SUNSYNK_SOLARSYNK2": {
+        "online": "sensor.{device_name}_{inverter sn}_battery_shutdown_cap",
         # "modes": {
         #     1: "Selfuse - No Grid Charging",
         #     3: "Timed Charge/Discharge - No Grid Charging",
@@ -67,6 +68,14 @@ class InverterController:
                     conf[item] = [z.replace("{inverter_sn}", self.host.inverter_sn) for z in defs[item]]
                 else:
                     conf[item] = defs[item]
+
+    def is_online(self):
+        entity_id = INVERTER_DEFS[self.type].get("online", (None, None))
+        if entity_id is not None:
+            entity_id = entity_id.replace("{device_name}", self.host.device_name)
+            return self.host.get_state(entity_id) not in ["unknown", "unavailable"]
+        else:
+            return True
 
     def enable_timed_mode(self):
         if self.type == "SUNSYNK_SOLARSYNK2":
