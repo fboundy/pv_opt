@@ -2330,5 +2330,30 @@ class PVOpt(hass.Hass):
 
         return df
 
+    def write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
+        changed = False
+        written = False
+        state = float(self.get_state(entity_id=entity_id))
+        new_state = None
+        diff = abs(state - value)
+        if diff > tolerance:
+            changed = True
+            try:
+                self.call_service("number/set_value", entity_id=entity_id, value=str(value))
+
+                time.sleep(0.5)
+                new_state = float(self.get_state(entity_id=entity_id))
+                written = new_state == value
+
+            except:
+                written = False
+
+            if verbose:
+                str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
+                str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
+                self.log(str_log)
+
+        return (changed, written)
+
 
 # %%
