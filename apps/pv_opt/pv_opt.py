@@ -12,11 +12,10 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.12.4"
+VERSION = "3.13.1"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
-VERSION = "3.13.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -40,6 +39,7 @@ MAX_INVERTER_UPDATES = 2
 MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
+WRITE_POLL_SLEEP = 0.5
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -2341,7 +2341,7 @@ class PVOpt(hass.Hass):
             try:
                 self.call_service("number/set_value", entity_id=entity_id, value=str(value))
 
-                time.sleep(0.5)
+                time.sleep(WRITE_POLL_SLEEP)
                 new_state = float(self.get_state(entity_id=entity_id))
                 written = new_state == value
 
