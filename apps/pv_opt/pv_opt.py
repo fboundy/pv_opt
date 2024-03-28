@@ -20,7 +20,7 @@ VERSION = "3.13.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
-DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
+DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M %Z"
 TIME_FORMAT = "%H:%M"
 
 REDACT_REGEX = [
@@ -1715,7 +1715,7 @@ class PVOpt(hass.Hass):
             self.log("Optimal forced charge/discharge slots:")
             for window in self.windows.iterrows():
                 self.log(
-                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
+                    f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
