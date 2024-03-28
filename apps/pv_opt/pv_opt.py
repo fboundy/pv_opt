@@ -12,13 +12,10 @@ import numpy as np
 from numpy import nan
 import re
 
+VERSION = "4.0.0-alpha-10"
 
-# import pvpy as pv
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
-USE_TARIFF = True
-
-VERSION = "4.0.0-alpha-10"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -43,6 +40,7 @@ MAX_ITERS = 10
 MAX_INVERTER_UPDATES = 2
 MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
+ONLINE_RETRIES = 12
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -306,41 +304,6 @@ def importName(modulename, name):
 
 
 class PVOpt(hass.Hass):
-    def hass2df(self, entity_id, days=2, log=False, freq=None):
-        if log:
-            self.log(f">>> Getting {days} days' history for {entity_id}")
-            self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
-
-        hist = None
-
-        i = 0
-        while (hist is None) and (i < MAX_HASS_HISTORY_CALLS):
-            hist = self.get_history(entity_id=entity_id, days=days)
-            if hist is None:
-                time.sleep(1)
-            i += 1
-
-        if (hist is not None) and (len(hist) > 0):
-            df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
-            df.index = pd.to_datetime(df.index, format="ISO8601")
-
-            df = df.sort_index()
-            df = df[df != "unavailable"]
-            df = df[df != "unknown"]
-            df = pd.to_numeric(df, errors="coerce")
-            df = df.dropna()
-            if isinstance(freq, str):
-                try:
-                    df = df.resample(freq).mean().interpolate()
-                except:
-                    pass
-
-        else:
-            self.log(f"No data returned from HASS entity {entity_id}", level="ERROR")
-            df = None
-
-        return df
-
     def initialize(self):
         self.config = {}
         self.log("")
@@ -366,9 +329,6 @@ class PVOpt(hass.Hass):
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
         self.device_name = self.args.pop("device_name", "solis")
 
-        if self.debug or self.args.get("list_entities", True):
-            self._list_entities()
-
         self.redact = self.args.pop("redact_personal_data_from_log", True)
 
         self.inverter_sn = self.args.pop("inverter_sn", "")
@@ -377,6 +337,23 @@ class PVOpt(hass.Hass):
 
         self.redact = self.args.pop("redact_personal_data_from_log", True)
         self._load_inverter()
+
+        retry_count = 0
+        while (not self.inverter.is_online()) and (retry_count < ONLINE_RETRIES):
+            self.log("Inverter controller appears not to be running. Waiting 5 secomds to re-try")
+            time.sleep(5)
+            retry_count += 1
+
+        if not self.inverter.is_online():
+            e = "Unable to get expected response from Inverter Controller for {self.inverter_type}"
+            self._status(e)
+            self.log(e, level="ERROR")
+            raise Exception(e)
+        else:
+            self.log("Inverter appears to be online")
+
+        if self.debug or self.args.get("list_entities", True):
+            self._list_entities()
 
         self.change_items = {}
         self.config_state = {}
@@ -527,7 +504,9 @@ class PVOpt(hass.Hass):
         end = kwargs.get("end", pd.Timestamp.now(tz="UTC"))
 
         if self.debug:
-            self.log(f">>> Start: {start.strftime(DATE_TIME_FORMAT_LONG)} End: {end.strftime(DATE_TIME_FORMAT_LONG)}")
+            self.log(
+                f">>> Start: {start.strftime(DATE_TIME_FORMAT_SHORT)} End: {end.strftime(DATE_TIME_FORMAT_SHORT)}"
+            )
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
 
         index = pd.date_range(
@@ -709,7 +688,7 @@ class PVOpt(hass.Hass):
                                 level="WARNING",
                             )
 
-            if self.contract is None or USE_TARIFF:
+            if self.contract is None:
                 if (
                     "octopus_import_tariff_code" in self.config
                     and self.config["octopus_import_tariff_code"] is not None
@@ -1405,13 +1384,13 @@ class PVOpt(hass.Hass):
         self.initial_soc = x.interpolate().loc[self.static.index[0]]
         if not isinstance(self.initial_soc, float):
             self.log("")
-            self.log("Unable to optimise without consumption data.", level="ERROR")
+            self.log("Unable to optimise without initial SOC", level="ERROR")
             self._status("ERROR: No initial SOC")
             return
 
+        self.log("")
         self.log(f"Initial SOC: {self.initial_soc}")
 
-        self.log("Calculating Base flows")
         self.base = self.pv_system.flows(
             self.initial_soc,
             self.static,
@@ -1419,17 +1398,26 @@ class PVOpt(hass.Hass):
             solar="weighted",
         )
 
+        self.log("Calculating Base flows:")
         if len(self.base) == 0:
             self.log("")
-            self.log("Unable to calculate baseline perfoormance", level="ERROR")
-            self._status("ERROR: Basline performance")
+            self.log("  Unable to calculate baseline perfoormance", level="ERROR")
+            self._status("ERROR: Baseline performance")
             return
 
         self.base_cost = self.contract.net_cost(self.base)
-        self.log(f"Base cost: {self.base_cost.sum():6.2f}p")
+        self.log(f"  Base cost: {self.base_cost.sum():6.2f}p")
         self.log("")
+        if self.get_config("use_solar", True):
+            str_log = (
+                f'Optimising for Solcast {self.get_config("solcast_confidence_level")}% confidence level forecast'
+            )
+        else:
+            str_log = "Optimising without Solar"
+
         self.log(
-            f'Optimising for {self.get_config("solar_forecast")} forecast from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}'
+            str_log
+            + f" from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
         )
 
         self._status("Optimising charge plan")
@@ -1989,6 +1977,7 @@ class PVOpt(hass.Hass):
             log=log,
         )
 
+        # self.log(df.to_string())
         if df is not None:
             df.index = pd.to_datetime(df.index)
             df = (df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30min")).ffill().fillna(0).diff(-1) * 2000
@@ -2001,19 +1990,34 @@ class PVOpt(hass.Hass):
         return df
 
     def load_consumption(self, start, end):
-        self.log("Getting expected consumption data:")
+        self.log(
+            f"Getting expected consumption data for {start.strftime(DATE_TIME_FORMAT_LONG)} to {end.strftime(DATE_TIME_FORMAT_LONG)}:"
+        )
+
+        time_now = pd.Timestamp.now(tz="UTC")
+        if (start < time_now) and (end < time_now):
+            self.log("  - Start and end are both in past so actuals will be used with no weighting")
 
         index = pd.date_range(start, end, inclusive="left", freq="30min")
         consumption = pd.DataFrame(index=index, data={"consumption": 0})
 
         if self.get_config("use_consumption_history"):
-            entity_ids = self.config["id_consumption_today"]
+            entity_id = self.config["id_consumption_today"]
             days = int(self.get_config("consumption_history_days"))
 
-            if not isinstance(entity_ids, list):
-                entity_ids = [entity_ids]
+            # if not isinstance(entity_ids, list):
+            #     entity_ids = [entity_ids]
 
-            for entity_id in entity_ids:
+            # for entity_id in entity_ids:
+            if (start < time_now) and (end < time_now):
+                consumption["consumption"] = self._get_hass_power_from_daily_kwh(
+                    entity_id,
+                    start=start,
+                    end=end,
+                    log=self.debug,
+                )
+
+            else:
                 df = self._get_hass_power_from_daily_kwh(
                     entity_id,
                     days=days,
@@ -2049,7 +2053,7 @@ class PVOpt(hass.Hass):
 
                 if self.debug:
                     self.log(">>> All consumption:")
-                    self.log(f">>> {dfx}")
+                    self.log(f">>> {dfx.to_string()}")
                     self.log(">>> Consumption grouped by time:")
                     self.log(f">>> {df}")
 
@@ -2098,23 +2102,26 @@ class PVOpt(hass.Hass):
                 consumption["consumption"] = self.get_config("daily_consumption_kwh") * 1000 / 24
 
             self.log("  - Consumption estimated OK")
-        self.log("")
+
+        self.log(f"  - Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
         return consumption
 
     def _compare_tariffs(self):
-        self.log("")
-        self.log("Comparing yesterday's tariffs")
+        self.ulog("Comparing yesterday's tariffs")
         end = pd.Timestamp.now(tz="UTC").normalize()
         start = end - pd.Timedelta(24, "hours")
 
         solar = self._get_solar(start, end)
+        if solar is None:
+            self.log("  Unable to compare tariffs", level="ERROR")
+            return
+
         consumption = self.load_consumption(start, end)
         static = pd.concat([solar, consumption], axis=1).set_axis(["solar", "consumption"], axis=1)
 
-        initial_soc_df = self.hass2df(self.config["id_battery_soc"], days=2, log=True, freq="30min")
-
-        self.log(f">>> {initial_soc_df.dropna()}")
+        initial_soc_df = self.hass2df(self.config["id_battery_soc"], days=2, freq="30min")
         initial_soc = initial_soc_df.loc[start]
+
         base = self.pv_system.flows(initial_soc, static, solar="solar")
 
         contracts = [self.contract]
@@ -2149,7 +2156,11 @@ class PVOpt(hass.Hass):
                 "friendly_name": f"PV Opt Comparison Actual",
             },
         )
-        self.log(f"  Actual:                                          {actual.sum():6.1f}p")
+
+        self.ulog("Net Cost comparison:", underline=None)
+        self.log(f"  {'Tariff':20s}  {'Base Cost (GBP)':>20s}  {'Optimised Cost (GBP)':>20s} ")
+        self.log(f"  {'------':20s}  {'---------------':>20s}  {'--------------------':>20s} ")
+        self.log(f"  {'Actual':20s}  {'':20s}  {(actual.sum()/100):>20.3f}")
 
         cols = [
             "soc",
@@ -2180,12 +2191,12 @@ class PVOpt(hass.Hass):
                 "device_class": "monetary",
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison {contract.name}",
-            } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
+                "net_base": round(net_base.sum() / 100, 2),
+                # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
+            }
 
             net_opt = contract.net_cost(opt, day_ahead=False)
-            self.log(
-                f"  {contract.name:10s}  Base Cost: {net_base.sum():6.1f}p   Optimised Cost: {net_opt.sum():6.1f}p"
-            )
+            self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
             entity_id = f"sensor.{self.prefix}_opt_cost_{contract.name}"
             self.set_state(
                 state=round(net_opt.sum() / 100, 2),
@@ -2194,7 +2205,7 @@ class PVOpt(hass.Hass):
             )
 
     def _get_solar(self, start, end):
-        self.log("  - Getting yesterday's solar generation")
+        self.log("Getting yesterday's solar generation:")
         entity_id = self.config["id_daily_solar"]
         if entity_id is None or not self.entity_exists(entity_id):
             return
@@ -2209,14 +2220,16 @@ class PVOpt(hass.Hass):
         df = self.hass2df(entity_id, days=days).astype(float).resample("30min").ffill()
         if df is not None:
             df.index = pd.to_datetime(df.index)
+            self.log(f"  - {df.loc[dt[-2]]:0.1f} kWh")
             df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
 
+        else:
+            self.log("  - FAILED")
+        self.log("")
         return df
 
     def _check_tariffs_vs_bottlecap(self):
-        self.log("")
-        self.log("Checking tariff prices vs Octopus Energy Integration:")
-        self.log("-----------------------------------------------------")
+        self.ulog("Checking tariff prices vs Octopus Energy Integration:")
         for direction in self.contract.tariffs:
             if self.bottlecap_entities[direction] is None:
                 str_log = "No OE Integration entity found."
@@ -2258,10 +2271,15 @@ class PVOpt(hass.Hass):
 
             self.log(f"  {direction.title()}: {str_log}")
 
-    def ulog(self, strlog):
+    def ulog(self, strlog, underline="-", words=False):
         self.log("")
         self.log(strlog)
-        self.log("-" * len(strlog))
+        if underline is not None:
+            if words:
+                self.log(" ".join(["-" * len(word) for word in strlog.split()]))
+            else:
+                self.log(underline * len(strlog))
+
         self.log("")
 
     def _list_entities(self, domains=["select", "number", "sensor"]):
@@ -2288,6 +2306,41 @@ class PVOpt(hass.Hass):
                     for option in states[entity_id]["attributes"]["options"]:
                         self.log(f"{option:>83s}")
         self.log("")
+
+    def hass2df(self, entity_id, days=2, log=False, freq=None):
+        if log:
+            self.log(f">>> Getting {days} days' history for {entity_id}")
+            self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
+
+        hist = None
+
+        i = 0
+        while (hist is None) and (i < MAX_HASS_HISTORY_CALLS):
+            hist = self.get_history(entity_id=entity_id, days=days)
+            if hist is None:
+                time.sleep(1)
+            i += 1
+
+        if (hist is not None) and (len(hist) > 0):
+            df = pd.DataFrame(hist[0]).set_index("last_updated")["state"]
+            df.index = pd.to_datetime(df.index, format="ISO8601")
+
+            df = df.sort_index()
+            df = df[df != "unavailable"]
+            df = df[df != "unknown"]
+            df = pd.to_numeric(df, errors="coerce")
+            df = df.dropna()
+            if isinstance(freq, str):
+                try:
+                    df = df.resample(freq).mean().interpolate()
+                except:
+                    pass
+
+        else:
+            self.log(f"No data returned from HASS entity {entity_id}", level="ERROR")
+            df = None
+
+        return df
 
 
 # %%
