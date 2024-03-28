@@ -2355,5 +2355,12 @@ class PVOpt(hass.Hass):
 
         return (changed, written)
 
+    def set_select(self, item, state):
+        if state is not None:
+            entity_id = self.config[f"id_{item}"]
+            if self.get_state(entity_id=entity_id) != state:
+                self.call_service("select/select_option", entity_id=entity_id, option=state)
+                self.rlog(f"Setting {entity_id} to {state}")
+
 
 # %%

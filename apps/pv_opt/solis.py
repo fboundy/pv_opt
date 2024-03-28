@@ -440,10 +440,7 @@ class InverterController:
                 self.log(f">>> Modes: {modes}")
                 self.log(f">>> Inverter Mode: {mode}")
 
-            if mode is not None:
-                if self.host.get_state(entity_id=entity_id) != mode:
-                    self.host.call_service("select/select_option", entity_id=entity_id, option=mode)
-                    self.log(f"Setting {entity_id} to {mode}")
+            self.host.set_select("inverter_mode", mode)
 
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
