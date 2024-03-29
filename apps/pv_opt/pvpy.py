@@ -131,11 +131,6 @@ class Tariff:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standard-unit-rates/"
             self.unit = requests.get(url, params=params).json()["results"]
 
-        if self.host.debug and "AGILE" not in code:
-            self.log(f">>> {code}: Unit Cost")
-            for x in self.unit:
-                self.log(f">>> {x}")
-
     def __str__(self):
         if self.export:
             str = f"Export Tariff: {self.name}"
@@ -205,9 +200,6 @@ class Tariff:
                     self.log("")
                     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
-                if self.host.debug:
-                    self.log(f">>> {df.index[-1].day}  {end.day}")
-
                 if pd.Timestamp.now(tz="UTC").hour > 11 and df.index[-1].day != end.day:
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
@@ -247,9 +239,6 @@ class Tariff:
                 newindex = pd.date_range(df.index[0], end, freq="30min")
                 df = df.reindex(index=newindex).ffill().loc[start:]
             else:
-                if self.host.debug:
-                    self.log(">>> Index <= 30")
-
                 i = 0
                 while df.index[-1] < end and i < 7:
                     i += 1
@@ -431,8 +420,11 @@ class Contract:
                 self.tariffs["import"] = None
                 return
 
-            mpans = r.json()["properties"][0]["electricity_meter_points"]
-            for mpan in mpans:
+            self.host.mpans = r.json()["properties"][0]["electricity_meter_points"]
+            for mpan in self.mpans:
+                self.redact_patterns.append(mpan["mpan"])
+
+            for mpan in self.host.mpans:
                 self.rlog(f"Getting details for MPAN {mpan['mpan']}")
                 df = pd.DataFrame(mpan["agreements"])
                 df = df.set_index("valid_from")
@@ -484,10 +476,10 @@ class Contract:
         imp_df = self.tariffs["import"].to_df(start, end, **kwargs)
         nc = imp_df["fixed"]
         if kwargs.get("log"):
-            self.log(f">>> Import{self.tariffs['import'].to_df(start,end).to_string()}")
+            self.rlog(f">>> Import{self.tariffs['import'].to_df(start,end).to_string()}")
         nc += imp_df["unit"] * grid_imp / 2000
         if kwargs.get("log"):
-            self.log(f">>> Export{self.tariffs['export'].to_df(start,end).to_string()}")
+            self.rlog(f">>> Export{self.tariffs['export'].to_df(start,end).to_string()}")
         if self.tariffs["export"] is not None:
             nc += self.tariffs["export"].to_df(start, end, **kwargs)["unit"] * grid_exp / 2000
 
