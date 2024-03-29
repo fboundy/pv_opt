@@ -2195,7 +2195,6 @@ class PVOpt(hass.Hass):
                 # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
             }
 
-            self.log(f">>> {attributes}")
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
             entity_id = f"sensor.{self.prefix}_opt_cost_{contract.name}"
