@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "4.0.0-sunsynk-alpha-8"
+VERSION = "4.0.0-sunsynk-alpha-9"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -312,6 +312,8 @@ class PVOpt(hass.Hass):
         self.log("")
 
         self.debug = DEBUG
+        self.redact_regex = REDACT_REGEX
+
         try:
             subver = int(VERSION.split(".")[2])
         except:
@@ -324,7 +326,6 @@ class PVOpt(hass.Hass):
         self.mqtt = self.get_plugin_api("MQTT")
         self._load_tz()
         self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
-        self.redact_patterns = REDACT_REGEX
 
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
@@ -410,7 +411,7 @@ class PVOpt(hass.Hass):
     def rlog(self, str, **kwargs):
         if self.redact:
             try:
-                for pattern in self.redact_patterns:
+                for pattern in self.redact_regex:
                     x = re.search(pattern, str)
                     if x:
                         str = re.sub(pattern, "*" * len(x.group()), str)
