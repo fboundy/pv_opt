@@ -75,6 +75,14 @@ class InverterController:
                 else:
                     conf[item] = defs[item]
 
+    def is_online(self):
+        entity_id = INVERTER_DEFS[self.type].get("online", (None, None))
+        if entity_id is not None:
+            entity_id = entity_id.replace("{device_name}", self.host.device_name)
+            return self.host.get_state(entity_id) not in ["unknown", "unavailable"]
+        else:
+            return True
+
     def enable_timed_mode(self):
         if self.type == "SOLAX_X1":
             self._solax_set_select("lock_state", "Unlocked - Advanced")
