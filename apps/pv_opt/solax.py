@@ -48,6 +48,7 @@ INVERTER_DEFS = {
             "id_lock_state": "select.{device_name}_lock_state",
             "id_export_duration": "select.{device_name}_export_duration",
             "id_target_soc": "number.{device_name}_forcetime_period_1_max_capacity",
+            "id_backup_grid_charge": "select.{device_name}_allow_grid_charge",
         },
     },
 }
@@ -208,7 +209,7 @@ class InverterController:
         if self.type == "SOLAX_X1":
             return {
                 limit: pd.Timestamp(
-                    self.host.get_state(entity_id=self.host.config(f"id_charge_{limit}_time_1")), tz=self.tz
+                    self.host.get_state(entity_id=self.host.config[f"id_charge_{limit}_time_1"]), tz=self.tz
                 )
                 for limit in LIMITS
             } | {"current": self.host.get_state(entity_id=self.host.config[f"id_max_charge_current"])}
