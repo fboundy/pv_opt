@@ -4,7 +4,7 @@ import time
 TIMEFORMAT = "%H:%M"
 INVERTER_DEFS = {
     "SUNSYNK_SOLARSYNK2": {
-        "online": "sensor.{device_name}_{inverter sn}_battery_shutdown_cap",
+        "online": "sensor.{device_name}_{inverter_sn}_battery_shutdown_cap",
         # "modes": {
         #     1: "Selfuse - No Grid Charging",
         #     3: "Timed Charge/Discharge - No Grid Charging",
@@ -31,11 +31,11 @@ INVERTER_DEFS = {
         # file. They are required for the main PV_Opt module and if they cannot be found an ERROR will be
         # raised
         "default_config": {
-            "maximum_dod_percent": "sensor.{device_name}_{inverter sn}_battery_shutdown_cap",
-            "id_battery_soc": " sensor.{device_name}_{inverter sn}_battery_soc",
-            "id_consumption_today": "sensor.{device_name}_{inverter sn}_day_load_energy",
-            "id_grid_import_today": "sensor.{device_name}_{inverter sn}_day_grid_import",
-            "id_grid_export_today": "sensor.{device_name}_{inverter sn}_day_grid_export",
+            "maximum_dod_percent": "sensor.{device_name}_{inverter_sn}_battery_shutdown_cap",
+            "id_battery_soc": " sensor.{device_name}_{inverter_sn}_battery_soc",
+            "id_consumption_today": "sensor.{device_name}_{inverter_sn}_day_load_energy",
+            "id_grid_import_today": "sensor.{device_name}_{inverter_sn}_day_grid_import",
+            "id_grid_export_today": "sensor.{device_name}_{inverter_sn}_day_grid_export",
             "supports_hold_soc": False,
             "update_cycle_seconds": 300,
         },
