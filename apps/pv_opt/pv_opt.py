@@ -2232,6 +2232,7 @@ class PVOpt(hass.Hass):
     def _check_tariffs_vs_bottlecap(self):
         self.ulog("Checking tariff prices vs Octopus Energy Integration:")
         for direction in self.contract.tariffs:
+            err = False
             if self.bottlecap_entities[direction] is None:
                 str_log = "No OE Integration entity found."
 
@@ -2269,8 +2270,12 @@ class PVOpt(hass.Hass):
                 if round(df["delta"].abs().mean(), 2) > 0:
                     str_log += " <<< ERROR"
                     self._status("ERROR: Tariff inconsistency")
+                    err = True
 
             self.log(f"  {direction.title()}: {str_log}")
+
+            if err:
+                self.rlog(self.contract.tariffs[direction])
 
     def ulog(self, strlog, underline="-", words=False):
         self.log("")
