@@ -12,11 +12,10 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.12.4"
+VERSION = "3.13.1"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
-VERSION = "3.13.0"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
@@ -40,6 +39,7 @@ MAX_INVERTER_UPDATES = 2
 MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
+WRITE_POLL_SLEEP = 0.5
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -310,6 +310,8 @@ class PVOpt(hass.Hass):
         self.log("")
 
         self.debug = DEBUG
+        self.redact_regex = REDACT_REGEX
+
         try:
             subver = int(VERSION.split(".")[2])
         except:
@@ -399,7 +401,7 @@ class PVOpt(hass.Hass):
     def rlog(self, str, **kwargs):
         if self.redact:
             try:
-                for pattern in REDACT_REGEX:
+                for pattern in self.redact_regex:
                     x = re.search(pattern, str)
                     if x:
                         str = re.sub(pattern, "*" * len(x.group()), str)
@@ -484,7 +486,7 @@ class PVOpt(hass.Hass):
         self.timer_handle = self.run_every(
             self._compare_tariff_cb,
             start=start,
-            interval=3600 * 24,
+            interval=3600,
         )
 
     def _cost_actual(self, **kwargs):
@@ -649,6 +651,10 @@ class PVOpt(hass.Hass):
             if self.contract is None:
                 if ("octopus_account" in self.config) and ("octopus_api_key" in self.config):
                     if (self.config["octopus_account"] is not None) and (self.config["octopus_api_key"] is not None):
+                        for x in ["octopus_account", "octopus_api_key"]:
+                            if self.config[x] not in self.redact_regex:
+                                self.redact_regex.append(x)
+                                self.redact_regex.append(x.lower().replace("-", "_"))
                         try:
                             self.rlog(
                                 f"Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
@@ -770,6 +776,12 @@ class PVOpt(hass.Hass):
             ][0]
             self.log("")
             self.rlog(f"Found Octopus Savings Events entity: {saving_events_entity}")
+            octopus_account = self.get_state(entity_id=saving_events_entity, attribute="account_id")
+
+            self.config["octopus_account"] = octopus_account
+            if octopus_account not in self.redact_regex:
+                self.redact_regex.append(octopus_account)
+                self.redact_regex.append(octopus_account.lower().replace("-", "_"))
 
             available_events = self.get_state(saving_events_entity, attribute="all")["attributes"]["available_events"]
 
@@ -2183,6 +2195,7 @@ class PVOpt(hass.Hass):
                 # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
             }
 
+            self.log(f">>> {attributes}")
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
             entity_id = f"sensor.{self.prefix}_opt_cost_{contract.name}"
@@ -2341,7 +2354,7 @@ class PVOpt(hass.Hass):
             try:
                 self.call_service("number/set_value", entity_id=entity_id, value=str(value))
 
-                time.sleep(0.5)
+                time.sleep(WRITE_POLL_SLEEP)
                 new_state = float(self.get_state(entity_id=entity_id))
                 written = new_state == value
 
