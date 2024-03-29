@@ -335,7 +335,7 @@ class PVOpt(hass.Hass):
 
         self.inverter_sn = self.args.pop("inverter_sn", "")
         if self.inverter_sn != "":
-            self.redact_patterns.append(self.inverter_sn)
+            self.redact_regex.append(self.inverter_sn)
 
         self.redact = self.args.pop("redact_personal_data_from_log", True)
         self._load_inverter()
