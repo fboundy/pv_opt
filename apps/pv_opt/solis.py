@@ -267,7 +267,7 @@ class InverterController:
 
             self.log(f"Setting Backup SOC to {soc}%")
             if self.type == "SOLIS_SOLAX_MODBUS":
-                changed, written = self._write_and_poll_value(entity_id=entity_id, value=soc)
+                changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=soc)
             elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self.solis_write_holding_register(
                     address=INVERTER_DEFS(self.type)["registers"]["backup_mode_soc"],
@@ -286,31 +286,6 @@ class InverterController:
             status = self._solis_state()
 
         return status
-
-    def _write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
-        changed = False
-        written = False
-        state = float(self.host.get_state(entity_id=entity_id))
-        new_state = None
-        diff = abs(state - value)
-        if diff > tolerance:
-            changed = True
-            try:
-                self.host.call_service("number/set_value", entity_id=entity_id, value=str(value))
-
-                time.sleep(0.5)
-                new_state = float(self.host.get_state(entity_id=entity_id))
-                written = new_state == value
-
-            except:
-                written = False
-
-            if verbose:
-                str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
-                str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
-                self.log(str_log)
-
-        return (changed, written)
 
     def _monitor_target_soc(self, target_soc, mode="charge"):
         pass
@@ -368,7 +343,9 @@ class InverterController:
                         value = times[limit].minute
 
                     if self.type == "SOLIS_SOLAX_MODBUS":
-                        changed, written = self._write_and_poll_value(entity_id=entity_id, value=value, verbose=True)
+                        changed, written = self.host.write_and_poll_value(
+                            entity_id=entity_id, value=value, verbose=True
+                        )
                     elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                         changed, written = self._solis_write_time_register(direction, limit, unit, value)
 
@@ -416,7 +393,7 @@ class InverterController:
             current = abs(round(power / self.host.get_config("battery_voltage"), 1))
             self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
             if self.type == "SOLIS_SOLAX_MODBUS":
-                changed, written = self._write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
+                changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
             elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self._solis_write_current_register(direction, current, tolerance=1)
             else:
@@ -466,10 +443,7 @@ class InverterController:
                 self.log(f">>> Modes: {modes}")
                 self.log(f">>> Inverter Mode: {mode}")
 
-            if mode is not None:
-                if self.host.get_state(entity_id=entity_id) != mode:
-                    self.host.call_service("select/select_option", entity_id=entity_id, option=mode)
-                    self.log(f"Setting {entity_id} to {mode}")
+            self.host.set_select("inverter_mode", mode)
 
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]

@@ -19,7 +19,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
-DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
+DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M %Z"
 TIME_FORMAT = "%H:%M"
 
 REDACT_REGEX = [
@@ -41,6 +41,7 @@ MAX_INVERTER_UPDATES = 2
 MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
+WRITE_POLL_SLEEP = 0.5
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -311,6 +312,8 @@ class PVOpt(hass.Hass):
         self.log("")
 
         self.debug = DEBUG
+        self.redact_regex = REDACT_REGEX
+
         try:
             subver = int(VERSION.split(".")[2])
         except:
@@ -409,7 +412,7 @@ class PVOpt(hass.Hass):
     def rlog(self, str, **kwargs):
         if self.redact:
             try:
-                for pattern in self.redact_patterns:
+                for pattern in self.redact_regex:
                     x = re.search(pattern, str)
                     if x:
                         str = re.sub(pattern, "*" * len(x.group()), str)
@@ -496,7 +499,7 @@ class PVOpt(hass.Hass):
         self.timer_handle = self.run_every(
             self._compare_tariff_cb,
             start=start,
-            interval=3600 * 24,
+            interval=3600,
         )
 
     def _cost_actual(self, **kwargs):
@@ -661,6 +664,10 @@ class PVOpt(hass.Hass):
             if self.contract is None:
                 if ("octopus_account" in self.config) and ("octopus_api_key" in self.config):
                     if (self.config["octopus_account"] is not None) and (self.config["octopus_api_key"] is not None):
+                        for x in ["octopus_account", "octopus_api_key"]:
+                            if self.config[x] not in self.redact_regex:
+                                self.redact_regex.append(x)
+                                self.redact_regex.append(x.lower().replace("-", "_"))
                         try:
                             self.rlog(
                                 f"Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
@@ -782,6 +789,12 @@ class PVOpt(hass.Hass):
             ][0]
             self.log("")
             self.rlog(f"Found Octopus Savings Events entity: {saving_events_entity}")
+            octopus_account = self.get_state(entity_id=saving_events_entity, attribute="account_id")
+
+            self.config["octopus_account"] = octopus_account
+            if octopus_account not in self.redact_regex:
+                self.redact_regex.append(octopus_account)
+                self.redact_regex.append(octopus_account.lower().replace("-", "_"))
 
             available_events = self.get_state(saving_events_entity, attribute="all")["attributes"]["available_events"]
 
@@ -1731,7 +1744,7 @@ class PVOpt(hass.Hass):
             self.log("Optimal forced charge/discharge slots:")
             for window in self.windows.iterrows():
                 self.log(
-                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
+                    f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
@@ -2201,6 +2214,7 @@ class PVOpt(hass.Hass):
                 # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
             }
 
+            self.log(f">>> {attributes}")
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
             entity_id = f"sensor.{self.prefix}_opt_cost_{contract.name}"
@@ -2237,6 +2251,7 @@ class PVOpt(hass.Hass):
     def _check_tariffs_vs_bottlecap(self):
         self.ulog("Checking tariff prices vs Octopus Energy Integration:")
         for direction in self.contract.tariffs:
+            err = False
             if self.bottlecap_entities[direction] is None:
                 str_log = "No OE Integration entity found."
 
@@ -2274,8 +2289,12 @@ class PVOpt(hass.Hass):
                 if round(df["delta"].abs().mean(), 2) > 0:
                     str_log += " <<< ERROR"
                     self._status("ERROR: Tariff inconsistency")
+                    err = True
 
             self.log(f"  {direction.title()}: {str_log}")
+
+            if err:
+                self.rlog(self.contract.tariffs[direction])
 
     def ulog(self, strlog, underline="-", words=False):
         self.log("")
@@ -2347,6 +2366,38 @@ class PVOpt(hass.Hass):
             df = None
 
         return df
+
+    def write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
+        changed = False
+        written = False
+        state = float(self.get_state(entity_id=entity_id))
+        new_state = None
+        diff = abs(state - value)
+        if diff > tolerance:
+            changed = True
+            try:
+                self.call_service("number/set_value", entity_id=entity_id, value=str(value))
+
+                time.sleep(WRITE_POLL_SLEEP)
+                new_state = float(self.get_state(entity_id=entity_id))
+                written = new_state == value
+
+            except:
+                written = False
+
+            if verbose:
+                str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
+                str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
+                self.log(str_log)
+
+        return (changed, written)
+
+    def set_select(self, item, state):
+        if state is not None:
+            entity_id = self.config[f"id_{item}"]
+            if self.get_state(entity_id=entity_id) != state:
+                self.call_service("select/select_option", entity_id=entity_id, option=state)
+                self.rlog(f"Setting {entity_id} to {state}")
 
 
 # %%
