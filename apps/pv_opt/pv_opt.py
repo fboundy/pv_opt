@@ -2337,7 +2337,7 @@ class PVOpt(hass.Hass):
 
             self.log(f"  {direction.title()}: {str_log}")
             if err:
-                self.log(self.contract[direction])
+                self.rlog(self.contract.tariffs[direction])
 
     def ulog(self, strlog, underline="-", words=False):
         self.log("")
