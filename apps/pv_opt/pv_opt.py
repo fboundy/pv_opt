@@ -2314,10 +2314,10 @@ class PVOpt(hass.Hass):
                     x = "  - "
                     for attribute in DOMAIN_ATTRIBUTES[domain]:
                         x = f"{x} {attribute}: {states[entity_id]['attributes'][attribute]} "
-                    self.log(x)
+                    self.rlog(x)
                 elif domain == "select":
                     for option in states[entity_id]["attributes"]["options"]:
-                        self.log(f"{option:>83s}")
+                        self.rlog(f"{option:>83s}")
         self.log("")
 
     def hass2df(self, entity_id, days=2, log=False, freq=None):
