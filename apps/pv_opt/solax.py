@@ -45,6 +45,7 @@ INVERTER_DEFS = {
             "id_charge_start_time_2": "select.{device_name}_charger_start_time_2",
             "id_max_charge_current": "number.{device_name}_battery_charge_max_current",
             "id_use_mode": "select.{device_name}_use_mode",
+            "id_lock_state": "select.{device_name}_lock_state",
             "id_export_duration": "select.{device_name}_export_duration",
             "id_target_soc": "number.{device_name}_forcetime_period_1_max_capacity",
         },
@@ -85,9 +86,9 @@ class InverterController:
 
     def enable_timed_mode(self):
         if self.type == "SOLAX_X1":
-            self._solax_set_select("lock_state", "Unlocked - Advanced")
-            self._solax_set_select("allow_grid_charge", "Period 1 Allowed")
-            self._solax_set_select("backup_grid_charge", "Disabled")
+            self.host.set_select("lock_state", "Unlocked - Advanced")
+            self.host.set_select("allow_grid_charge", "Period 1 Allowed")
+            self.host.set_select("backup_grid_charge", "Disabled")
 
         else:
             self._unknown_inverter()
@@ -95,12 +96,12 @@ class InverterController:
     def control_charge(self, enable, **kwargs):
         if self.type == "SOLAX_X1":
             if enable:
-                self._solax_set_select("use_mode", "Force Time Use")
+                self.host.set_select("use_mode", "Force Time Use")
                 time_now = pd.Timestamp(tz=self.tz)
                 start = kwargs.get("start", time_now).floor("15min").strftime(TIMEFORMAT)
                 end = kwargs.get("end", time_now).ceil("30min").strftime(TIMEFORMAT)
-                self._solax_set_select("charge_start_time_1", start)
-                self._solax_set_select("charge_end_time_1", end)
+                self.host.set_select("charge_start_time_1", start)
+                self.host.set_select("charge_end_time_1", end)
 
                 power = self.kwargs.get("power")
                 if power is not None:
@@ -108,7 +109,7 @@ class InverterController:
                     current = abs(round(power / self.host.get_config("battery_voltage"), 1))
 
                     self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
-                    changed, written = self._write_and_poll_value(
+                    changed, written = self.host.write_and_poll_value(
                         entity_id=entity_id, value=current, tolerance=1, verbose=True
                     )
 
@@ -124,7 +125,7 @@ class InverterController:
                 if target_soc is not None:
                     entity_id = self.host.config[f"id_target_soc"]
 
-                    changed, written = self._write_and_poll_value(
+                    changed, written = self.host.write_and_poll_value(
                         entity_id=entity_id, value=target_soc, tolerance=1, verbose=True
                     )
 
@@ -190,11 +191,6 @@ class InverterController:
 
         return status
 
-    def _write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
-        changed = False
-        written = False
-        return (changed, written)
-
     def _monitor_target_soc(self, target_soc, mode="charge"):
         pass
 
@@ -211,41 +207,11 @@ class InverterController:
     def _solax_charge_periods(self, **kwargs):
         if self.type == "SOLAX_X1":
             return {
-                l: pd.Timestamp(self.host.get_state(entity_id=self.host.config(f"id_charge_{l}_time_1")), tz=self.tz)
-                for l in LIMITS
-            } | {"current": self.host.get_state(entity_id=self.host.config[f"id_battery_charge_max_current"])}
+                limit: pd.Timestamp(
+                    self.host.get_state(entity_id=self.host.config(f"id_charge_{limit}_time_1")), tz=self.tz
+                )
+                for limit in LIMITS
+            } | {"current": self.host.get_state(entity_id=self.host.config[f"id_max_charge_current"])}
 
         else:
             self._unknown_inverter()
-
-    def _solax_set_select(self, item, state):
-        if state is not None:
-            entity_id = self.host.config[f"id_{item}"]
-            if self.host.get_state(entity_id=entity_id) != state:
-                self.host.call_service("select/select_option", entity_id=entity_id, option=state)
-                self.log(f"Setting {entity_id} to {state}")
-
-    def _write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
-        changed = False
-        written = False
-        state = float(self.host.get_state(entity_id=entity_id))
-        new_state = None
-        diff = abs(state - value)
-        if diff > tolerance:
-            changed = True
-            try:
-                self.host.call_service("number/set_value", entity_id=entity_id, value=str(value))
-
-                time.sleep(WRITE_POLL_SLEEP_DURATION)
-                new_state = float(self.host.get_state(entity_id=entity_id))
-                written = new_state == value
-
-            except:
-                written = False
-
-            if verbose:
-                str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
-                str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
-                self.log(str_log)
-
-        return (changed, written)
