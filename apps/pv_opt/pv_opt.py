@@ -663,6 +663,10 @@ class PVOpt(hass.Hass):
             if self.contract is None:
                 if ("octopus_account" in self.config) and ("octopus_api_key" in self.config):
                     if (self.config["octopus_account"] is not None) and (self.config["octopus_api_key"] is not None):
+                        for x in ["octopus_account", "octopus_api_key"]:
+                            if self.config[x] not in self.redact_regex:
+                                self.redact_regex.append(x)
+                                self.redact_regex.append(x.lower().replace("-", "_"))
                         try:
                             self.rlog(
                                 f"Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
@@ -784,6 +788,12 @@ class PVOpt(hass.Hass):
             ][0]
             self.log("")
             self.rlog(f"Found Octopus Savings Events entity: {saving_events_entity}")
+            octopus_account = self.get_state(entity_id=saving_events_entity, attribute="account_id")
+
+            self.config["octopus_account"] = octopus_account
+            if octopus_account not in self.redact_regex:
+                self.redact_regex.append(octopus_account)
+                self.redact_regex.append(octopus_account.lower().replace("-", "_"))
 
             available_events = self.get_state(saving_events_entity, attribute="all")["attributes"]["available_events"]
 
