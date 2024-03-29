@@ -326,7 +326,6 @@ class PVOpt(hass.Hass):
         self.mqtt = self.get_plugin_api("MQTT")
         self._load_tz()
         self.log(f"Time Zone Offset: {self.get_tz_offset()} minutes")
-        self.redact_patterns = REDACT_REGEX
 
         # self.log(self.args)
         self.inverter_type = self.args.pop("inverter_type", "SOLIS_SOLAX_MODBUS")
@@ -336,7 +335,7 @@ class PVOpt(hass.Hass):
 
         self.inverter_sn = self.args.pop("inverter_sn", "")
         if self.inverter_sn != "":
-            self.redact_patterns.append(self.inverter_sn)
+            self.redact_regex.append(self.inverter_sn)
 
         self.redact = self.args.pop("redact_personal_data_from_log", True)
         self._load_inverter()
