@@ -751,7 +751,7 @@ class PVsystemModel:
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                             net_cost_opt = net_cost[-1]
                             str_log += f"Net: {net_cost_opt:6.1f}"
-                            if log:
+                            if self.host.debug:
                                 self.log(str_log)
                                 xx = pd.concat(
                                     [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
