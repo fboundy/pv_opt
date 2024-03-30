@@ -33,7 +33,7 @@ INVERTER_DEFS = {
         # Brand Conguration: Exposed as inverter.brand_config and can be over-written using arguments
         # from the config.yaml file but not rquired outside of this module
         "brand_config": {
-            "battery_voltage": 101.8,
+            "battery_voltage": "sensor.{device_name}_battery_voltage_charge",
             "id_allow_grid_charge": "select.{device_name}_allow_grid_charge",
             "id_battery_capacity": "sensor.{device_name}_battery_capacity",
             "id_battery_minimum_capacity": "number.{device_name}_battery_minimum_capacity",
@@ -44,11 +44,11 @@ INVERTER_DEFS = {
             "id_charge_end_time_2": "select.{device_name}_charger_end_time_2",
             "id_charge_start_time_2": "select.{device_name}_charger_start_time_2",
             "id_max_charge_current": "number.{device_name}_battery_charge_max_current",
-            "id_use_mode": "select.{device_name}_use_mode",
+            "id_use_mode": "select.{device_name}_charger_use_mode",
             "id_lock_state": "select.{device_name}_lock_state",
             "id_export_duration": "select.{device_name}_export_duration",
             "id_target_soc": "number.{device_name}_forcetime_period_1_max_capacity",
-            "id_backup_grid_charge": "select.{device_name}_allow_grid_charge",
+            "id_backup_grid_charge": "select.{device_name}_backup_grid_charge",
         },
     },
 }
