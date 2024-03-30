@@ -1379,11 +1379,11 @@ class PVOpt(hass.Hass):
             self.log(f">>> Original: {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
 
         try:
-            self.soc_cnow = float(self.soc_cnow)
+            self.soc_now = float(self.soc_now)
 
         except:
             self.log("")
-            self.log("Unable to get current SOC from HASS. Using last value from History.", level="WARN")
+            self.log("Unable to get current SOC from HASS. Using last value from History.", level="WARNING")
             self.soc_now = x.iloc[-1]
 
         # x = x.astype(float)
