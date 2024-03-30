@@ -1371,8 +1371,8 @@ class PVOpt(hass.Hass):
 
         except:
             self.log("")
-            self.log("Unable to get SOC at start of current window. Skipping optimisaton.", level="ERROR")
-            return
+            self.log("Unable to get current SOC from HASS. Using last value from History.", level="WARN")
+            self.soc_now = x.iloc[-1]
 
         # x = x.astype(float)
         x = pd.to_numeric(x, errors="coerce").interpolate()
