@@ -1373,16 +1373,18 @@ class PVOpt(hass.Hass):
         # self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
-
-        if x is None:
-            self.log("")
-            self.log("Unable to get SOC at start of current window.", level="ERROR")
-            return
-
         if self.debug:
             self.log(f">>> soc_now: {self.soc_now}")
             self.log(f">>> x: {x}")
             self.log(f">>> Original: {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
+
+        try:
+            self.soc_cnow = float(self.soc_cnow)
+
+        except:
+            self.log("")
+            self.log("Unable to get current SOC from HASS. Using last value from History.", level="WARN")
+            self.soc_now = x.iloc[-1]
 
         # x = x.astype(float)
         x = pd.to_numeric(x, errors="coerce").interpolate()
