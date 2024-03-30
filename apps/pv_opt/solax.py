@@ -28,7 +28,7 @@ INVERTER_DEFS = {
             "id_grid_export_today": "sensor.{device_name}_today_s_export_energy",
             "supports_hold_soc": False,
             "supports_forced_discharge": False,
-            "update_cycle_seconds": 300,
+            "update_cycle_seconds": 15,
         },
         # Brand Conguration: Exposed as inverter.brand_config and can be over-written using arguments
         # from the config.yaml file but not rquired outside of this module
@@ -137,6 +137,13 @@ class InverterController:
                             self.log(f"Failed to write Target SOC of {target_soc}% to inverter")
                     else:
                         self.log("Inverter already at correct Target SOC")
+            else:
+                self.host.set_select("use_mode", "Self Use Mode")
+                time_now = pd.Timestamp(tz=self.tz)
+                start = kwargs.get("start", time_now).floor("15min").strftime(TIMEFORMAT)
+                end = start
+                self.host.set_select("charge_start_time_1", start)
+                self.host.set_select("charge_end_time_1", end)
 
         else:
             self._unknown_inverter()

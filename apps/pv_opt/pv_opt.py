@@ -305,6 +305,7 @@ def importName(modulename, name):
 
 
 class PVOpt(hass.Hass):
+    @ad.app_lock
     def initialize(self):
         self.config = {}
         self.log("")
@@ -1309,7 +1310,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self._load_saving_events()
 
-        if self.get_config("forced_discharge"):
+        if self.get_config("forced_discharge") and (self.get_config("supports_forced_discharge", True)):
             discharge_enable = "enabled"
         else:
             discharge_enable = "disabled"
@@ -1763,7 +1764,6 @@ class PVOpt(hass.Hass):
             self.log(f"No charging slots")
             self.charge_current = 0
             self.charge_target_soc = 0
-            self.windows["end"].iloc[0]
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
             self.hold = []
