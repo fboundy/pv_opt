@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.13.1"
+VERSION = "3.13.2"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -2401,7 +2401,7 @@ class PVOpt(hass.Hass):
             valid_state = (
                 (("attribute" in kwargs) and (isinstance(state, dict)))
                 or (state not in ["unknown", "unavailable", "", None, nan])
-                or len(args == 1)
+                or (len(args) == 1)
             )
 
             if not valid_state:
