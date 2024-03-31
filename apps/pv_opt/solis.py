@@ -232,7 +232,7 @@ class InverterController:
         entity_id = INVERTER_DEFS[self.type].get("online", (None, None))
         if entity_id is not None:
             entity_id = entity_id.replace("{device_name}", self.host.device_name)
-            return self.host.get_state(entity_id) not in ["unknown", "unavailable"]
+            return self.host.get_state_retry(entity_id) not in ["unknown", "unavailable"]
         else:
             return True
 
@@ -371,7 +371,7 @@ class InverterController:
                 self.host.call_service("button/press", entity_id=entity_id)
                 time.sleep(0.5)
                 try:
-                    time_pressed = pd.Timestamp(self.host.get_state(entity_id))
+                    time_pressed = pd.Timestamp(self.host.get_state_retry(entity_id))
 
                     dt = (pd.Timestamp.now(self.host.tz) - time_pressed).total_seconds()
                     if dt < 10:
@@ -433,7 +433,7 @@ class InverterController:
         entity_id = self.host.config["id_inverter_mode"]
 
         if self.type == "SOLIS_SOLAX_MODBUS":
-            entity_modes = self.host.get_state(entity_id, attribute="options")
+            entity_modes = self.host.get_state_retry(entity_id, attribute="options")
             modes = {INVERTER_DEFS[self.type]["codes"].get(mode): mode for mode in entity_modes}
             # mode = INVERTER_DEFS[self.type]["modes"].get(code)
             mode = modes.get(code)
@@ -450,7 +450,7 @@ class InverterController:
             self._solis_write_holding_register(address=address, value=code, entity_id=entity_id)
 
     def _solis_solax_solarman_mode_switch(self):
-        inverter_mode = self.host.get_state(entity_id=self.host.config["id_inverter_mode"])
+        inverter_mode = self.host.get_state_retry(entity_id=self.host.config["id_inverter_mode"])
         if self.type == "SOLIS_SOLAX_MODBUS":
             code = INVERTER_DEFS[self.type]["codes"][inverter_mode]
         else:
@@ -466,7 +466,7 @@ class InverterController:
 
     def _solis_core_mode_switch(self):
         bits = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["bits"]
-        code = int(self.host.get_state(entity_id=self.host.config["id_inverter_mode"]))
+        code = int(self.host.get_state_retry(entity_id=self.host.config["id_inverter_mode"]))
         switches = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
         return {"code": code, "switches": switches}
 
@@ -483,13 +483,13 @@ class InverterController:
                 states = {}
                 for unit in ["hours", "minutes"]:
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
-                    states[unit] = int(float(self.host.get_state(entity_id=entity_id)))
+                    states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 status[direction][limit] = pd.Timestamp(
                     f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                 )
             time_now = pd.Timestamp.now(tz=self.tz)
             status[direction]["current"] = float(
-                self.host.get_state(self.host.config[f"id_timed_{direction}_current"])
+                self.host.get_state_retry(self.host.config[f"id_timed_{direction}_current"])
             )
 
             status[direction]["active"] = (
@@ -523,7 +523,7 @@ class InverterController:
             slave = self.host.get_config("modbus_slave")
 
             if entity_id is not None:
-                old_value = int(float(self.host.get_state(entity_id=entity_id)))
+                old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                     self.log(f"Inverter value already set to {value}.")
                     changed = False
@@ -540,7 +540,7 @@ class InverterController:
 
         elif self.type == "SOLIS_SOLARMAN":
             if entity_id is not None and self.host.entity_exists(entity_id):
-                old_value = int(float(self.host.get_state(entity_id=entity_id)))
+                old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                     self.log(f"Inverter value already set to {value}.")
                     changed = False

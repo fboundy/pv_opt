@@ -305,19 +305,22 @@ class Tariff:
                                 # print(time)
                         else:
                             if len(i["Name"]) > 8:
-                                # print(i["Name"])
-                                data.append(float(i["Value"].replace(",", ".")))
-                                index.append(
-                                    pd.Timestamp(
-                                        i["Name"].split("-")[2]
-                                        + "-"
-                                        + i["Name"].split("-")[1]
-                                        + "-"
-                                        + i["Name"].split("-")[0]
-                                        + " "
-                                        + time
+                                try:
+                                    self.log(time, i["Name"], i["Value"])
+                                    data.append(float(i["Value"].replace(",", ".")))
+                                    index.append(
+                                        pd.Timestamp(
+                                            i["Name"].split("-")[2]
+                                            + "-"
+                                            + i["Name"].split("-")[1]
+                                            + "-"
+                                            + i["Name"].split("-")[0]
+                                            + " "
+                                            + time
+                                        )
                                     )
-                                )
+                                except:
+                                    pass
 
         price = pd.Series(index=index, data=data).sort_index()
         price.index = price.index.tz_localize("CET")
@@ -655,7 +658,10 @@ class PVsystemModel:
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
         net_cost = [base_cost]
         slot_count = [0]
+        yy = True
         while not done:
+            old_cost = contract.net_cost(df)
+            old_soc = df["soc_end"]
             i += 1
             if (i > 96) or (available.sum() == 0):
                 done = True
@@ -748,8 +754,14 @@ class PVsystemModel:
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                             net_cost_opt = net_cost[-1]
                             str_log += f"Net: {net_cost_opt:6.1f}"
-                            if log:
+                            if self.host.debug:
                                 self.log(str_log)
+                                xx = pd.concat(
+                                    [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
+                                ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
+                                xx["Diff"] = xx["New"] - xx["Old"]
+                                self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
+                                # yy = False
                         else:
                             available[max_slot] = False
                 else:
