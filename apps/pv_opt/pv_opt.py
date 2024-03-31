@@ -2464,7 +2464,7 @@ class PVOpt(hass.Hass):
             valid_state = (
                 (("attribute" in kwargs) and (isinstance(state, dict)))
                 or (state not in ["unknown", "unavailable", "", None, nan])
-                or len(args == 1)
+                or (len(args) == 1)
             )
 
             if not valid_state:
