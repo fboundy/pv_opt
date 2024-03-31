@@ -19,7 +19,7 @@ OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 DEBUG = False
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
-DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M"
+DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M %Z"
 TIME_FORMAT = "%H:%M"
 
 REDACT_REGEX = [
@@ -39,6 +39,9 @@ MAX_INVERTER_UPDATES = 2
 MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
+WRITE_POLL_SLEEP = 0.5
+GET_STATE_RETRIES = 5
+GET_STATE_WAIT = 0.5
 
 BOTTLECAP_DAVE = {
     "domain": "event",
@@ -535,7 +538,7 @@ class PVOpt(hass.Hass):
         self.timer_handle = self.run_every(
             self._compare_tariff_cb,
             start=start,
-            interval=3600 * 24,
+            interval=3600,
         )
 
     def _cost_actual(self, **kwargs):
@@ -642,7 +645,7 @@ class PVOpt(hass.Hass):
 
                     octopus_entities = [
                         name
-                        for name in self.get_state(BOTTLECAP_DAVE["domain"]).keys()
+                        for name in self.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
                         if ("octopus_energy_electricity" in name and BOTTLECAP_DAVE["rates"] in name)
                     ]
 
@@ -652,7 +655,7 @@ class PVOpt(hass.Hass):
 
                     for imp_exp in IMPEXP:
                         for entity in entities[imp_exp]:
-                            tariff_code = self.get_state(entity, attribute="all")["attributes"].get(
+                            tariff_code = self.get_state_retry(entity, attribute="all")["attributes"].get(
                                 BOTTLECAP_DAVE["tariff_code"], None
                             )
 
@@ -664,7 +667,7 @@ class PVOpt(hass.Hass):
                             self.log(f">>>{imp_exp}: {entities[imp_exp]}")
                         if len(entities[imp_exp]) > 0:
                             for entity in entities[imp_exp]:
-                                tariff_code = self.get_state(entity, attribute="all")["attributes"].get(
+                                tariff_code = self.get_state_retry(entity, attribute="all")["attributes"].get(
                                     BOTTLECAP_DAVE["tariff_code"], None
                                 )
                                 if self.debug:
@@ -704,7 +707,6 @@ class PVOpt(hass.Hass):
                             if self.config[x] not in self.redact_regex:
                                 self.redact_regex.append(x)
                                 self.redact_regex.append(x.lower().replace("-", "_"))
-
                         try:
                             self.rlog(
                                 f"Trying to load tariffs using Account: {self.config['octopus_account']} API Key: {self.config['octopus_api_key']}"
@@ -822,20 +824,25 @@ class PVOpt(hass.Hass):
             self.log("  AGILE tariff detected. Rates will update at 16:00 daily")
 
     def _load_saving_events(self):
-        if len([name for name in self.get_state("event").keys() if ("octoplus_saving_session_events" in name)]) > 0:
+        if (
+            len([name for name in self.get_state_retry("event").keys() if ("octoplus_saving_session_events" in name)])
+            > 0
+        ):
             saving_events_entity = [
-                name for name in self.get_state("event").keys() if ("octoplus_saving_session_events" in name)
+                name for name in self.get_state_retry("event").keys() if ("octoplus_saving_session_events" in name)
             ][0]
             self.log("")
             self.rlog(f"Found Octopus Savings Events entity: {saving_events_entity}")
-            octopus_account = self.get_state(entity_id=saving_events_entity, attribute="account_id")
+            octopus_account = self.get_state_retry(entity_id=saving_events_entity, attribute="account_id")
 
             self.config["octopus_account"] = octopus_account
             if octopus_account not in self.redact_regex:
                 self.redact_regex.append(octopus_account)
                 self.redact_regex.append(octopus_account.lower().replace("-", "_"))
 
-            available_events = self.get_state(saving_events_entity, attribute="all")["attributes"]["available_events"]
+            available_events = self.get_state_retry(saving_events_entity, attribute="all")["attributes"][
+                "available_events"
+            ]
 
             if len(available_events) > 0:
                 self.log("Joining the following new Octoplus Events:")
@@ -851,7 +858,7 @@ class PVOpt(hass.Hass):
                             event_code=event["code"],
                         )
 
-            joined_events = self.get_state(saving_events_entity, attribute="all")["attributes"]["joined_events"]
+            joined_events = self.get_state_retry(saving_events_entity, attribute="all")["attributes"]["joined_events"]
 
             for event in joined_events:
                 if event["id"] not in self.saving_events and pd.Timestamp(event["end"], tz="UTC") > pd.Timestamp.now(
@@ -874,7 +881,7 @@ class PVOpt(hass.Hass):
 
         # if the entity doesn't exist return None
         if self.entity_exists(entity_id=entity_id):
-            state = self.get_state(entity_id=entity_id)
+            state = self.get_state_retry(entity_id=entity_id)
 
             # if the state is None return None
             if state is not None:
@@ -1224,7 +1231,7 @@ class PVOpt(hass.Hass):
                 self.set_state(state=state, entity_id=entity_id)
 
             elif item in self.yaml_config:
-                state = self.get_state(entity_id)
+                state = self.get_state_retry(entity_id)
                 new_state = str(self._state_from_value(self.config[item]))
                 if over_write and state != new_state:
                     if not over_write_log:
@@ -1241,7 +1248,7 @@ class PVOpt(hass.Hass):
                     while (state != new_state) and (over_write_count < OVERWRITE_ATTEMPTS):
                         self.set_state(state=new_state, entity_id=entity_id)
                         time.sleep(0.1)
-                        state = self.get_state(entity_id)
+                        state = self.get_state_retry(entity_id)
                         over_write_count += 1
 
                     if state == new_state:
@@ -1250,7 +1257,7 @@ class PVOpt(hass.Hass):
                         self.log(f"{str_log} <<< FAILED!", level="WARN")
 
             else:
-                state = self.get_state(entity_id)
+                state = self.get_state_retry(entity_id)
 
             self.config[item] = entity_id
             self.change_items[entity_id] = item
@@ -1409,16 +1416,18 @@ class PVOpt(hass.Hass):
         # self.load_consumption()
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
-
-        if x is None:
-            self.log("")
-            self.log("Unable to get SOC at start of current window.", level="ERROR")
-            return
-
         if self.debug:
             self.log(f">>> soc_now: {self.soc_now}")
             self.log(f">>> x: {x}")
             self.log(f">>> Original: {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
+
+        try:
+            self.soc_now = float(self.soc_now)
+
+        except:
+            self.log("")
+            self.log("Unable to get current SOC from HASS. Using last value from History.", level="WARNING")
+            self.soc_now = x.iloc[-1]
 
         # x = x.astype(float)
         x = pd.to_numeric(x, errors="coerce").interpolate()
@@ -1787,7 +1796,7 @@ class PVOpt(hass.Hass):
             self.log("Optimal forced charge/discharge slots:")
             for window in self.windows.iterrows():
                 self.log(
-                    f"  {window[1]['start'].strftime('%d-%b %H:%M'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
+                    f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
@@ -1985,8 +1994,10 @@ class PVOpt(hass.Hass):
         if self.debug:
             self.log("Getting Solcast data")
         try:
-            solar = self.get_state(self.config["id_solcast_today"], attribute="all")["attributes"]["detailedForecast"]
-            solar += self.get_state(self.config["id_solcast_tomorrow"], attribute="all")["attributes"][
+            solar = self.get_state_retry(self.config["id_solcast_today"], attribute="all")["attributes"][
+                "detailedForecast"
+            ]
+            solar += self.get_state_retry(self.config["id_solcast_tomorrow"], attribute="all")["attributes"][
                 "detailedForecast"
             ]
 
@@ -2303,9 +2314,9 @@ class PVOpt(hass.Hass):
                 str_log = "No export tariff."
 
             else:
-                df = pd.DataFrame(self.get_state(self.bottlecap_entities[direction], attribute=("rates"))).set_index(
-                    "start"
-                )["value_inc_vat"]
+                df = pd.DataFrame(
+                    self.get_state_retry(self.bottlecap_entities[direction], attribute=("rates"))
+                ).set_index("start")["value_inc_vat"]
                 df.index = pd.to_datetime(df.index)
                 df *= 100
                 df = pd.concat(
@@ -2354,7 +2365,7 @@ class PVOpt(hass.Hass):
         domains = [d for d in domains if d in ["select", "number", "sensor"]]
         self.ulog(f"Available entities for device {self.device_name}:")
         for domain in domains:
-            states = self.get_state(domain)
+            states = self.get_state_retry(domain)
             states = {k: states[k] for k in states if self.device_name in k}
             for entity_id in states:
                 x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
@@ -2409,6 +2420,66 @@ class PVOpt(hass.Hass):
             df = None
 
         return df
+
+    def write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
+        changed = False
+        written = False
+        state = float(self.get_state_retry(entity_id=entity_id))
+        new_state = None
+        diff = abs(state - value)
+        if diff > tolerance:
+            changed = True
+            try:
+                self.call_service("number/set_value", entity_id=entity_id, value=str(value))
+
+                time.sleep(WRITE_POLL_SLEEP)
+                new_state = float(self.get_state_retry(entity_id=entity_id))
+                written = new_state == value
+
+            except:
+                written = False
+
+            if verbose:
+                str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
+                str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
+                self.log(str_log)
+
+        return (changed, written)
+
+    def set_select(self, item, state):
+        if state is not None:
+            entity_id = self.config[f"id_{item}"]
+            if self.get_state_retry(entity_id=entity_id) != state:
+                self.call_service("select/select_option", entity_id=entity_id, option=state)
+                self.rlog(f"Setting {entity_id} to {state}")
+
+    def get_state_retry(self, *args, **kwargs):
+        retries = 0
+        state = None
+
+        valid_state = False
+
+        while not valid_state and retries < GET_STATE_RETRIES:
+            state = self.get_state(*args, **kwargs)
+            valid_state = (
+                (("attribute" in kwargs) and (isinstance(state, dict)))
+                or (state not in ["unknown", "unavailable", "", None, nan])
+                or len(args == 1)
+            )
+
+            if not valid_state:
+                retries += 1
+                self.rlog(
+                    f"  - Retrieved invalid state of {state} for {kwargs.get('entity_id', None)} (Attempt {retries} of {GET_STATE_RETRIES})",
+                    level="WARN",
+                )
+                time.sleep(GET_STATE_WAIT)
+
+        if not valid_state:
+            self.log("  - FAILED", level="ERROR")
+            return None
+        else:
+            return state
 
 
 # %%

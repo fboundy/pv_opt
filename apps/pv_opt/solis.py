@@ -229,7 +229,7 @@ class InverterController:
         entity_id = INVERTER_DEFS[self.type].get("online", (None, None))
         if entity_id is not None:
             entity_id = entity_id.replace("{device_name}", self.host.device_name)
-            return self.host.get_state(entity_id) not in ["unknown", "unavailable"]
+            return self.host.get_state_retry(entity_id) not in ["unknown", "unavailable"]
         else:
             return True
 
@@ -287,9 +287,8 @@ class InverterController:
 
             self.log(f"Setting Backup SOC to {soc}%")
             if self.type == "SOLIS_SOLAX_MODBUS":
-                changed, written = self._write_and_poll_value(entity_id=entity_id, value=soc)
-            # elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
-            else:
+                changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=soc)
+            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self.solis_write_holding_register(
                     address=INVERTER_DEFS(self.type)["registers"]["backup_mode_soc"],
                     value=soc,
@@ -306,31 +305,6 @@ class InverterController:
             status = self._solis_state()
 
         return status
-
-    def _write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
-        changed = False
-        written = False
-        state = float(self.host.get_state(entity_id=entity_id))
-        new_state = None
-        diff = abs(state - value)
-        if diff > tolerance:
-            changed = True
-            try:
-                self.host.call_service("number/set_value", entity_id=entity_id, value=str(value))
-
-                time.sleep(0.5)
-                new_state = float(self.host.get_state(entity_id=entity_id))
-                written = new_state == value
-
-            except:
-                written = False
-
-            if verbose:
-                str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
-                str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
-                self.log(str_log)
-
-        return (changed, written)
 
     def _monitor_target_soc(self, target_soc, mode="charge"):
         pass
@@ -388,7 +362,9 @@ class InverterController:
                         value = times[limit].minute
 
                     if self.type == "SOLIS_SOLAX_MODBUS":
-                        changed, written = self._write_and_poll_value(entity_id=entity_id, value=value, verbose=True)
+                        changed, written = self.host.write_and_poll_value(
+                            entity_id=entity_id, value=value, verbose=True
+                        )
                     elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                         changed, written = self._solis_write_time_register(direction, limit, unit, value)
 
@@ -414,7 +390,7 @@ class InverterController:
                 self.host.call_service("button/press", entity_id=entity_id)
                 time.sleep(0.5)
                 try:
-                    time_pressed = pd.Timestamp(self.host.get_state(entity_id))
+                    time_pressed = pd.Timestamp(self.host.get_state_retry(entity_id))
 
                     dt = (pd.Timestamp.now(self.host.tz) - time_pressed).total_seconds()
                     if dt < 10:
@@ -436,7 +412,7 @@ class InverterController:
             current = abs(round(power / self.host.get_config("battery_voltage"), 1))
             self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
             if self.type == "SOLIS_SOLAX_MODBUS":
-                changed, written = self._write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
+                changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
             elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self._solis_write_current_register(direction, current, tolerance=1)
             else:
@@ -476,7 +452,7 @@ class InverterController:
         entity_id = self.host.config["id_inverter_mode"]
 
         if self.type == "SOLIS_SOLAX_MODBUS":
-            entity_modes = self.host.get_state(entity_id, attribute="options")
+            entity_modes = self.host.get_state_retry(entity_id, attribute="options")
             modes = {INVERTER_DEFS[self.type]["codes"].get(mode): mode for mode in entity_modes}
             # mode = INVERTER_DEFS[self.type]["modes"].get(code)
             mode = modes.get(code)
@@ -486,17 +462,14 @@ class InverterController:
                 self.log(f">>> Modes: {modes}")
                 self.log(f">>> Inverter Mode: {mode}")
 
-            if mode is not None:
-                if self.host.get_state(entity_id=entity_id) != mode:
-                    self.host.call_service("select/select_option", entity_id=entity_id, option=mode)
-                    self.log(f"Setting {entity_id} to {mode}")
+            self.host.set_select("inverter_mode", mode)
 
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
             self._solis_write_holding_register(address=address, value=code, entity_id=entity_id)
 
     def _solis_solax_solarman_mode_switch(self):
-        inverter_mode = self.host.get_state(entity_id=self.host.config["id_inverter_mode"])
+        inverter_mode = self.host.get_state_retry(entity_id=self.host.config["id_inverter_mode"])
         if self.type == "SOLIS_SOLAX_MODBUS":
             code = INVERTER_DEFS[self.type]["codes"][inverter_mode]
         else:
@@ -512,7 +485,7 @@ class InverterController:
 
     def _solis_core_mode_switch(self):
         bits = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["bits"]
-        code = int(self.host.get_state(entity_id=self.host.config["id_inverter_mode"]))
+        code = int(self.host.get_state_retry(entity_id=self.host.config["id_inverter_mode"]))
         switches = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
         return {"code": code, "switches": switches}
 
@@ -529,13 +502,13 @@ class InverterController:
                 states = {}
                 for unit in ["hours", "minutes"]:
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
-                    states[unit] = int(float(self.host.get_state(entity_id=entity_id)))
+                    states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 status[direction][limit] = pd.Timestamp(
                     f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                 )
             time_now = pd.Timestamp.now(tz=self.tz)
             status[direction]["current"] = float(
-                self.host.get_state(self.host.config[f"id_timed_{direction}_current"])
+                self.host.get_state_retry(self.host.config[f"id_timed_{direction}_current"])
             )
 
             status[direction]["active"] = (
@@ -569,7 +542,7 @@ class InverterController:
             slave = self.host.get_config("modbus_slave")
 
             if entity_id is not None:
-                old_value = int(float(self.host.get_state(entity_id=entity_id)))
+                old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                     self.log(f"Inverter value already set to {value}.")
                     changed = False
@@ -586,7 +559,7 @@ class InverterController:
 
         elif self.type == "SOLIS_SOLARMAN":
             if entity_id is not None and self.host.entity_exists(entity_id):
-                old_value = int(float(self.host.get_state(entity_id=entity_id)))
+                old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                     self.log(f"Inverter value already set to {value}.")
                     changed = False
