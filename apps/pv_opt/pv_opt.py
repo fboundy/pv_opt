@@ -2137,6 +2137,15 @@ class PVOpt(hass.Hass):
 
         contracts = [self.contract]
 
+        self.log("")
+        self.log(f"Start:       {start.strftime(DATE_TIME_FORMAT_SHORT):>15s}")
+        self.log(f"End:         {end.strftime(DATE_TIME_FORMAT_SHORT):>15s}")
+        self.log(f"Initial SOC: {initial_soc:>15.1f}%")
+        self.log(f"Consumption: {static['consumption'].sum()/2000:15.1f} kWh")
+        self.log(f"Solar:       {static['solar'].sum()/2000:15.1f} kWh")
+
+        self.log(f">>> \n{static.to_string()}")
+
         for tariff_set in self.config["alt_tariffs"]:
             code = {}
             tariffs = {}
@@ -2216,7 +2225,9 @@ class PVOpt(hass.Hass):
             )
 
     def _get_solar(self, start, end):
-        self.log("Getting yesterday's solar generation:")
+        self.log(
+            f"Getting yesterday's solar generation ({start.strftime(DATE_TIME_FORMAT_SHORT)} - {end.strftime(DATE_TIME_FORMAT_SHORT)}):"
+        )
         entity_id = self.config["id_daily_solar"]
         if entity_id is None or not self.entity_exists(entity_id):
             return
@@ -2229,11 +2240,12 @@ class PVOpt(hass.Hass):
 
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
         df = self.hass2df(entity_id, days=days).astype(float).resample("30min").ffill()
+        # self.log(f"\n{df.to_string()}")
         if df is not None:
             df.index = pd.to_datetime(df.index)
             self.log(f"  - {df.loc[dt[-2]]:0.1f} kWh")
             df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
-
+            # self.log(f"\n{df.to_string()}")
         else:
             self.log("  - FAILED")
         self.log("")
