@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "4.0.0-solax-x1-beta-18"
+VERSION = "3.14.0"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -91,8 +91,9 @@ DOMAIN_ATTRIBUTES = {
 }
 
 DEFAULT_CONFIG = {
-    "forced_discharge": {"default": True, "domain": "switch"},
     "read_only": {"default": True, "domain": "switch"},
+    "include_export": {"default": True, "domain": "switch"},
+    "forced_discharge": {"default": True, "domain": "switch"},
     "allow_cyclic": {"default": False, "domain": "switch"},
     "use_solar": {"default": True, "domain": "switch"},
     "optimise_frequency_minutes": {
@@ -925,13 +926,19 @@ class PVOpt(hass.Hass):
             # if the item starts with 'id_' then it must be an entity that exists:
             elif item == "alt_tariffs":
                 self.config[item] = values
-                self.rlog(
-                    f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value(s) in YAML"
-                )
+                for i, x in enumerate(values):
+                    if i == 0:
+                        str1 = item
+                        str2 = "="
+                    else:
+                        str1 = ""
+                        str2 = " "
+
+                    self.rlog(f"    {str1:34s} {str2} {x['name']:27s} Import: {x['octopus_import_tariff_code']:>36s}")
+                    self.rlog(f"    {'':34s}   {'':27s} Export: {x['octopus_export_tariff_code']:>36s}")
                 self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
-                self.log(f">>>{[self.entity_exists(v) for v in values]}")
                 if min([self.entity_exists(v) for v in values]):
                     if len(values) == 1:
                         self.config[item] = values[0]
@@ -1110,8 +1117,6 @@ class PVOpt(hass.Hass):
             self.rlog("All config items defined OK")
 
         self.rlog("")
-
-        # self.rlog(f">>> {self.yaml_config}")
 
         self._expose_configs(over_write)
 
@@ -1449,8 +1454,19 @@ class PVOpt(hass.Hass):
             self.initial_soc,
             self.static,
             self.contract,
-            # solar="self.get_config("solar_forecast")",
             solar="weighted",
+            export=False,
+            log=False,
+        )
+        opt_no_export = self.contract.net_cost(self.opt)
+        self.log(f"  Optimised cost (no export): {opt_no_export.sum():6.2f}p")
+
+        self.opt = self.pv_system.optimised_force(
+            self.initial_soc,
+            self.static,
+            self.contract,
+            solar="weighted",
+            export=self.get_config("use_export"),
             discharge=self.get_config("forced_discharge"),
             max_iters=MAX_ITERS,
         )
