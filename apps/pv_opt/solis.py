@@ -239,6 +239,8 @@ class InverterController:
     def enable_timed_mode(self):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True, Backup=False)
+        else:
+            self._unknown_inverter()
 
     def control_charge(self, enable, **kwargs):
         if enable:
@@ -250,14 +252,35 @@ class InverterController:
             self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
-    def hold_soc(self, enable, soc=None):
+    def hold_soc(self, enable, soc=None, **kwargs):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+            start = kwargs.get("start", pd.Timestamp.now(tz=self.tz).floor("1min"))
+            end = kwargs.get("end", pd.Timestamp.now(tz=self.tz).ceil("30min"))
+            self._solis_control_charge_discharge(
+                "charge",
+                enable=enable,
+                start=start,
+                end=end,
+                power=0,
+            )
+        else:
+            self._unknown_inverter()
+
+    def _unknown_inverter(self):
+        e = f"Unknown inverter type {self.type}"
+        self.log(e, level="ERROR")
+        self.host.status(e)
+        raise Exception(e)
+
+    def hold_soc_old(self, enable, soc=None):
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+
             if enable:
                 self._solis_set_mode_switch(SelfUse=True, Timed=False, GridCharge=True, Backup=True)
             else:
                 self.enable_timed_mode()
 
-            # Waiyt for a second to make sure the mode is correct
+            # Wait for a second to make sure the mode is correct
             time.sleep(1)
 
             if soc is None:
@@ -274,10 +297,9 @@ class InverterController:
                     value=soc,
                     entity_id=entity_id,
                 )
-            else:
-                e = "Unknown inverter type"
-                self.log(e, level="ERROR")
-                raise Exception(e)
+
+        else:
+            self._unknown_inverter()
 
     @property
     def status(self):
