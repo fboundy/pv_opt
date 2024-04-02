@@ -918,6 +918,7 @@ class PVOpt(hass.Hass):
                 self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
+                self.log(f">>>{[self.entity_exists(v) for v in values]}")
                 if min([self.entity_exists(v) for v in values]):
                     if len(values) == 1:
                         self.config[item] = values[0]
@@ -2013,7 +2014,7 @@ class PVOpt(hass.Hass):
         consumption = pd.DataFrame(index=index, data={"consumption": 0})
 
         if self.get_config("use_consumption_history"):
-            entity_id = self.config["id_consumption_today"]
+
             days = int(self.get_config("consumption_history_days"))
 
             # if not isinstance(entity_ids, list):
@@ -2021,19 +2022,38 @@ class PVOpt(hass.Hass):
 
             # for entity_id in entity_ids:
             if (start < time_now) and (end < time_now):
-                consumption["consumption"] = self._get_hass_power_from_daily_kwh(
-                    entity_id,
-                    start=start,
-                    end=end,
-                    log=self.debug,
-                )
+                # consumption["consumption"] = self._get_hass_power_from_daily_kwh(
+                #     entity_id,
+                #     start=start,
+                #     end=end,
+                #     log=self.debug,
+                # )
 
+                consumption["consumption"] = 0
+                for entity_id in self.config["id_consumption"]:
+                    power = self.hass2df(entity_id=entity_id, days=days).loc[
+                        start.floor("30min") : end.ceil("30min") + pd.Timedelta("30min")
+                    ]
+
+                    power = self.riemann_avg(power)
+                    consumption["consumption"] += power
             else:
-                df = self._get_hass_power_from_daily_kwh(
-                    entity_id,
-                    days=days,
-                    log=self.debug,
-                )
+                df = None
+                for entity_id in self.config["id_consumption"]:
+                    power = self.hass2df(entity_id=entity_id, days=days)
+
+                    power = self.riemann_avg(power)
+                    if df is None:
+                        df = power
+                    else:
+                        df += power
+
+                # entity_id = self.config["id_consumption_today"]
+                # df = self._get_hass_power_from_daily_kwh(
+                #     entity_id,
+                #     days=days,
+                #     log=self.debug,
+                # )
 
                 if df is None:
                     self._status("ERROR: No consumption history.")
@@ -2144,7 +2164,8 @@ class PVOpt(hass.Hass):
         self.log(f"Consumption: {static['consumption'].sum()/2000:15.1f} kWh")
         self.log(f"Solar:       {static['solar'].sum()/2000:15.1f} kWh")
 
-        self.log(f">>> \n{static.to_string()}")
+        if self.debug:
+            self.log(f">>> Yesterday's data:\n{static.to_string()}")
 
         for tariff_set in self.config["alt_tariffs"]:
             code = {}
@@ -2164,7 +2185,7 @@ class PVOpt(hass.Hass):
             )
 
         actual = self._cost_actual(start=start, end=end - pd.Timedelta(30, "minutes"))
-
+        static["period_start"] = static.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
         entity_id = f"sensor.{self.prefix}_opt_cost_actual"
         self.set_state(
             state=round(actual.sum() / 100, 2),
@@ -2174,7 +2195,8 @@ class PVOpt(hass.Hass):
                 "device_class": "monetary",
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison Actual",
-            },
+            }
+            | {col: static[["period_start", col]].to_dict("records") for col in ["solar", "consumption"]},
         )
 
         self.ulog("Net Cost comparison:", underline=None)
@@ -2204,7 +2226,7 @@ class PVOpt(hass.Hass):
                 log=self.debug,
             )
 
-            opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+            # opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
 
             attributes = {
                 "state_class": "measurement",
@@ -2228,24 +2250,31 @@ class PVOpt(hass.Hass):
         self.log(
             f"Getting yesterday's solar generation ({start.strftime(DATE_TIME_FORMAT_SHORT)} - {end.strftime(DATE_TIME_FORMAT_SHORT)}):"
         )
-        entity_id = self.config["id_daily_solar"]
+        # entity_id = self.config["id_daily_solar"]
+        entity_id = self.config["id_solar_power"]
         if entity_id is None or not self.entity_exists(entity_id):
             return
 
-        dt = pd.date_range(
-            start,
-            end,
-            freq="30min",
-        )
+        # dt = pd.date_range(
+        #     start,
+        #     end,
+        #     freq="30min",
+        # )
 
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
-        df = self.hass2df(entity_id, days=days).astype(float).resample("30min").ffill()
-        # self.log(f"\n{df.to_string()}")
+        # df = self.hass2df(entity_id, days=days).astype(float).resample("30min").ffill()
+
+        df = self.hass2df(entity_id, days=days)
         if df is not None:
-            df.index = pd.to_datetime(df.index)
-            self.log(f"  - {df.loc[dt[-2]]:0.1f} kWh")
-            df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
-            # self.log(f"\n{df.to_string()}")
+
+            df = (self.riemann_avg(df).loc[start : end - pd.Timedelta("30min")] / 10).round(0) * 10
+
+        #     df.index = pd.to_datetime(df.index)
+        #     self.log(f"  - {df.loc[dt[-2]]:0.1f} kWh")
+        #     df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
+        #     self.log(f"\n{df.to_string()}")
+        #     self.log(f"\n{df2.to_string()}")
+
         else:
             self.log("  - FAILED")
         self.log("")
@@ -2429,6 +2458,14 @@ class PVOpt(hass.Hass):
             return None
         else:
             return state
+
+    def riemann_avg(self, x, freq="30min"):
+        dt = x.index.diff().total_seconds().fillna(0)
+
+        integral = (dt * x.shift(1)).fillna(0).cumsum().resample(freq).last()
+        avg = (integral.diff().shift(-1)[:-1] / pd.Timedelta(freq).total_seconds()).fillna(0).round(1)
+        # self.log(avg)
+        return avg
 
 
 # %%
