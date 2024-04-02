@@ -389,8 +389,8 @@ class PVOpt(hass.Hass):
             self._compare_tariffs()
             self._setup_compare_schedule()
 
-        if self.agile:
-            self._setup_agile_schedule()
+        # if self.agile:
+        #     self._setup_agile_schedule()
 
         self._cost_actual()
 
@@ -446,7 +446,7 @@ class PVOpt(hass.Hass):
     def _check_for_zappi(self):
         self.ulog("Checking for Zappi Sensors")
         sensor_entities = self.get_state("sensor")
-        self.zappi_entities = [k for k in sensor_entities if "zappi" in k if "charge_added_session" in k]
+        self.zappi_entities = [k for k in sensor_entities if "zappi" in k for x in ["charge_added_session"] if x in k]
         if len(self.zappi_entities) > 0:
             for entity_id in self.zappi_entities:
                 zappi_sn = entity_id.split("_")[2]
@@ -460,7 +460,7 @@ class PVOpt(hass.Hass):
         for entity_id in self.zappi_entities:
             df = self.hass2df(entity_id=entity_id, **kwargs)
             self.rlog(f">>> Zappi entity {entity_id}")
-            self.log(f">>> {df}")
+            self.log(f">>> {df.to_string()}")
 
     def rlog(self, str, **kwargs):
         if self.redact:
@@ -539,16 +539,16 @@ class PVOpt(hass.Hass):
         )
         self.pv_system = pv.PVsystemModel("PV_Opt", self.inverter_model, self.battery_model, host=self)
 
-    def _setup_agile_schedule(self):
-        start = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(1, "minutes")).to_pydatetime()
-        self.timer_handle = self.run_every(
-            self._load_agile_cb,
-            start=start,
-            interval=3600,
-        )
+    # def _setup_agile_schedule(self):
+    #     start = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(1, "minutes")).to_pydatetime()
+    #     self.timer_handle = self.run_every(
+    #         self._load_agile_cb,
+    #         start=start,
+    #         interval=3600,
+    #     )
 
     def _setup_compare_schedule(self):
-        start = (pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta(hours=25, minutes=1)).to_pydatetime()
+        start = (pd.Timestamp.now(tz="UTC").ceil("60min") - pd.Timedelta("2min")).to_pydatetime()
         self.timer_handle = self.run_every(
             self._compare_tariff_cb,
             start=start,
@@ -588,21 +588,22 @@ class PVOpt(hass.Hass):
     def _compare_tariff_cb(self, cb_args):
         self._compare_tariffs()
 
-    @ad.app_lock
-    def _load_agile_cb(self, cb_args):
-        # reload if the time is after 16:00 and the last data we have is today
-        if self.debug:
-            self.log(">>> Agile Callback Handler")
-            self.log(
-                f">>> Contract end day: {self.contract.tariffs['import'].end().day:2d} Today:{pd.Timestamp.now().day:2d}  {(self.contract.tariffs['import'].end().day == pd.Timestamp.now().day)}"
-            )
-            self.log(f">>> Current hour:     {pd.Timestamp.now().hour:2d}           {pd.Timestamp.now().hour > 16}")
-        if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (pd.Timestamp.now().hour > 16):
-            self.log(f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}")
-            self._load_contract()
+    # @ad.app_lock
+    # def _load_agile_cb(self, cb_args):
+    #     # reload if the time is after 16:00 and the last data we have is today
+    #     if self.debug:
+    #         self.log(">>> Agile Callback Handler")
+    #         self.log(
+    #             f">>> Contract end day: {self.contract.tariffs['import'].end().day:2d} Today:{pd.Timestamp.now().day:2d}  {(self.contract.tariffs['import'].end().day == pd.Timestamp.now().day)}"
+    #         )
+    #         self.log(f">>> Current hour:     {pd.Timestamp.now().hour:2d}           {pd.Timestamp.now().hour > 16}")
 
-        elif pd.Timestamp.now(tz="UTC").hour == 0:
-            self._load_contract()
+    #     if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (pd.Timestamp.now().hour > 16):
+    #         self.log(f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}")
+    #         self._load_contract()
+
+    #     elif pd.Timestamp.now(tz="UTC").hour == 0:
+    #         self._load_contract()
 
     def get_config(self, item, default=None):
         if item in self.config_state:
@@ -1375,6 +1376,9 @@ class PVOpt(hass.Hass):
         self.log("")
         self._load_saving_events()
 
+        if self.io:
+            self._get_io()
+
         if self.get_config("forced_discharge") and (self.get_config("supports_forced_discharge", True)):
             discharge_enable = "enabled"
         else:
@@ -1387,6 +1391,18 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("Checking tariffs:")
         self.log("-----------------")
+
+        if self.agile:
+            if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
+                pd.Timestamp.now().hour > 16
+            ):
+                self.log(
+                    f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}"
+                )
+                self._load_contract()
+
+        elif pd.Timestamp.now(tz="UTC").hour == 0:
+            self._load_contract()
 
         if self._check_tariffs():
             self.log("")
@@ -2170,6 +2186,10 @@ class PVOpt(hass.Hass):
                     str_days = "Potential error. <<<"
 
                 self.log(f"  - {days} days was expected. {str_days}")
+
+                if len(self.zappi_entities) > 0:
+                    zappi = self._get_zappi(days=days, log=True)
+
                 df = df * (1 + self.get_config("consumption_margin") / 100)
                 dfx = pd.Series(index=df.index, data=df.to_list())
                 # Group by time and take the mean
@@ -2203,9 +2223,6 @@ class PVOpt(hass.Hass):
                     consumption["consumption"] = consumption_mean
 
                 self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
-
-                if len(self.zappi_entities) > 0:
-                    self._get_zappi(days=days, log=True, freq="30min")
 
         else:
             daily_kwh = self.get_config("daily_consumption_kwh")
@@ -2397,7 +2414,9 @@ class PVOpt(hass.Hass):
                 df = pd.concat(
                     [
                         df,
-                        self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1])["unit"],
+                        self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1], day_ahead=False)[
+                            "unit"
+                        ],
                     ],
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
@@ -2423,7 +2442,7 @@ class PVOpt(hass.Hass):
 
             self.log(f"  {direction.title()}: {str_log}")
             if err:
-                self.rlog(self.contract.tariffs[direction])
+                self.rlog(self.contract.tariffs[direction].to_df())
 
     def ulog(self, strlog, underline="-", words=False):
         self.log("")

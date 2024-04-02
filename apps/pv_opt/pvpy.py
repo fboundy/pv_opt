@@ -66,8 +66,10 @@ class Tariff:
         self.host = host
         if host is None:
             self.log = print
+            self.tz = "GB"
         else:
             self.log = host.log
+            self.tz = self.host.tz
 
         self.export = export
         self.eco7 = eco7
@@ -201,7 +203,11 @@ class Tariff:
                     self.log("")
                     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
-                if pd.Timestamp.now(tz="UTC").hour > 11 and df.index[-1].day != end.day:
+                if pd.Timestamp.now(tz=self.tz).hour > 11 and df.index[-1].day != end.day:
+                    # self.log(f">>> {pd.Timestamp.now(tz=self.tz).hour}")
+                    # self.log(f">>> {df.index[-1].day}")
+                    # self.log(f">>> {end.day}")
+
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
                         self.day_ahead = self.get_day_ahead(df.index[0])
