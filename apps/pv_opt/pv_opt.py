@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.13.2"
+VERSION = "4.0.0-solax-x1-beta-18"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -24,7 +24,9 @@ TIME_FORMAT = "%H:%M"
 
 REDACT_REGEX = [
     "[0-9]{2}m[0-9]{7}_[0-9]{13}",  # Serial_MPAN
+    "[0-9]{2}e[0-9]{7}_[0-9]{13}",  # Serial_MPAN
     "[0-9]{2}m[0-9]{7}",  # Serial
+    "[0-9]{2}e[0-9]{7}",  # Serial
     "^$|\d{13}$",  # MPAN
     "a_[0-f]{8}",  # Account Number
     "A-[0-f]{8}",  # Account Number
@@ -54,7 +56,7 @@ CONSUMPTION_SHAPE = {
     "consumption": [300, 200, 150, 500, 500, 750, 750, 300],
 }
 
-INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN"]
+INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN", "SUNSYNK_SOLARSYNK2", "SOLAX_X1"]
 
 SYSTEM_ARGS = [
     "module",
@@ -305,6 +307,7 @@ def importName(modulename, name):
 
 
 class PVOpt(hass.Hass):
+    @ad.app_lock
     def initialize(self):
         self.config = {}
         self.log("")
@@ -333,6 +336,11 @@ class PVOpt(hass.Hass):
 
         self.redact = self.args.pop("redact_personal_data_from_log", True)
 
+        self.inverter_sn = self.args.pop("inverter_sn", "")
+        if self.inverter_sn != "":
+            self.redact_regex.append(self.inverter_sn)
+
+        self.redact = self.args.pop("redact_personal_data_from_log", True)
         self._load_inverter()
 
         retry_count = 0
@@ -358,8 +366,11 @@ class PVOpt(hass.Hass):
         self.handles = {}
         self.mqtt_handles = {}
 
+        self.mpans = []
+
         self.saving_events = {}
         self.contract = None
+
         self.bottlecap_entities = {"import": None, "export": None}
 
         # Load arguments from the YAML file
@@ -453,6 +464,8 @@ class PVOpt(hass.Hass):
             InverterController = importName(f"{inverter_brand}", "InverterController")
             self.log(f"Inverter type: {self.inverter_type}: inverter module: {inverter_brand}.py")
             self.inverter = InverterController(inverter_type=self.inverter_type, host=self)
+            self.log(f"  Device name:   {self.device_name}")
+            self.log(f"  Serial number: {self.inverter_sn}")
 
         else:
             e = f"Inverter type {self.inverter_type} is not yet supported. Only read-only mode with explicit config from the YAML will work."
@@ -918,6 +931,7 @@ class PVOpt(hass.Hass):
                 self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
+                self.log(f">>>{[self.entity_exists(v) for v in values]}")
                 if min([self.entity_exists(v) for v in values]):
                     if len(values) == 1:
                         self.config[item] = values[0]
@@ -1304,7 +1318,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self._load_saving_events()
 
-        if self.get_config("forced_discharge"):
+        if self.get_config("forced_discharge") and (self.get_config("supports_forced_discharge", True)):
             discharge_enable = "enabled"
         else:
             discharge_enable = "disabled"
@@ -1507,6 +1521,7 @@ class PVOpt(hass.Hass):
                             start=self.charge_start_datetime,
                             end=self.charge_end_datetime,
                             power=self.charge_power,
+                            target_soc=self.charge_target_soc,
                         )
                         self.inverter.control_discharge(enable=False)
 
@@ -1516,6 +1531,7 @@ class PVOpt(hass.Hass):
                             start=self.charge_start_datetime,
                             end=self.charge_end_datetime,
                             power=self.charge_power,
+                            target_soc=self.charge_target_soc,
                         )
                         self.inverter.control_charge(enable=False)
 
@@ -1549,6 +1565,7 @@ class PVOpt(hass.Hass):
                                 start=start,
                                 end=self.charge_end_datetime,
                                 power=self.charge_power,
+                                target_soc=self.charge_target_soc,
                             )
 
                             if status["discharge"]["active"]:
@@ -1567,6 +1584,7 @@ class PVOpt(hass.Hass):
                                 start=start,
                                 end=self.charge_end_datetime,
                                 power=self.charge_power,
+                                target_soc=self.charge_target_soc,
                             )
 
                             if status["charge"]["active"]:
@@ -1743,6 +1761,7 @@ class PVOpt(hass.Hass):
             self.charge_current = self.charge_power / self.get_config("battery_voltage", default=50)
             self.charge_start_datetime = self.windows["start"].iloc[0]
             self.charge_end_datetime = self.windows["end"].iloc[0]
+            self.charge_target_soc = self.windows["soc_end"].iloc[0]
             self.hold = [
                 {
                     "active": self.windows["hold_soc"].iloc[i] == "<=",
@@ -1754,7 +1773,7 @@ class PVOpt(hass.Hass):
         else:
             self.log(f"No charging slots")
             self.charge_current = 0
-            self.charge_power = 0
+            self.charge_target_soc = 0
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
             self.hold = []
@@ -2013,7 +2032,7 @@ class PVOpt(hass.Hass):
         consumption = pd.DataFrame(index=index, data={"consumption": 0})
 
         if self.get_config("use_consumption_history"):
-            entity_id = self.config["id_consumption_today"]
+
             days = int(self.get_config("consumption_history_days"))
 
             # if not isinstance(entity_ids, list):
@@ -2021,19 +2040,38 @@ class PVOpt(hass.Hass):
 
             # for entity_id in entity_ids:
             if (start < time_now) and (end < time_now):
-                consumption["consumption"] = self._get_hass_power_from_daily_kwh(
-                    entity_id,
-                    start=start,
-                    end=end,
-                    log=self.debug,
-                )
+                # consumption["consumption"] = self._get_hass_power_from_daily_kwh(
+                #     entity_id,
+                #     start=start,
+                #     end=end,
+                #     log=self.debug,
+                # )
 
+                consumption["consumption"] = 0
+                for entity_id in self.config["id_consumption"]:
+                    power = self.hass2df(entity_id=entity_id, days=days).loc[
+                        start.floor("30min") : end.ceil("30min") + pd.Timedelta("30min")
+                    ]
+
+                    power = self.riemann_avg(power)
+                    consumption["consumption"] += power
             else:
-                df = self._get_hass_power_from_daily_kwh(
-                    entity_id,
-                    days=days,
-                    log=self.debug,
-                )
+                df = None
+                for entity_id in self.config["id_consumption"]:
+                    power = self.hass2df(entity_id=entity_id, days=days)
+
+                    power = self.riemann_avg(power)
+                    if df is None:
+                        df = power
+                    else:
+                        df += power
+
+                # entity_id = self.config["id_consumption_today"]
+                # df = self._get_hass_power_from_daily_kwh(
+                #     entity_id,
+                #     days=days,
+                #     log=self.debug,
+                # )
 
                 if df is None:
                     self._status("ERROR: No consumption history.")
@@ -2137,6 +2175,16 @@ class PVOpt(hass.Hass):
 
         contracts = [self.contract]
 
+        self.log("")
+        self.log(f"Start:       {start.strftime(DATE_TIME_FORMAT_SHORT):>15s}")
+        self.log(f"End:         {end.strftime(DATE_TIME_FORMAT_SHORT):>15s}")
+        self.log(f"Initial SOC: {initial_soc:>15.1f}%")
+        self.log(f"Consumption: {static['consumption'].sum()/2000:15.1f} kWh")
+        self.log(f"Solar:       {static['solar'].sum()/2000:15.1f} kWh")
+
+        if self.debug:
+            self.log(f">>> Yesterday's data:\n{static.to_string()}")
+
         for tariff_set in self.config["alt_tariffs"]:
             code = {}
             tariffs = {}
@@ -2155,7 +2203,7 @@ class PVOpt(hass.Hass):
             )
 
         actual = self._cost_actual(start=start, end=end - pd.Timedelta(30, "minutes"))
-
+        static["period_start"] = static.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
         entity_id = f"sensor.{self.prefix}_opt_cost_actual"
         self.set_state(
             state=round(actual.sum() / 100, 2),
@@ -2165,7 +2213,8 @@ class PVOpt(hass.Hass):
                 "device_class": "monetary",
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison Actual",
-            },
+            }
+            | {col: static[["period_start", col]].to_dict("records") for col in ["solar", "consumption"]},
         )
 
         self.ulog("Net Cost comparison:", underline=None)
@@ -2195,7 +2244,7 @@ class PVOpt(hass.Hass):
                 log=self.debug,
             )
 
-            opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+            # opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
 
             attributes = {
                 "state_class": "measurement",
@@ -2216,23 +2265,33 @@ class PVOpt(hass.Hass):
             )
 
     def _get_solar(self, start, end):
-        self.log("Getting yesterday's solar generation:")
-        entity_id = self.config["id_daily_solar"]
+        self.log(
+            f"Getting yesterday's solar generation ({start.strftime(DATE_TIME_FORMAT_SHORT)} - {end.strftime(DATE_TIME_FORMAT_SHORT)}):"
+        )
+        # entity_id = self.config["id_daily_solar"]
+        entity_id = self.config["id_solar_power"]
         if entity_id is None or not self.entity_exists(entity_id):
             return
 
-        dt = pd.date_range(
-            start,
-            end,
-            freq="30min",
-        )
+        # dt = pd.date_range(
+        #     start,
+        #     end,
+        #     freq="30min",
+        # )
 
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
-        df = self.hass2df(entity_id, days=days).astype(float).resample("30min").ffill()
+        # df = self.hass2df(entity_id, days=days).astype(float).resample("30min").ffill()
+
+        df = self.hass2df(entity_id, days=days)
         if df is not None:
-            df.index = pd.to_datetime(df.index)
-            self.log(f"  - {df.loc[dt[-2]]:0.1f} kWh")
-            df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
+
+            df = (self.riemann_avg(df).loc[start : end - pd.Timedelta("30min")] / 10).round(0) * 10
+
+        #     df.index = pd.to_datetime(df.index)
+        #     self.log(f"  - {df.loc[dt[-2]]:0.1f} kWh")
+        #     df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
+        #     self.log(f"\n{df.to_string()}")
+        #     self.log(f"\n{df2.to_string()}")
 
         else:
             self.log("  - FAILED")
@@ -2417,6 +2476,14 @@ class PVOpt(hass.Hass):
             return None
         else:
             return state
+
+    def riemann_avg(self, x, freq="30min"):
+        dt = x.index.diff().total_seconds().fillna(0)
+
+        integral = (dt * x.shift(1)).fillna(0).cumsum().resample(freq).last()
+        avg = (integral.diff().shift(-1)[:-1] / pd.Timedelta(freq).total_seconds()).fillna(0).round(1)
+        # self.log(avg)
+        return avg
 
 
 # %%

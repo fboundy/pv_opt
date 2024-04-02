@@ -20,14 +20,14 @@ pv_opt:
 
   log: pv_opt_log
   prefix: pvopt
-  # debug: True
+  debug: false
 
 
 # User configuration ---  EDIT AWAY! ---
-  inverter_type: "SOLIS_SOLAX_MODBUS"
-  # inverter_type: "SOLIS_CORE_MODBUS"
-  # inverter_type: SOLIS_SOLARMAN
-  device_name: solis
+  # ========================================
+  # System parameters
+  # ========================================
+
 
   # If true the current config in HA will be over-written with that in the config.yaml. 
   overwrite_ha_on_restart: true
@@ -72,7 +72,7 @@ pv_opt:
   # ========================================
   #
   # use_consumption_history: true
-  consumption_history_days: 2
+  consumption_history_days: 6
   #
   # daily_consumption_kwh: 17
   # shape_consumption_profile: true
@@ -104,11 +104,18 @@ pv_opt:
   #
   # These are the default entities used with the Solis Solax Modbus integration. You can change them here and over-ride the defaults
 
+  # inverter_type: SOLIS_SOLAX_MODBUS
+  # device_name: solis
+  
   # battery_voltage: sensor.{device_name}_battery_voltage
   # update_cycle_seconds: 15
   # maximum_dod_percent: number.{device_name}_battery_minimum_soc 
   
   # id_consumption_today: sensor.{device_name}_consumption_today
+  # id_consumption:
+  #   - sensor.{device_name}_house_load
+  #   - sensor.{device_name}_bypass_load
+
   # id_grid_import_today: sensor.{device_name}_grid_import_today
   # id_grid_export_today: sensor.{device_name}_grid_export_today
 
@@ -134,6 +141,9 @@ pv_opt:
   #
   # These are the default entities used with the Solis Core Modbus integration. You can change them here and over-ride the defaults
 
+  # inverter_type: SOLIS_CORE_MODBUS
+  # device_name: solis
+  
   # modbus_hub: "{device_name}"
   # modbus_slave: 1
   # battery_voltage: sensor.{device_name}_battery_voltage
@@ -165,6 +175,9 @@ pv_opt:
   #
   # These are the default entities used with the Solis Solarman integration. You can change them here and over-ride the defaults
 
+  # inverter_type: SOLIS_SOLARMAN
+  # device_name: solis
+
   # battery_voltage: sensor.{device_name}_battery_voltage
   # maximum_dod_percent: 15
   # update_cycle_seconds: 60
@@ -193,6 +206,7 @@ pv_opt:
 
 # Tariff comparison
   id_daily_solar: sensor.{device_name}_power_generation_today
+  id_solar_power: sensor.{device_name}_pv_total_power
   alt_tariffs:
     - name: Agile_Fix
       octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
