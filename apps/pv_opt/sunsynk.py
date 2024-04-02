@@ -123,15 +123,29 @@ class InverterController:
     @property
     def status(self):
         status = None
+        time_now = pd.Timestamp.now(tz=self.tz)
         if self.type == "SUNSYNK_SOLARSYNK2":
-            status = "Status"
+            status = {
+                "mode": "Test - Dummy Entries",
+                "charge": {
+                    "start": time_now,
+                    "end": time_now,
+                    "current": 0,
+                    "active": False,
+                },
+                "discharge": {
+                    "start": time_now,
+                    "end": time_now,
+                    "current": 0,
+                    "active": False,
+                },
+                "hold_soc": {
+                    "active": False,
+                    "soc": 0.0,
+                },
+            }
 
         return status
-
-    def _write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
-        changed = False
-        written = False
-        return (changed, written)
 
     def _monitor_target_soc(self, target_soc, mode="charge"):
         pass
