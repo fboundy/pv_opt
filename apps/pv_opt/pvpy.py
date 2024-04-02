@@ -754,14 +754,15 @@ class PVsystemModel:
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                             net_cost_opt = net_cost[-1]
                             str_log += f"Net: {net_cost_opt:6.1f}"
-                            if self.host.debug:
+                            if log:
                                 self.log(str_log)
-                                xx = pd.concat(
-                                    [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
-                                ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
-                                xx["Diff"] = xx["New"] - xx["Old"]
-                                self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
-                                # yy = False
+                                if self.host.debug:
+                                    xx = pd.concat(
+                                        [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
+                                    ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
+                                    xx["Diff"] = xx["New"] - xx["Old"]
+                                    self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
+                                    # yy = False
                         else:
                             available[max_slot] = False
                 else:
@@ -781,9 +782,10 @@ class PVsystemModel:
         net_cost_opt = round(contract.net_cost(df).sum(), 1)
 
         if base_cost - net_cost_opt <= self.host.get_config("pass_threshold_p"):
-            self.log(
-                f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
-            )
+            if log:
+                self.log(
+                    f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
+                )
             slots = []
             net_cost_opt = base_cost
             df = pd.concat(
