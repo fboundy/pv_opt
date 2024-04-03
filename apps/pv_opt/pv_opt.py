@@ -629,7 +629,7 @@ class PVOpt(hass.Hass):
             return default
 
     def _setup_schedule(self):
-        start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}T").to_pydatetime()
+        start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}min").to_pydatetime()
         self.timer_handle = self.run_every(
             self.optimise_time,
             start=start_opt,
@@ -1394,7 +1394,7 @@ class PVOpt(hass.Hass):
 
         if self.agile:
             if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
-                pd.Timestamp.now().hour > 16
+                pd.Timestamp.now().hour >= 16
             ):
                 self.log(
                     f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}"
@@ -1900,6 +1900,7 @@ class PVOpt(hass.Hass):
         else:
             self.log(f"No charging slots")
             self.charge_current = 0
+            self.charge_power = 0
             self.charge_target_soc = 0
             self.charge_start_datetime = self.static.index[0]
             self.charge_end_datetime = self.static.index[0]
@@ -2500,7 +2501,7 @@ class PVOpt(hass.Hass):
 
             self.log(f"  {direction.title()}: {str_log}")
             if err:
-                self.rlog(self.contract.tariffs[direction].to_df())
+                self.rlog(self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1], day_ahead=False))
 
     def ulog(self, strlog, underline="-", words=False):
         self.log("")
