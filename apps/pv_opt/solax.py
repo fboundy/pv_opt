@@ -180,12 +180,15 @@ class InverterController:
             status = self._solax_mode()
 
             status["charge"] = self._solax_charge_periods()
-            status["charge"]["active"] = (
-                time_now >= status["charge"]["start"]
-                and time_now < status["charge"]["end"]
-                and status["charge"]["current"] > 0
-                and status["use_mode"]["Timed"] == "Force Time Use"
-            )
+            try:
+                status["charge"]["active"] = (
+                    time_now >= status["charge"]["start"]
+                    and time_now < status["charge"]["end"]
+                    and status["charge"]["current"] > 0
+                    and status["use_mode"]["Timed"] == "Force Time Use"
+                )
+            except:
+                status["charge"]["active"] = False
 
             status["discharge"] = {
                 "start": midnight,
@@ -209,7 +212,7 @@ class InverterController:
     def _solax_mode(self, **kwargs):
         if self.type == "SOLAX_X1":
             return {
-                x: self.host.get_state(entity_id=self.host.config[f"id_{x}"])
+                x: self.host.get_state_retry(entity_id=self.host.config[f"id_{x}"])
                 for x in INVERTER_DEFS[self.type]["MODE_ITEMS"]
             }
 
@@ -220,10 +223,10 @@ class InverterController:
         if self.type == "SOLAX_X1":
             return {
                 limit: pd.Timestamp(
-                    self.host.get_state(entity_id=self.host.config[f"id_charge_{limit}_time_1"]), tz=self.tz
+                    self.host.get_state_retry(entity_id=self.host.config[f"id_charge_{limit}_time_1"]), tz=self.tz
                 )
                 for limit in LIMITS
-            } | {"current": self.host.get_state(entity_id=self.host.config[f"id_max_charge_current"])}
+            } | {"current": self.host.get_state_retry(entity_id=self.host.config[f"id_max_charge_current"])}
 
         else:
             self._unknown_inverter()
