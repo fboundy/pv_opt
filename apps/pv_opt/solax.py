@@ -103,6 +103,8 @@ class InverterController:
                 end = kwargs.get("end", time_now).ceil("30min").strftime(TIMEFORMAT)
                 self.host.set_select("charge_start_time_1", start)
                 self.host.set_select("charge_end_time_1", end)
+                self.host.set_select("charge_start_time_2", start)
+                self.host.set_select("charge_end_time_2", end)
 
                 power = self.kwargs.get("power")
                 if power is not None:
@@ -140,10 +142,12 @@ class InverterController:
             else:
                 self.host.set_select("use_mode", "Self Use Mode")
                 time_now = pd.Timestamp.now(tz=self.tz)
-                start = kwargs.get("start", time_now).floor("15min").strftime(TIMEFORMAT)
+                start = kwargs.get("start", time_now).normalize().strftime(TIMEFORMAT)
                 end = start
                 self.host.set_select("charge_start_time_1", start)
                 self.host.set_select("charge_end_time_1", end)
+                self.host.set_select("charge_start_time_2", start)
+                self.host.set_select("charge_end_time_2", end)
 
         else:
             self._unknown_inverter()

@@ -1505,7 +1505,7 @@ class PVOpt(hass.Hass):
             self._status("ERROR: Baseline performance")
             return
 
-        self.optimised_cost = {"Base": self.contract.net_cost(self.flows["Base"]).sum()}
+        self.optimised_cost = {"Base": self.contract.net_cost(self.flows["Base"])}
 
         self.log("")
         if self.get_config("use_solar", True):
@@ -1521,23 +1521,26 @@ class PVOpt(hass.Hass):
         )
 
         cases = {
-            "No Export": {
+            "Optimised Charging": {
                 "export": False,
+                "discharge": False,
             },
-            "Optimised Charge": {
+            "Optimised PV Export": {
                 "export": True,
                 "discharge": False,
             },
-            "Optimised Discharge:" "export": True,
-            "discharge": True,
+            "Forced Discharge": {
+                "export": True,
+                "discharge": True,
+            },
         }
 
-        if not self.get_config("use_export"):
-            self.selected_case = "No Export"
+        if not self.get_config("include_export"):
+            self.selected_case = "Optimised Charging"
         elif not self.get_config("forced_discharge"):
-            self.selected_case = "Optimised Charge"
+            self.selected_case = "Optimised PV Export"
         else:
-            self.selected_case = "Optimised Discharge"
+            self.selected_case = "Forced Discharge"
 
         self._status("Optimising charge plan")
 
@@ -1547,17 +1550,21 @@ class PVOpt(hass.Hass):
                 self.static,
                 self.contract,
                 solar="weighted",
-                export=case["export"],
-                discharge=case["discharge"],
+                export=cases[case]["export"],
+                discharge=cases[case]["discharge"],
                 log=(case == self.selected_case),
                 max_iters=MAX_ITERS,
             )
 
-            self.optimised_cost[case] = self.contract.net_cost(self.flows[case]).sum()
+            self.optimised_cost[case] = self.contract.net_cost(self.flows[case])
 
-        self.log(f"  {'Base cost:':30s}: {self.optimised_cost['Base']:6.2f}p")
+        self.ulog("Optimisation Summary")
+        self.log(f"  {'Base cost:':40s} {self.optimised_cost['Base'].sum():6.1f}p")
         for case in cases:
-            self.log(f"  {f'Optimised cost ({case}):':30s}: {self.optimised_cost[case]:6.2f}p")
+            str_log = f"  {f'Optimised cost ({case}):':40s} {self.optimised_cost[case].sum():6.1f}p"
+            if case == self.selected_case:
+                str_log += " <=== Current Setup"
+            self.log(str_log)
 
         # self.opt = self.pv_system.optimised_force(
         #     self.initial_soc,
@@ -1569,13 +1576,15 @@ class PVOpt(hass.Hass):
         # )
         # self.opt_cost = self.optimised_cost[selected_case]
 
+        self.opt = self.flows[self.selected_case]
+
         self.log("")
 
         self._create_windows()
 
         self.log("")
         self.log(
-            f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.optimised_cost[self.selected_case].sum():5.2f}"
+            f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.optimised_cost['Base'].sum():5.1f} Opt Cost: {self.optimised_cost[self.selected_case].sum():5.1f}"
         )
         self.log("")
         optimiser_elapsed = round((pd.Timestamp.now() - self.t0).total_seconds(), 1)
@@ -1993,7 +2002,7 @@ class PVOpt(hass.Hass):
         self.write_cost(
             "PV Opt Base Cost",
             entity=f"sensor.{self.prefix}_base_cost",
-            cost=self.optimsed_cost["Base"],
+            cost=self.optimised_cost["Base"],
             df=self.flows["Base"],
         )
 
@@ -2125,15 +2134,13 @@ class PVOpt(hass.Hass):
             log=log,
         )
 
-        # self.log(df.to_string())
         if df is not None:
             df.index = pd.to_datetime(df.index)
-            df = (df.diff(-1).fillna(0).clip(upper=0).cumsum().resample("30min")).ffill().fillna(0).diff(-1) * 2000
-            df = df.fillna(0)
-            if start is not None:
-                df = df.loc[start:]
-            if end is not None:
-                df = df.loc[:end]
+            x = df.diff().clip(0).fillna(0).cumsum() + df.iloc[0]
+            x.index = x.index.round("1s")
+            y = -pd.concat([x.resample("1s").interpolate().resample("30min").asfreq(), x.iloc[-1:]]).diff(-1)
+            dt = y.index.diff().total_seconds() / pd.Timedelta("60min").total_seconds() / 1000
+            df = y[1:-1] / dt[2:]
 
         return df
 
@@ -2148,34 +2155,52 @@ class PVOpt(hass.Hass):
 
         index = pd.date_range(start, end, inclusive="left", freq="30min")
         consumption = pd.DataFrame(index=index, data={"consumption": 0})
+        df = None
+
+        entity_ids = []
+        entity_id = None
 
         if self.get_config("use_consumption_history"):
-
             days = int(self.get_config("consumption_history_days"))
 
-            # if not isinstance(entity_ids, list):
-            #     entity_ids = [entity_ids]
+            if "id_consumption" in self.config:
+                entity_ids = self.config["id_consumption"]
+                if not isinstance(entity_ids, list):
+                    entity_ids = [entity_ids]
 
-            # for entity_id in entity_ids:
+                entity_ids = [entity_id for entity_id in entity_ids if self.entity_exists(entity_id)]
+
+            if (
+                (len(entity_ids) == 0)
+                and ("id_consumption_today" in self.config)
+                and self.entity_exists(self.config["id_consumption_today"])
+            ):
+                entity_id = self.config["id_consumption_today"]
+
             if (start < time_now) and (end < time_now):
-                # consumption["consumption"] = self._get_hass_power_from_daily_kwh(
-                #     entity_id,
-                #     start=start,
-                #     end=end,
-                #     log=self.debug,
-                # )
-
-                consumption["consumption"] = 0
-                for entity_id in self.config["id_consumption"]:
+                for entity_id in entity_ids:
                     power = self.hass2df(entity_id=entity_id, days=days).loc[
                         start.floor("30min") : end.ceil("30min") + pd.Timedelta("30min")
                     ]
 
-                    power = self.riemann_avg(power)
-                    consumption["consumption"] += power
+                    if power is not None:
+                        power = self.riemann_avg(power)
+                        consumption["consumption"] += power
+
+                if consumption["consumption"].sum() == 0:
+                    consumption["consumption"] = self._get_hass_power_from_daily_kwh(
+                        entity_id,
+                        start=start,
+                        end=end,
+                        log=self.debug,
+                    )
+
+                if consumption["consumption"].sum() == 0:
+                    self._status("ERROR: No consumption history.")
+                    return
+
             else:
-                df = None
-                for entity_id in self.config["id_consumption"]:
+                for entity_id in entity_ids:
                     power = self.hass2df(entity_id=entity_id, days=days)
 
                     power = self.riemann_avg(power)
@@ -2184,12 +2209,13 @@ class PVOpt(hass.Hass):
                     else:
                         df += power
 
-                # entity_id = self.config["id_consumption_today"]
-                # df = self._get_hass_power_from_daily_kwh(
-                #     entity_id,
-                #     days=days,
-                #     log=self.debug,
-                # )
+                if df is None:
+                    self.log("Getting consumpo")
+                    df = self._get_hass_power_from_daily_kwh(
+                        entity_id,
+                        days=days,
+                        log=self.debug,
+                    )
 
                 if df is None:
                     self._status("ERROR: No consumption history.")
@@ -2362,9 +2388,10 @@ class PVOpt(hass.Hass):
                 static,
                 contract,
                 solar="solar",
-                discharge=self.get_config("forced_discharge"),
+                export=True,
+                discharge=True,
                 max_iters=MAX_ITERS,
-                log=self.debug,
+                log=False,
             )
 
             # opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"

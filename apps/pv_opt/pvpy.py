@@ -313,7 +313,7 @@ class Tariff:
                         else:
                             if len(i["Name"]) > 8:
                                 try:
-                                    self.log(time, i["Name"], i["Value"])
+                                    # self.log(time, i["Name"], i["Value"])
                                     data.append(float(i["Value"].replace(",", ".")))
                                     index.append(
                                         pd.Timestamp(

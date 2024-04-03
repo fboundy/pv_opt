@@ -53,8 +53,8 @@ INVERTER_DEFS = {
             "id_battery_soc": "sensor.{device_name}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_house_load_today",
             "id_consumption": [
-                "sensor.{device_name}_house_load",
-                "sensor.{device_name}_bypass_load",
+                "sensor.{device_name}_house_load_x",
+                "sensor.{device_name}_bypass_load_x",
             ],
             "id_grid_import_today": "sensor.{device_name}_grid_import_today",
             "id_grid_export_today": "sensor.{device_name}_grid_export_today",
