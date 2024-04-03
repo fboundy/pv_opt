@@ -1490,22 +1490,23 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log(f"Initial SOC: {self.initial_soc}")
 
-        self.base = self.pv_system.flows(
-            self.initial_soc,
-            self.static,
-            # solar="self.get_config("solar_forecast")",
-            solar="weighted",
-        )
-
+        self.flows = {
+            "Base": self.pv_system.flows(
+                self.initial_soc,
+                self.static,
+                solar="weighted",
+            )
+        }
         self.log("Calculating Base flows:")
-        if len(self.base) == 0:
+
+        if len(self.flows["Base"]) == 0:
             self.log("")
             self.log("  Unable to calculate baseline perfoormance", level="ERROR")
             self._status("ERROR: Baseline performance")
             return
 
-        self.base_cost = self.contract.net_cost(self.base)
-        self.log(f"  Base cost: {self.base_cost.sum():6.2f}p")
+        self.optimised_cost = {"Base": self.contract.net_cost(self.flows["Base"]).sum()}
+
         self.log("")
         if self.get_config("use_solar", True):
             str_log = (
@@ -1519,29 +1520,54 @@ class PVOpt(hass.Hass):
             + f" from {self.static.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {self.static.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
         )
 
+        cases = {
+            "No Export": {
+                "export": False,
+            },
+            "Optimised Charge": {
+                "export": True,
+                "discharge": False,
+            },
+            "Optimised Discharge:" "export": True,
+            "discharge": True,
+        }
+
+        if not self.get_config("use_export"):
+            self.selected_case = "No Export"
+        elif not self.get_config("forced_discharge"):
+            self.selected_case = "Optimised Charge"
+        else:
+            self.selected_case = "Optimised Discharge"
+
         self._status("Optimising charge plan")
 
-        self.opt = self.pv_system.optimised_force(
-            self.initial_soc,
-            self.static,
-            self.contract,
-            solar="weighted",
-            export=False,
-            log=False,
-        )
-        opt_no_export = self.contract.net_cost(self.opt)
-        self.log(f"  Optimised cost (no export): {opt_no_export.sum():6.2f}p")
+        for case in cases:
+            self.flows[case] = self.pv_system.optimised_force(
+                self.initial_soc,
+                self.static,
+                self.contract,
+                solar="weighted",
+                export=case["export"],
+                discharge=case["discharge"],
+                log=(case == self.selected_case),
+                max_iters=MAX_ITERS,
+            )
 
-        self.opt = self.pv_system.optimised_force(
-            self.initial_soc,
-            self.static,
-            self.contract,
-            solar="weighted",
-            export=self.get_config("use_export"),
-            discharge=self.get_config("forced_discharge"),
-            max_iters=MAX_ITERS,
-        )
-        self.opt_cost = self.contract.net_cost(self.opt)
+            self.optimised_cost[case] = self.contract.net_cost(self.flows[case]).sum()
+
+        self.log(f"  {'Base cost:':30s}: {self.optimised_cost['Base']:6.2f}p")
+        for case in cases:
+            self.log(f"  {f'Optimised cost ({case}):':30s}: {self.optimised_cost[case]:6.2f}p")
+
+        # self.opt = self.pv_system.optimised_force(
+        #     self.initial_soc,
+        #     self.static,
+        #     self.contract,
+        #     solar="weighted",
+        #     export=self.get_config("use_export"),
+        #     discharge=self.get_config("forced_discharge"),
+        # )
+        # self.opt_cost = self.optimised_cost[selected_case]
 
         self.log("")
 
@@ -1549,7 +1575,7 @@ class PVOpt(hass.Hass):
 
         self.log("")
         self.log(
-            f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.opt_cost.sum():5.2f}"
+            f"Plan time: {self.static.index[0].strftime('%d-%b %H:%M')} - {self.static.index[-1].strftime('%d-%b %H:%M')} Initial SOC: {self.initial_soc} Base Cost: {self.base_cost.sum():5.2f} Opt Cost: {self.optimised_cost[self.selected_case].sum():5.2f}"
         )
         self.log("")
         optimiser_elapsed = round((pd.Timestamp.now() - self.t0).total_seconds(), 1)
@@ -1967,15 +1993,15 @@ class PVOpt(hass.Hass):
         self.write_cost(
             "PV Opt Base Cost",
             entity=f"sensor.{self.prefix}_base_cost",
-            cost=self.base_cost,
-            df=self.base,
+            cost=self.optimsed_cost["Base"],
+            df=self.flows["Base"],
         )
 
         self.write_cost(
             "PV Opt Optimised Cost",
             entity=f"sensor.{self.prefix}_opt_cost",
-            cost=self.opt_cost,
-            df=self.opt,
+            cost=self.optimised_cost[self.selected_case],
+            df=self.flows[self.selected_case],
         )
 
         self.write_to_hass(
