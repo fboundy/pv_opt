@@ -237,6 +237,41 @@ DEFAULT_CONFIG = {
             "mode": "slider",
         },
     },
+    "ev_charger_power_watts": {
+        "default": 7000,
+        "domain": "number",
+        "attributes": {
+            "min": 1000,
+            "max": 10000,
+            "step": 100,
+            "unit_of_measurement": "W",
+            "device_class": "power",
+            "mode": "slider",
+        },
+    },
+    "ev_battery_capacity_kwh": {
+        "default": 30,
+        "domain": "number",
+        "attributes": {
+            "min": 5,
+            "max": 600,
+            "step": 1,
+            "unit_of_measurement": "kWh",
+            "device_class": "energy",
+            "mode": "slider",
+        },
+    },
+    "ev_charger": {
+        "default": "None",
+        "attributes": {
+            "options": [
+                "None",
+                "Zappi",
+                "Other",
+            ]
+        },
+        "domain": "select",
+    },
     "solar_forecast": {
         "default": "Solcast",
         "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90", "Weighted"]},
