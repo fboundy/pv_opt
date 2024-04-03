@@ -2142,6 +2142,11 @@ class PVOpt(hass.Hass):
             dt = y.index.diff().total_seconds() / pd.Timedelta("60min").total_seconds() / 1000
             df = y[1:-1] / dt[2:]
 
+            if start is not None:
+                df = df.loc[start:]
+            if end is not None:
+                df = df.loc[:end]
+
         return df
 
     def load_consumption(self, start, end):
