@@ -98,7 +98,7 @@ class InverterController:
         if self.type == "SOLAX_X1":
             if enable:
                 self.host.set_select("use_mode", "Force Time Use")
-                time_now = pd.Timestamp(tz=self.tz)
+                time_now = pd.Timestamp.now(tz=self.tz)
                 start = kwargs.get("start", time_now).floor("15min").strftime(TIMEFORMAT)
                 end = kwargs.get("end", time_now).ceil("30min").strftime(TIMEFORMAT)
                 self.host.set_select("charge_start_time_1", start)
