@@ -2271,6 +2271,8 @@ class PVOpt(hass.Hass):
         self.log(
             f"Getting expected consumption data for {start.strftime(DATE_TIME_FORMAT_LONG)} to {end.strftime(DATE_TIME_FORMAT_LONG)}:"
         )
+        index = pd.date_range(start, end, inclusive="left", freq="30min")
+        consumption = pd.DataFrame(index=index, data={"consumption": 0})
 
         if self.get_config("use_consumption_history"):
             time_now = pd.Timestamp.now(tz="UTC")
@@ -2280,8 +2282,6 @@ class PVOpt(hass.Hass):
             else:
                 days = int(self.get_config("consumption_history_days"))
 
-            index = pd.date_range(start, end, inclusive="left", freq="30min")
-            consumption = pd.DataFrame(index=index, data={"consumption": 0})
             df = None
 
             entity_ids = []
