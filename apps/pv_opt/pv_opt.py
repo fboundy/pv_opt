@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "4.0.0-sunsynk-alpha-15"
+VERSION = "4.0.0-sunsynk-alpha-16"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -1312,6 +1312,7 @@ class PVOpt(hass.Hass):
             for item in DEFAULT_CONFIG
             if (item not in [self.change_items[entity] for entity in self.change_items])
             and ("id_" not in item)
+            and ("json_" not in item)
             and ("alt_" not in item)
             and ("auto" not in item)
             and "domain" in DEFAULT_CONFIG[item]
@@ -1760,6 +1761,8 @@ class PVOpt(hass.Hass):
                         self.log("No charge/discharge windows planned.")
 
                     if self.charge_power > 0:
+                        self.inverter.control_discharge(enable=False)
+
                         self.inverter.control_charge(
                             enable=True,
                             start=self.charge_start_datetime,
@@ -1767,9 +1770,11 @@ class PVOpt(hass.Hass):
                             power=self.charge_power,
                             target_soc=self.charge_target_soc,
                         )
-                        self.inverter.control_discharge(enable=False)
+
 
                     elif self.charge_power < 0:
+                        self.inverter.control_charge(enable=False)
+
                         self.inverter.control_discharge(
                             enable=True,
                             start=self.charge_start_datetime,
@@ -1777,7 +1782,6 @@ class PVOpt(hass.Hass):
                             power=self.charge_power,
                             target_soc=self.charge_target_soc,
                         )
-                        self.inverter.control_charge(enable=False)
 
                 elif (
                     (time_to_slot_start <= 0)
@@ -1809,6 +1813,11 @@ class PVOpt(hass.Hass):
                             else:
                                 start = None
 
+                            if status["discharge"]["active"]:
+                                self.inverter.control_discharge(
+                                    enable=False,
+                                )
+
                             self.inverter.control_charge(
                                 enable=True,
                                 start=start,
@@ -1817,16 +1826,17 @@ class PVOpt(hass.Hass):
                                 target_soc=self.charge_target_soc,
                             )
 
-                            if status["discharge"]["active"]:
-                                self.inverter.control_discharge(
-                                    enable=False,
-                                )
 
                         elif self.charge_power < 0:
                             if not status["discharge"]["active"]:
                                 start = pd.Timestamp.now(tz=self.tz)
                             else:
                                 start = None
+
+                            if status["charge"]["active"]:
+                                self.inverter.control_charge(
+                                    enable=False,
+                                )
 
                             self.inverter.control_discharge(
                                 enable=True,
@@ -1835,11 +1845,6 @@ class PVOpt(hass.Hass):
                                 power=self.charge_power,
                                 target_soc=self.charge_target_soc,
                             )
-
-                            if status["charge"]["active"]:
-                                self.inverter.control_charge(
-                                    enable=False,
-                                )
 
                 else:
                     if self.charge_power > 0:
@@ -1866,6 +1871,7 @@ class PVOpt(hass.Hass):
                         self.log(str_log)
                         self.inverter.control_charge(enable=False)
                         did_something = True
+
                     elif status["charge"]["start"] != status["charge"]["end"]:
                         str_log += " but charge start and end times are different."
                         self.log(str_log)
@@ -1877,6 +1883,7 @@ class PVOpt(hass.Hass):
                         self.log(str_log)
                         self.inverter.control_discharge(enable=False)
                         did_something = True
+
                     elif status["discharge"]["start"] != status["discharge"]["end"]:
                         str_log += " but charge start and end times are different."
                         self.log(str_log)
@@ -1917,9 +1924,9 @@ class PVOpt(hass.Hass):
                 if did_something:
                     if self.get_config("update_cycle_seconds") is not None:
                         i = int(self.get_config("update_cycle_seconds") * 1.2)
-                        self.log(f"Waiting for Modbus Read cycle: {i} seconds")
+                        self.log(f"Waiting for inverter Read cycle: {i} seconds")
                         while i > 0:
-                            self._status(f"Waiting for Modbus Read cycle: {i}")
+                            self._status(f"Waiting for inverter Read cycle: {i}")
                             time.sleep(1)
                             i -= 1
 
