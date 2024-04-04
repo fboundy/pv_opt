@@ -704,23 +704,6 @@ class PVOpt(hass.Hass):
     def _compare_tariff_cb(self, cb_args):
         self._compare_tariffs()
 
-    # @ad.app_lock
-    # def _load_agile_cb(self, cb_args):
-    #     # reload if the time is after 16:00 and the last data we have is today
-    #     if self.debug:
-    #         self.log(">>> Agile Callback Handler")
-    #         self.log(
-    #             f">>> Contract end day: {self.contract.tariffs['import'].end().day:2d} Today:{pd.Timestamp.now().day:2d}  {(self.contract.tariffs['import'].end().day == pd.Timestamp.now().day)}"
-    #         )
-    #         self.log(f">>> Current hour:     {pd.Timestamp.now().hour:2d}           {pd.Timestamp.now().hour > 16}")
-
-    #     if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (pd.Timestamp.now().hour > 16):
-    #         self.log(f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}")
-    #         self._load_contract()
-
-    #     elif pd.Timestamp.now(tz="UTC").hour == 0:
-    #         self._load_contract()
-
     def get_config(self, item, default=None):
         if item in self.config_state:
             return self._value_from_state(self.config_state[item])
