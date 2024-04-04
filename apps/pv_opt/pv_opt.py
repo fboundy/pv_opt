@@ -1647,8 +1647,10 @@ class PVOpt(hass.Hass):
 
         if not self.get_config("include_export"):
             self.selected_case = "Optimised Charging"
+
         elif not self.get_config("forced_discharge"):
             self.selected_case = "Optimised PV Export"
+
         else:
             self.selected_case = "Forced Discharge"
 
@@ -1670,21 +1672,19 @@ class PVOpt(hass.Hass):
 
         self.ulog("Optimisation Summary")
         self.log(f"  {'Base cost:':40s} {self.optimised_cost['Base'].sum():6.1f}p")
+        cost_today = self._cost_actual().sum()
+        self.summary_costs = {
+            "Base": {"cost": ((self.optimised_cost["Base"].sum() + cost_today) / 100).round(2), "Selected": ""}
+        }
         for case in cases:
             str_log = f"  {f'Optimised cost ({case}):':40s} {self.optimised_cost[case].sum():6.1f}p"
+            self.summary_costs[case] = {"cost": ((self.optimised_cost[case].sum() + cost_today) / 100).round(2)}
             if case == self.selected_case:
-                str_log += " <=== Current Setup"
-            self.log(str_log)
+                self.summary_costs[case]["Selected"] = " <=== Current Setup"
+            else:
+                self.summary_costs[case]["Selected"] = ""
 
-        # self.opt = self.pv_system.optimised_force(
-        #     self.initial_soc,
-        #     self.static,
-        #     self.contract,
-        #     solar="weighted",
-        #     export=self.get_config("use_export"),
-        #     discharge=self.get_config("forced_discharge"),
-        # )
-        # self.opt_cost = self.optimised_cost[selected_case]
+            self.log(str_log + self.summary_costs[case]["Selected"])
 
         self.opt = self.flows[self.selected_case]
 
@@ -2051,6 +2051,7 @@ class PVOpt(hass.Hass):
         entity,
         cost,
         df,
+        attributes={},
     ):
         cost_today = self._cost_actual()
         midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta(24, "hours")
@@ -2087,6 +2088,7 @@ class PVOpt(hass.Hass):
             }
             | {col: df[["period_start", col]].to_dict("records") for col in cols if col in df.columns}
             | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")}
+            | attributes
         )
 
         self.write_to_hass(
@@ -2126,6 +2128,7 @@ class PVOpt(hass.Hass):
             entity=f"sensor.{self.prefix}_opt_cost",
             cost=self.optimised_cost[self.selected_case],
             df=self.flows[self.selected_case],
+            attributes={"Summary": self.summary_costs},
         )
 
         self.write_to_hass(

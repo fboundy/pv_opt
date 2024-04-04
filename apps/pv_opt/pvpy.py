@@ -592,7 +592,7 @@ class PVsystemModel:
         consumption.name = "consumption"
 
         discharge = kwargs.pop("discharge", False)
-        use_export = kwargs.pop("use_export", True)
+        use_export = kwargs.pop("export", True)
         max_iters = kwargs.pop("max_iters", MAX_ITERS)
 
         prices = pd.DataFrame()
@@ -613,12 +613,11 @@ class PVsystemModel:
                 f"Optimiser prices loaded for period {prices.index[0].strftime(TIME_FORMAT)} - {prices.index[-1].strftime(TIME_FORMAT)}"
             )
 
+        prices = prices.set_axis([t for t in contract.tariffs.keys() if contract.tariffs[t] is not None], axis=1)
         if not use_export:
             self.log(f"Ignoring export pricing because Use Export is turned off")
             discharge = False
             prices["export"] = 0
-
-        prices = prices.set_axis([t for t in contract.tariffs.keys() if contract.tariffs[t] is not None], axis=1)
 
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
