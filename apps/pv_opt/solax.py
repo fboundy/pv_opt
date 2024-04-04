@@ -106,7 +106,7 @@ class InverterController:
                 self.host.set_select("charge_start_time_2", start)
                 self.host.set_select("charge_end_time_2", end)
 
-                power = self.kwargs.get("power")
+                power = kwargs.get("power")
                 if power is not None:
                     entity_id = self.host.config[f"id_max_charge_current"]
                     current = abs(round(power / self.host.get_config("battery_voltage"), 1))

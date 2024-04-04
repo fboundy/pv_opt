@@ -82,6 +82,9 @@ MQTT_CONFIGS = {
     "number": {
         "mode": "slider",
     },
+    "text": {
+        "pattern": "^([0-1]?[0-9]|2[0-3]):[0-5][0-9]",
+    },
 }
 
 DOMAIN_ATTRIBUTES = {
@@ -105,6 +108,47 @@ DEFAULT_CONFIG = {
             "mode": "slider",
         },
         "domain": "number",
+    },
+    "test_start": {"default": "00:00", "domain": "text", "min": 5, "max": 5},
+    "test_end": {"default": "00:00", "domain": "text", "min": 5, "max": 5},
+    "test_power": {
+        "default": 3000,
+        "domain": "number",
+        "attributes": {
+            "min": 1000,
+            "max": 10000,
+            "step": 100,
+            "unit_of_measurement": "W",
+            "device_class": "power",
+            "mode": "slider",
+        },
+    },
+    "test_target_soc": {
+        "default": 100,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "unit_of_measurement": "%",
+            "device_class": "battery",
+            "mode": "slider",
+        },
+    },
+    "test_enable": {
+        "default": "Enable",
+        "domain": "select",
+        "attributes": {"options": ["Enable", "Disable"]},
+    },
+    "test_function": {
+        "default": "Charge",
+        "domain": "select",
+        "attributes": {"options": ["Charge", "Discharge"]},
+    },
+    "test_button": {
+        "default": pd.Timestamp.now(tz="UTC"),
+        "name": "Test",
+        "domain": "button",
     },
     "solcast_confidence_level": {
         "default": 50,
@@ -448,6 +492,42 @@ class PVOpt(hass.Hass):
             for id in self.handles:
                 self.log(f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}")
 
+    @ad.app_lock
+    def _run_test(self):
+        self.ulog("Test")
+
+        test = {
+            item: self.get_ha_value(self.ha_entities[f"test_{item}"])
+            for item in ["start", "end", "power", "enable", "function", "target_soc"]
+        }
+
+        for x in ["start", "end"]:
+            test[x] = pd.Timestamp(test[x], tz=self.tz)
+
+        test["enable"] = test["enable"].lower() == "enable"
+        function = test.pop("function").lower()
+
+        self._log_inverter_status(self.inverter.status)
+
+        if function == "charge":
+            self.inverter.control_charge(**test)
+
+        elif function == "discharge":
+            self.inverter.control_discharge(**test)
+
+        else:
+            pass
+
+        if self.get_config("update_cycle_seconds") is not None:
+            i = int(self.get_config("update_cycle_seconds") * 1.2)
+            self.log(f"Waiting for Modbus Read cycle: {i} seconds")
+            while i > 0:
+                self._status(f"Waiting for Modbus Read cycle: {i}")
+                time.sleep(1)
+                i -= 1
+
+        self._log_inverter_status(self.inverter.status)
+
     def _check_for_io(self):
         self.ulog("Checking for Intelligent Octopus")
         entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
@@ -671,7 +751,7 @@ class PVOpt(hass.Hass):
             interval=self.get_config("optimise_frequency_minutes") * 60,
         )
         self.log(
-            f"Optimiser will run every {self.get_config('optimise_frequency_minutes')} minutes from {start_opt.strftime('%H:%M')} or on {EVENT_TRIGGER} Event"
+            f"Optimiser will run every {self.get_config('optimise_frequency_minutes')} minutes from {start_opt.strftime('%H:%M %Z')} or on {EVENT_TRIGGER} Event"
         )
 
     def _load_contract(self):
@@ -1276,9 +1356,12 @@ class PVOpt(hass.Hass):
 
                 self.mqtt.mqtt_subscribe(state_topic)
 
-            elif isinstance(self.get_ha_value(entity_id), str) and self.get_ha_value(entity_id) not in attributes.get(
-                "options", {}
+            elif (
+                isinstance(self.get_ha_value(entity_id), str)
+                and (self.get_ha_value(entity_id) not in attributes.get("options", {}))
+                and (domain not in ["text", "button"])
             ):
+
                 state = self._state_from_value(self.get_default_config(item))
 
                 self.log(f"  - Found unexpected str for {entity_id} reverting to default of {state}")
@@ -1327,14 +1410,15 @@ class PVOpt(hass.Hass):
             self.log(f"  {'Config Item':40s}  {'HA Entity':42s}  Current State")
             self.log(f"  {'-----------':40s}  {'---------':42s}  -------------")
 
+            self.ha_entities = {}
             for entity_id in self.change_items:
                 if not "sensor" in entity_id:
-                    self.log(
-                        f"  {self.change_items[entity_id]:40s}  {entity_id:42s}  {self.config_state[self.change_items[entity_id]]}"
-                    )
+                    item = self.change_items[entity_id]
+                    self.log(f"  {item:40s}  {entity_id:42s}  {self.config_state[item]}")
                     self.handles[entity_id] = self.listen_state(
                         callback=self.optimise_state_change, entity_id=entity_id
                     )
+                    self.ha_entities[item] = entity_id
 
         self.mqtt.listen_state(
             callback=self.optimise_state_change,
@@ -1365,7 +1449,10 @@ class PVOpt(hass.Hass):
         ]:
             self._load_pv_system_model()
 
-        self.optimise()
+        if "test" not in item:
+            self.optimise()
+        elif "button" in item:
+            self._run_test()
 
     def _value_from_state(self, state):
         value = None
@@ -1718,7 +1805,7 @@ class PVOpt(hass.Hass):
 
                         if self.charge_power > 0:
                             if not status["charge"]["active"]:
-                                start = pd.Timestamp.now()
+                                start = pd.Timestamp.now(tz=self.tz)
                             else:
                                 start = None
 
@@ -1737,7 +1824,7 @@ class PVOpt(hass.Hass):
 
                         elif self.charge_power < 0:
                             if not status["discharge"]["active"]:
-                                start = pd.Timestamp.now()
+                                start = pd.Timestamp.now(tz=self.tz)
                             else:
                                 start = None
 
@@ -1872,8 +1959,8 @@ class PVOpt(hass.Hass):
         self.opt["period"] = (self.opt["forced"].diff() > 0).cumsum()
         if (self.opt["forced"] != 0).sum() > 0:
             x = self.opt[self.opt["forced"] > 0].copy()
-            x["start"] = x.index
-            x["end"] = x.index + pd.Timedelta(30, "minutes")
+            x["start"] = x.index.tz_convert(self.tz)
+            x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
             x["soc"] = x["soc"].round(0).astype(int)
             x["soc_end"] = x["soc_end"].round(0).astype(int)
             windows = pd.concat(
@@ -1885,8 +1972,8 @@ class PVOpt(hass.Hass):
             )
 
             x = self.opt[self.opt["forced"] < 0].copy()
-            x["start"] = x.index
-            x["end"] = x.index + pd.Timedelta(30, "minutes")
+            x["start"] = x.index.tz_convert(self.tz)
+            x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
             self.windows = pd.concat(
                 [
                     x.groupby("period").first()[["start", "soc", "forced"]],
@@ -1921,8 +2008,8 @@ class PVOpt(hass.Hass):
 
             self.charge_power = self.windows["forced"].iloc[0]
             self.charge_current = self.charge_power / self.get_config("battery_voltage", default=50)
-            self.charge_start_datetime = self.windows["start"].iloc[0]
-            self.charge_end_datetime = self.windows["end"].iloc[0]
+            self.charge_start_datetime = self.windows["start"].iloc[0].tz_convert(self.tz)
+            self.charge_end_datetime = self.windows["end"].iloc[0].tz_convert(self.tz)
             self.charge_target_soc = self.windows["soc_end"].iloc[0]
             self.hold = [
                 {
@@ -1937,8 +2024,8 @@ class PVOpt(hass.Hass):
             self.charge_current = 0
             self.charge_power = 0
             self.charge_target_soc = 0
-            self.charge_start_datetime = self.static.index[0]
-            self.charge_end_datetime = self.static.index[0]
+            self.charge_start_datetime = self.static.index[0].tz_convert(self.tz)
+            self.charge_end_datetime = self.static.index[0].tz_convert(self.tz)
             self.hold = []
             self.windows = pd.DataFrame()
 
@@ -2659,7 +2746,7 @@ class PVOpt(hass.Hass):
                 retries += 1
                 self.rlog(
                     f"  - Retrieved invalid state of {state} for {kwargs.get('entity_id', None)} (Attempt {retries} of {GET_STATE_RETRIES})",
-                    level="WARN",
+                    level="WARNING",
                 )
                 time.sleep(GET_STATE_WAIT)
 

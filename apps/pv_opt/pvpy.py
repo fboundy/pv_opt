@@ -7,7 +7,7 @@ from copy import copy
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
-TIME_FORMAT = "%d/%m %H:%M"
+TIME_FORMAT = "%d/%m %H:%M %Z"
 MAX_ITERS = 3
 
 AGILE_FACTORS = {
@@ -69,7 +69,7 @@ class Tariff:
             self.tz = "GB"
         else:
             self.log = host.log
-            self.tz = self.host.tz
+            self.tz = host.tz
 
         self.export = export
         self.eco7 = eco7
@@ -405,9 +405,11 @@ class Contract:
         if self.host:
             self.log = host.log
             self.rlog = host.rlog
+            self.tz = host.tz
         else:
             self.log = print
             self.rlog = print
+            self.tz = "GB"
 
         if imp is None and octopus_account is None:
             raise ValueError("Either a named import tariff or Octopus Account details much be provided")
@@ -504,8 +506,10 @@ class PVsystemModel:
         self.host = host
         if host:
             self.log = host.log
+            self.tz = host.tz
         else:
             self.log = print
+            self.tz = "GB"
 
     def __str__(self):
         pass
@@ -705,7 +709,7 @@ class PVsystemModel:
                     x = x[x["soc_end"] <= 97]
 
                     search_window = x.index
-                    str_log = f"{max_slot.strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
+                    str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
                     if len(search_window) > 0:
                         # str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
                         pass
@@ -720,7 +724,7 @@ class PVsystemModel:
 
                         cost_at_min_price = round_trip_energy_required * min_price
 
-                        str_log += f"<==> {start_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
+                        str_log += f"<==> {start_window.tz_convert(self.tz).strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
                         str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
                         factors = []
                         for slot in window:
