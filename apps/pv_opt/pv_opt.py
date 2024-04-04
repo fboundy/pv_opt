@@ -42,6 +42,7 @@ MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
 WRITE_POLL_SLEEP = 0.5
+WRITE_POLL_RETRIES = 5
 GET_STATE_RETRIES = 5
 GET_STATE_WAIT = 0.5
 
@@ -2707,9 +2708,13 @@ class PVOpt(hass.Hass):
             try:
                 self.call_service("number/set_value", entity_id=entity_id, value=str(value))
 
-                time.sleep(WRITE_POLL_SLEEP)
-                new_state = float(self.get_state_retry(entity_id=entity_id))
-                written = new_state == value
+                written = False
+                retries = 0
+                while not written and retries < WRITE_POLL_RETRIES:
+                    retries += 1
+                    time.sleep(WRITE_POLL_SLEEP)
+                    new_state = float(self.get_state_retry(entity_id=entity_id))
+                    written = new_state == value
 
             except:
                 written = False

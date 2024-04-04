@@ -684,11 +684,12 @@ class PVsystemModel:
                 done = True
 
             import_cost = ((df["import"] * df["grid"]).clip(0) / 2000)[available]
+
             if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 max_slot = import_cost[import_cost == max_import_cost].index[0]
 
-                max_slot_energy = df["grid"].loc[max_slot] / 2000  # kWh
+                max_slot_energy = round(df["grid"].loc[max_slot] / 2000, 2)  # kWh
 
                 if max_slot_energy > 0:
                     round_trip_energy_required = (
@@ -748,7 +749,7 @@ class PVsystemModel:
                                         round(
                                             min(
                                                 round_trip_energy_required * 2000 * factor,
-                                                self.inverter.charger_power - x["forced"].loc[slot],
+                                                max(self.inverter.charger_power - x["forced"].loc[slot], 0),
                                                 ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity)
                                                 * 2
                                                 * factor,
