@@ -35,6 +35,7 @@ INVERTER_DEFS = {
             "maximum_dod_percent": 20,
             "id_battery_soc": "sensor.{device_name}_{inverter_sn}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_{inverter_sn}_day_load_energy",
+            "id_consumption": "sensor.{device_name}_{inverter_sn}_load_power",
             "id_grid_import_today": "sensor.{device_name}_{inverter_sn}_day_grid_import",
             "id_grid_export_today": "sensor.{device_name}_{inverter_sn}_day_grid_export",
             "supports_hold_soc": False,
