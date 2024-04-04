@@ -105,12 +105,12 @@ pv_opt:
   # device_name: solarsynk
   # inverter_sn: 000000  # enter {sunsynk_serial} from solarsynk2 addon
 
-  # maximum_dod_percent:  sensor.{device_name}_{inverter_sn}_battery_shutdown_cap
+  maximum_dod_percent:  20
   # id_battery_soc:  sensor.{device_name}_{inverter_sn}_battery_soc
   # id_consumption_today: sensor.{device_name}_{inverter_sn}_day_load_energy
   # id_grid_import_today: sensor.{device_name}_{inverter_sn}_day_grid_import
   # id_grid_export_today: sensor.{device_name}_{inverter_sn}_day_grid_export
-  # supports_hold_soc: false
-  # update_cycle_seconds: 300
+  supports_hold_soc: false
+  update_cycle_seconds: 300
 
 
