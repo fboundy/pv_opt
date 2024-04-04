@@ -572,11 +572,14 @@ class PVOpt(hass.Hass):
             self.log("No Zappi sensors found")
         self.log("")
 
-    def _get_zappi(self, **kwargs):
+    def _get_zappi(self, start, end, log=False):
+        df = pd.DataFrame()
         for entity_id in self.zappi_entities:
-            df = self.hass2df(entity_id=entity_id, **kwargs)
-            self.rlog(f">>> Zappi entity {entity_id}")
-            self.log(f">>> {df.to_string()}")
+            df += self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end)
+            if log:
+                self.rlog(f">>> Zappi entity {entity_id}")
+                self.log(f">>>\n{df.to_string()}")
+        return df
 
     def rlog(self, str, **kwargs):
         if self.redact:
@@ -1555,7 +1558,7 @@ class PVOpt(hass.Hass):
         self.time_now = pd.Timestamp.utcnow()
 
         self.static = self.static[self.time_now.floor("30min") :].fillna(0)
-        # self.load_consumption()
+
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
         if self.debug:
@@ -2266,19 +2269,20 @@ class PVOpt(hass.Hass):
             f"Getting expected consumption data for {start.strftime(DATE_TIME_FORMAT_LONG)} to {end.strftime(DATE_TIME_FORMAT_LONG)}:"
         )
 
-        time_now = pd.Timestamp.now(tz="UTC")
-        if (start < time_now) and (end < time_now):
-            self.log("  - Start and end are both in past so actuals will be used with no weighting")
-
-        index = pd.date_range(start, end, inclusive="left", freq="30min")
-        consumption = pd.DataFrame(index=index, data={"consumption": 0})
-        df = None
-
-        entity_ids = []
-        entity_id = None
-
         if self.get_config("use_consumption_history"):
-            days = int(self.get_config("consumption_history_days"))
+            time_now = pd.Timestamp.now(tz="UTC")
+            if (start < time_now) and (end < time_now):
+                self.log("  - Start and end are both in past so actuals will be used with no weighting")
+                days = (time_now - start).days + 1
+            else:
+                days = int(self.get_config("consumption_history_days"))
+
+            index = pd.date_range(start, end, inclusive="left", freq="30min")
+            consumption = pd.DataFrame(index=index, data={"consumption": 0})
+            df = None
+
+            entity_ids = []
+            entity_id = None
 
             if "id_consumption" in self.config:
                 entity_ids = self.config["id_consumption"]
@@ -2294,71 +2298,59 @@ class PVOpt(hass.Hass):
             ):
                 entity_id = self.config["id_consumption_today"]
 
-            if (start < time_now) and (end < time_now):
-                for entity_id in entity_ids:
-                    power = self.hass2df(entity_id=entity_id, days=days).loc[
-                        start.floor("30min") : end.ceil("30min") + pd.Timedelta("30min")
-                    ]
+            for entity_id in entity_ids:
+                power = self.hass2df(entity_id=entity_id, days=days)
 
-                    if power is not None:
-                        power = self.riemann_avg(power)
-                        consumption["consumption"] += power
-
-                if consumption["consumption"].sum() == 0:
-                    consumption["consumption"] = self._get_hass_power_from_daily_kwh(
-                        entity_id,
-                        start=start,
-                        end=end,
-                        log=self.debug,
-                    )
-
-                if consumption["consumption"].sum() == 0:
-                    self._status("ERROR: No consumption history.")
-                    return
-
-            else:
-                for entity_id in entity_ids:
-                    power = self.hass2df(entity_id=entity_id, days=days)
-
-                    power = self.riemann_avg(power)
-                    if df is None:
-                        df = power
-                    else:
-                        df += power
-
+                power = self.riemann_avg(power)
                 if df is None:
-                    self.log("Getting consumpo")
-                    df = self._get_hass_power_from_daily_kwh(
-                        entity_id,
-                        days=days,
-                        log=self.debug,
-                    )
-
-                if df is None:
-                    self._status("ERROR: No consumption history.")
-                    return
-
-                actual_days = int(
-                    round(
-                        (df.index[-1] - df.index[0]).total_seconds() / 3600 / 24,
-                        0,
-                    )
-                )
-
-                self.log(
-                    f"  - Got {actual_days} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
-                )
-                if int(actual_days) == days:
-                    str_days = "OK"
+                    df = power
                 else:
-                    self._status(f"WARNING: Consumption < {days} days.")
-                    str_days = "Potential error. <<<"
+                    df += power
 
-                self.log(f"  - {days} days was expected. {str_days}")
+            if df is None:
+                self.log("Getting consumpion")
+                df = self._get_hass_power_from_daily_kwh(
+                    entity_id,
+                    days=days,
+                    log=self.debug,
+                )
 
-                if len(self.zappi_entities) > 0:
-                    zappi = self._get_zappi(days=days, log=True)
+            if df is None:
+                self._status("ERROR: No consumption history.")
+                return
 
+            actual_days = int(
+                round(
+                    (df.index[-1] - df.index[0]).total_seconds() / 3600 / 24,
+                    0,
+                )
+            )
+
+            self.log(
+                f"  - Got {actual_days} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
+            )
+            if int(actual_days) == days:
+                str_days = "OK"
+            else:
+                self._status(f"WARNING: Consumption < {days} days.")
+                str_days = "Potential error. <<<"
+
+            self.log(f"  - {days} days was expected. {str_days}")
+
+            if (len(self.zappi_entities) > 0) and (self.get_config("ev_charger") == "Zappi"):
+                ev_power = self._get_zappi(start=df.index[0], end=df.index[-1])
+                self.log("")
+                self.log(f"  Deducting EV consumption of {ev_power.sum()/2000}")
+                self.log(
+                    f">>> EV consumption from    {ev_power.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {ev_power.index[-1].strftime(DATE_TIME_FORMAT_LONG)}"
+                )
+                self.log(
+                    f">>> House consumption from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_LONG)}"
+                )
+
+            if (start < time_now) and (end < time_now):
+                consumption["consumption"] = df.loc[start:end]
+            else:
                 df = df * (1 + self.get_config("consumption_margin") / 100)
                 dfx = pd.Series(index=df.index, data=df.to_list())
                 # Group by time and take the mean
@@ -2391,6 +2383,10 @@ class PVOpt(hass.Hass):
                     self.log(f"  - Ignoring 'Day of Week Weighting' because only {days} days of history is available")
                     consumption["consumption"] = consumption_mean
 
+            if len(entity_ids) > 0:
+                self.log(f"  - Estimated consumption from {entity_ids} loaded OK ")
+
+            else:
                 self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
 
         else:
