@@ -532,9 +532,9 @@ class PVOpt(hass.Hass):
     def _check_for_io(self):
         self.ulog("Checking for Intelligent Octopus")
         entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
-        self.rlog(f">>> {entity_id}")
+        self.rlog(f">>> check_for_io {entity_id}")
         io_dispatches = self.get_state(entity_id)
-        self.log(f">>> IO entity state:  {io_dispatches}")
+        self.log(f">>> check_for_io IO entity state:  {io_dispatches}")
         self.io = io_dispatches is not None
         if self.io:
             self.rlog(f"IO entity {entity_id} found")
@@ -680,7 +680,7 @@ class PVOpt(hass.Hass):
 
         if self.debug:
             self.log(
-                f">>> Start: {start.strftime(DATE_TIME_FORMAT_SHORT)} End: {end.strftime(DATE_TIME_FORMAT_SHORT)}"
+                f">>> _cost_actual  Start: {start.strftime(DATE_TIME_FORMAT_SHORT)} End: {end.strftime(DATE_TIME_FORMAT_SHORT)}"
             )
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
 
@@ -743,6 +743,7 @@ class PVOpt(hass.Hass):
 
     def _load_contract(self):
         self.rlog("")
+        self.rlog("In function _load_contract")
         self.rlog("Loading Contract:")
         self._status("Loading Tariffs")
         self.rlog("-----------------")
@@ -781,14 +782,14 @@ class PVOpt(hass.Hass):
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
                         if self.debug:
-                            self.log(f">>>{imp_exp}: {entities[imp_exp]}")
+                            self.log(f">>> _load_contract  {imp_exp}: {entities[imp_exp]}")
                         if len(entities[imp_exp]) > 0:
                             for entity in entities[imp_exp]:
                                 tariff_code = self.get_state_retry(entity, attribute="all")["attributes"].get(
                                     BOTTLECAP_DAVE["tariff_code"], None
                                 )
                                 if self.debug:
-                                    self.log(f">>> {tariff_code}")
+                                    self.log(f">>> _load_contract {tariff_code}")
 
                                 if tariff_code is not None:
                                     tariffs[imp_exp] = pv.Tariff(
@@ -907,6 +908,7 @@ class PVOpt(hass.Hass):
         self.rlog("Finished loading contract")
 
     def _check_tariffs(self):
+        self.log("Now in function _check_tariffs")
         if self.bottlecap_entities["import"] is not None:
             self._check_tariffs_vs_bottlecap()
 
@@ -1484,6 +1486,7 @@ class PVOpt(hass.Hass):
         # initialse a DataFrame to cover today and tomorrow at 30 minute frequency
 
         self.log("")
+        self.log("Now in function optimise")
         self._load_saving_events()
 
         if self.io:
@@ -1579,7 +1582,7 @@ class PVOpt(hass.Hass):
 
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
         if self.debug:
-            self.log(f">>> Fixed   : {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
+            self.log(f">>> Hass   Fixed   : {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
 
         x = pd.concat(
             [
@@ -2040,10 +2043,10 @@ class PVOpt(hass.Hass):
     def write_to_hass(self, entity, state, attributes={}):
         try:
             self.set_state(state=state, entity_id=entity, attributes=attributes)
-            self.log(f"Output written to {entity}")
+            self.log(f" write_to_hass....Output written to {entity}")
 
         except Exception as e:
-            self.log(f"Couldn't write to entity {entity}: {e}")
+            self.log(f" write_to_hass....Couldn't write to entity {entity}: {e}")
 
     def write_cost(
         self,
@@ -2053,10 +2056,18 @@ class PVOpt(hass.Hass):
         df,
         attributes={},
     ):
+        #self.log("")
+        #self.log("In function  write_cost")
+        #self.log("About to write df 1st time")
+        #self.log(df)
         cost_today = self._cost_actual()
         midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta(24, "hours")
         df = df.fillna(0).round(2)
+        #self.log("About to write df 2nd time")
+        #self.log(df)
         df["period_start"] = df.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+        #self.log("About to write df 3rd time")
+        #self.log(df)
         cols = [
             "soc",
             "forced",
@@ -2090,6 +2101,9 @@ class PVOpt(hass.Hass):
             | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")}
             | attributes
         )
+        self.log("About to write attributes")
+        self.log(attributes)
+
 
         self.write_to_hass(
             entity=entity,
@@ -2589,7 +2603,10 @@ class PVOpt(hass.Hass):
                     ],
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
-                # self.log(df)
+                self.log("Now in function check_tariffs_vs_bottlecap")
+                self.log("about to log df")
+                self.log(".............................")
+                self.log(df)
 
                 # Drop any Savings Sessions
 
