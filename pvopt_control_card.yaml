@@ -1,0 +1,132 @@
+type: custom:stack-in-card
+title: Optimised Charging
+cards:
+  - type: entities
+    entities:
+      - entity: sensor.pvopt_status
+        name: Status
+  - type: markdown
+    content: <h3>Control Parameters
+  - type: entities
+    entities:
+      - entity: number.pvopt_optimise_frequency_minutes
+        name: Optimiser Freq (mins)
+      - entity: switch.pvopt_read_only
+        name: Read Only Mode
+      - entity: switch.pvopt_include_export
+        name: Include Export
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.pvopt_include_export
+        state: 'on'
+    card:
+      type: entities
+      entities:
+        - entity: switch.pvopt_forced_discharge
+          name: Optimise Discharging
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.pvopt_forced_discharge
+        state: 'on'
+      - condition: state
+        entity: switch.pvopt_include_export
+        state: 'on'
+    card:
+      type: entities
+      entities:
+        - entity: switch.pvopt_allow_cyclic
+          name: Allow Cyclic Charge/Discharge
+  - type: markdown
+    content: <h3>Solar
+  - type: entities
+    entities:
+      - entity: switch.pvopt_use_solar
+        name: Use Solar
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.pvopt_use_solar
+        state: 'on'
+    card:
+      type: entities
+      entities:
+        - entity: number.pvopt_solcast_confidence_level
+          name: Solcast Confidence Level
+  - type: markdown
+    content: <h3>Consumption and EV
+  - type: entities
+    entities:
+      - entity: switch.pvopt_use_consumption_history
+        name: Use Consumption History
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.pvopt_use_consumption_history
+        state: 'on'
+    card:
+      type: entities
+      entities:
+        - entity: number.pvopt_consumption_history_days
+          name: Load History Days
+        - entity: number.pvopt_consumption_margin
+          name: Load Margin
+        - entity: number.pvopt_day_of_week_weighting
+          name: Weekday Weighting
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.pvopt_use_consumption_history
+        state: 'off'
+    card:
+      type: entities
+      entities:
+        - entity: number.pvopt_daily_consumption_kwh
+          name: Daily Consumption (kWh)
+        - entity: switch.pvopt_shape_consumption_profile
+          name: Shape Consumption Profile
+  - type: entities
+    entities:
+      - entity: select.pvopt_ev_charger
+        name: EV Charger
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: select.pvopt_ev_charger
+        state_not: None
+    card:
+      type: entities
+      entities:
+        - entity: number.pvopt_ev_charger_power_watts
+          name: EV Charger Power
+        - entity: number.pvopt_ev_battery_capacity_kwh
+          name: EV Battery Capacity
+  - type: markdown
+    content: <h3>System Parameters
+  - type: entities
+    entities:
+      - entity: number.pvopt_battery_capacity_wh
+        name: Battery Capacity
+      - entity: number.pvopt_inverter_power_watts
+        name: Inverter Power
+      - entity: number.pvopt_charger_power_watts
+        name: Charger Power
+      - entity: number.pvopt_inverter_efficiency_percent
+        name: Inverter Efficiency
+      - entity: number.pvopt_charger_efficiency_percent
+        name: Charger Efficiency
+  - type: markdown
+    content: Tuning Parameters
+  - type: entities
+    entities:
+      - entity: number.pvopt_pass_threshold_p
+        name: Charge threshold (p)
+      - entity: number.pvopt_discharge_threshold_p
+        name: Discharge threshold (p)
+      - entity: number.pvopt_plunge_threshold_p_kwh
+        name: Plunge threshold (p/kWh)
+      - entity: number.pvopt_slot_threshold_p
+        name: Threshold per slot (p)
+      - entity: number.pvopt_forced_power_group_tolerance
+        name: Power Resolution
