@@ -110,6 +110,7 @@ class InverterController:
                 if power is not None:
                     entity_id = self.host.config[f"id_max_charge_current"]
                     current = abs(round(power / self.host.get_config("battery_voltage"), 1))
+                    current = min(current, self.host.get_config("battery_current_limit_amps"))
 
                     self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
                     changed, written = self.host.write_and_poll_value(

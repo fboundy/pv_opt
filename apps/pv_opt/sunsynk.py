@@ -155,8 +155,10 @@ class InverterController:
                     self.config["json_timed_charge_end"]: kwargs.get(
                         "end", time_now.ceil("30min").strftime(TIMEFORMAT)
                     ),
-                    self.config["json_charge_current"]: kwargs.get("power", 0)
-                    / self.host.get_config("battery_voltage"),
+                    self.config["json_charge_current"]: min(
+                        kwargs.get("power", 0) / self.host.get_config("battery_voltage"),
+                        self.host.get_config("battery_current_limit_amps"),
+                    ),
                     self.config["json_timed_charge_enable"]: True,
                     self.config["json_gen_charge_enable"]: False,
                 } | {x: "00:00" for x in self.config["json_timed_charge_unused"]}
@@ -169,7 +171,7 @@ class InverterController:
                     self.config["json_target_soc"]: 100,
                     self.config["json_timed_charge_start"]: "00:00",
                     self.config["json_timed_charge_end"]: "00:00",
-                    self.config["json_charge_current"]: self.host.charger_power,
+                    self.config["json_charge_current"]: self.host.get_config("battery_current_limit_amps"),
                     self.config["json_timed_charge_enable"]: False,
                     self.config["json_gen_charge_enable"]: True,
                 } | {x: "00:00" for x in self.config["json_timed_charge_unused"]}

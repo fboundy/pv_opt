@@ -282,6 +282,18 @@ DEFAULT_CONFIG = {
             "mode": "slider",
         },
     },
+    "battery_current_limit_amps": {
+        "default": 100,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 300,
+            "step": 10,
+            "unit_of_measurement": "A",
+            "device_class": "current",
+            "mode": "slider",
+        },
+    },
     "ev_charger_power_watts": {
         "default": 7000,
         "domain": "number",

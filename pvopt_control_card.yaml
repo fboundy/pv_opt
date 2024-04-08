@@ -116,6 +116,8 @@ cards:
         name: Inverter Efficiency
       - entity: number.pvopt_charger_efficiency_percent
         name: Charger Efficiency
+      - entity: number.pvopt_battery_current_limit_amps
+        name: Battery Current Limit        
   - type: markdown
     content: Tuning Parameters
   - type: entities

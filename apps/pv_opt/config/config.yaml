@@ -57,6 +57,7 @@ pv_opt:
   # charger_power_watts: 3500
   # inverter_power_watts: 3600
   # inverter_loss_watts: 100
+  # battery_current_limit_amps: 50
   
   # ========================================
   # Solcast configuration

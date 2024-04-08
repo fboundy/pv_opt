@@ -413,6 +413,7 @@ class InverterController:
             entity_id = self.host.config[f"id_timed_{direction}_current"]
 
             current = abs(round(power / self.host.get_config("battery_voltage"), 1))
+            current = min(current, self.host.get_config("battery_current_limit_amps"))
             self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
             if self.type == "SOLIS_SOLAX_MODBUS":
                 changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
