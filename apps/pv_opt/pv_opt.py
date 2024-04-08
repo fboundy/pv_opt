@@ -575,7 +575,7 @@ class PVOpt(hass.Hass):
     def _get_zappi(self, start, end, log=False):
         df = pd.DataFrame()
         for entity_id in self.zappi_entities:
-            df += self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end)
+            df += self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end, log=log)
             if log:
                 self.rlog(f">>> Zappi entity {entity_id}")
                 self.log(f">>>\n{df.to_string()}")
@@ -2341,15 +2341,19 @@ class PVOpt(hass.Hass):
             self.log(f"  - {days} days was expected. {str_days}")
 
             if (len(self.zappi_entities) > 0) and (self.get_config("ev_charger") == "Zappi"):
-                ev_power = self._get_zappi(start=df.index[0], end=df.index[-1])
-                self.log("")
-                self.log(f"  Deducting EV consumption of {ev_power.sum()/2000}")
-                self.log(
-                    f">>> EV consumption from    {ev_power.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {ev_power.index[-1].strftime(DATE_TIME_FORMAT_LONG)}"
-                )
-                self.log(
-                    f">>> House consumption from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_LONG)}"
-                )
+                ev_power = self._get_zappi(start=df.index[0], end=df.index[-1], log=True)
+                if len(ev_power) > 0:
+                    self.log("")
+                    self.log(f"  Deducting EV consumption of {ev_power.sum()/2000}")
+                    self.log(
+                        f">>> EV consumption from    {ev_power.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {ev_power.index[-1].strftime(DATE_TIME_FORMAT_LONG)}"
+                    )
+                    self.log(
+                        f">>> House consumption from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_LONG)}"
+                    )
+                else:
+                    self.log("")
+                    self.log("  No power returned from Zappi")
 
             if (start < time_now) and (end < time_now):
                 consumption["consumption"] = df.loc[start:end]
