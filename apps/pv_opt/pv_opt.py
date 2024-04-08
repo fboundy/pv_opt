@@ -1306,7 +1306,7 @@ class PVOpt(hass.Hass):
             and ("json_" not in item)
             and ("alt_" not in item)
             and ("auto" not in item)
-            amd ("active" not in item)
+            and ("active" not in item)
             and "domain" in DEFAULT_CONFIG[item]
         ]
 
