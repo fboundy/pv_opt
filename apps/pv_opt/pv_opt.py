@@ -192,7 +192,7 @@ DEFAULT_CONFIG = {
         "domain": "number",
     },
     "plunge_threshold_p_kwh": {
-        "default": 2.0,
+        "default": -5.0,
         "attributes": {
             "min": -5.0,
             "max": 10.0,

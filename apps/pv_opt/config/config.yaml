@@ -22,7 +22,6 @@ pv_opt:
   prefix: pvopt
   debug: false
 
-
 # User configuration ---  EDIT AWAY! ---
   # ========================================
   # System parameters
