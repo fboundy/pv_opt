@@ -1504,7 +1504,7 @@ class PVOpt(hass.Hass):
 
         if self.agile:
             if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
-                pd.Timestamp.now().hour >= 16
+                pd.Timestamp.now(tz=self.tz).hour >= 16
             ):
                 self.log(
                     f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}"
