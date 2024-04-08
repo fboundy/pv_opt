@@ -91,9 +91,10 @@ class InverterController:
         if host is not None:
             self.log = host.log
             self.tz = self.host.tz
+            self.config = self.host.config
 
         self.type = inverter_type
-        self.config = {}
+
         self.brand_config = {}
         for defs, conf in zip(
             [INVERTER_DEFS[self.type][x] for x in ["default_config", "brand_config"]],
