@@ -375,6 +375,9 @@ DEFAULT_CONFIG = {
         },
     },
     # "alt_tariffs": {"default": [], "domain": "input_select"},
+    "charge_active": {"default": True, "domain": "switch"},
+    "discharge_active": {"default": True, "domain": "switch"},
+    "hold_soc_active": {"default": True, "domain": "switch"},
 }
 
 
@@ -897,6 +900,7 @@ class PVOpt(hass.Hass):
                 self.contract = old_contract
 
         else:
+            self.contract_last_loaded = pd.Timestamp.now(tz="UTC")
             if self.contract.tariffs["export"] is None:
                 self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
 
@@ -1302,6 +1306,7 @@ class PVOpt(hass.Hass):
             and ("json_" not in item)
             and ("alt_" not in item)
             and ("auto" not in item)
+            amd ("active" not in item)
             and "domain" in DEFAULT_CONFIG[item]
         ]
 
@@ -1498,9 +1503,9 @@ class PVOpt(hass.Hass):
         self.log(f"Starting Opimisation with discharge {discharge_enable}")
         self.log(f"------------------------------------{len(discharge_enable)*'-'}")
 
-        self.log("")
-        self.log("Checking tariffs:")
-        self.log("-----------------")
+        self.ulog("Checking tariffs:")
+
+        self.log(f"  Contract last loaded at {self.contract_last_loaded.strftime(DATE_TIME_FORMAT_SHORT)}")
 
         if self.agile:
             if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
@@ -1511,7 +1516,7 @@ class PVOpt(hass.Hass):
                 )
                 self._load_contract()
 
-        elif pd.Timestamp.now(tz="UTC").hour == 0:
+        elif self.contract_last_loaded.day != pd.Timestamp.now(tz="UTC").day:
             self._load_contract()
 
         if self._check_tariffs():
