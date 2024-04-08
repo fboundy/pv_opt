@@ -52,10 +52,10 @@ INVERTER_DEFS = {
             "maximum_dod_percent": "number.{device_name}_battery_minimum_soc",
             "id_battery_soc": "sensor.{device_name}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_house_load_today",
-            # "id_consumption": [
-            #     "sensor.{device_name}_house_load",
-            #     "sensor.{device_name}_bypass_load",
-            # ],
+            "id_consumption": [
+                "sensor.{device_name}_house_load_x",
+                "sensor.{device_name}_bypass_load_x",
+            ],
             "id_grid_import_today": "sensor.{device_name}_grid_import_today",
             "id_grid_export_today": "sensor.{device_name}_grid_export_today",
             # "id_grid_import_power": "sensor.{device_name}_grid_import_power",
@@ -63,6 +63,7 @@ INVERTER_DEFS = {
             "id_battery_charge_power": "sensor.{device_name}_battery_input_energy",
             "id_inverter_ac_power": "sensor.{device_name}_active_power",
             "supports_hold_soc": True,
+            "supports_forced_discharge": True,
             "update_cycle_seconds": 15,
         },
         # Brand Conguration: Exposed as inverter.brand_config and can be over-written using arguments
@@ -120,6 +121,7 @@ INVERTER_DEFS = {
             "id_grid_power": "sensor.{device_name}_grid_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
+            "supports_forced_discharge": True,
             "update_cycle_seconds": 60,
         },
         "brand_config": {
@@ -183,6 +185,7 @@ INVERTER_DEFS = {
             "id_grid_power": "sensor.{device_name}_meter_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
+            "supports_forced_discharge": True,
             "update_cycle_seconds": 60,
         },
         "brand_config": {
@@ -236,6 +239,8 @@ class InverterController:
     def enable_timed_mode(self):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True, Backup=False)
+        else:
+            self._unknown_inverter()
 
     def control_charge(self, enable, **kwargs):
         if enable:
@@ -247,14 +252,35 @@ class InverterController:
             self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
-    def hold_soc(self, enable, soc=None):
+    def hold_soc(self, enable, soc=None, **kwargs):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+            start = kwargs.get("start", pd.Timestamp.now(tz=self.tz).floor("1min"))
+            end = kwargs.get("end", pd.Timestamp.now(tz=self.tz).ceil("30min"))
+            self._solis_control_charge_discharge(
+                "charge",
+                enable=enable,
+                start=start,
+                end=end,
+                power=0,
+            )
+        else:
+            self._unknown_inverter()
+
+    def _unknown_inverter(self):
+        e = f"Unknown inverter type {self.type}"
+        self.log(e, level="ERROR")
+        self.host.status(e)
+        raise Exception(e)
+
+    def hold_soc_old(self, enable, soc=None):
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+
             if enable:
                 self._solis_set_mode_switch(SelfUse=True, Timed=False, GridCharge=True, Backup=True)
             else:
                 self.enable_timed_mode()
 
-            # Waiyt for a second to make sure the mode is correct
+            # Wait for a second to make sure the mode is correct
             time.sleep(1)
 
             if soc is None:
@@ -271,10 +297,9 @@ class InverterController:
                     value=soc,
                     entity_id=entity_id,
                 )
-            else:
-                e = "Unknown inverter type"
-                self.log(e, level="ERROR")
-                raise Exception(e)
+
+        else:
+            self._unknown_inverter()
 
     @property
     def status(self):
@@ -388,6 +413,7 @@ class InverterController:
             entity_id = self.host.config[f"id_timed_{direction}_current"]
 
             current = abs(round(power / self.host.get_config("battery_voltage"), 1))
+            current = min(current, self.host.get_config("battery_current_limit_amps"))
             self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
             if self.type == "SOLIS_SOLAX_MODBUS":
                 changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)

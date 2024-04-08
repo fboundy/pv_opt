@@ -7,7 +7,8 @@ from copy import copy
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
-TIME_FORMAT = "%d/%m %H:%M"
+TIME_FORMAT = "%d/%m %H:%M %Z"
+MAX_ITERS = 3
 
 AGILE_FACTORS = {
     "import": {
@@ -65,8 +66,10 @@ class Tariff:
         self.host = host
         if host is None:
             self.log = print
+            self.tz = "GB"
         else:
             self.log = host.log
+            self.tz = host.tz
 
         self.export = export
         self.eco7 = eco7
@@ -200,7 +203,11 @@ class Tariff:
                     self.log("")
                     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
-                if pd.Timestamp.now(tz="UTC").hour > 11 and df.index[-1].day != end.day:
+                if pd.Timestamp.now(tz=self.tz).hour > 11 and df.index[-1].day != end.day:
+                    # self.log(f">>> {pd.Timestamp.now(tz=self.tz).hour}")
+                    # self.log(f">>> {df.index[-1].day}")
+                    # self.log(f">>> {end.day}")
+
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
                         self.day_ahead = self.get_day_ahead(df.index[0])
@@ -306,7 +313,7 @@ class Tariff:
                         else:
                             if len(i["Name"]) > 8:
                                 try:
-                                    self.log(time, i["Name"], i["Value"])
+                                    # self.log(time, i["Name"], i["Value"])
                                     data.append(float(i["Value"].replace(",", ".")))
                                     index.append(
                                         pd.Timestamp(
@@ -398,9 +405,11 @@ class Contract:
         if self.host:
             self.log = host.log
             self.rlog = host.rlog
+            self.tz = host.tz
         else:
             self.log = print
             self.rlog = print
+            self.tz = "GB"
 
         if imp is None and octopus_account is None:
             raise ValueError("Either a named import tariff or Octopus Account details much be provided")
@@ -497,8 +506,10 @@ class PVsystemModel:
         self.host = host
         if host:
             self.log = host.log
+            self.tz = host.tz
         else:
             self.log = print
+            self.tz = "GB"
 
     def __str__(self):
         pass
@@ -581,7 +592,8 @@ class PVsystemModel:
         consumption.name = "consumption"
 
         discharge = kwargs.pop("discharge", False)
-        max_iters = kwargs.pop("max_iters", 3)
+        use_export = kwargs.pop("export", True)
+        max_iters = kwargs.pop("max_iters", MAX_ITERS)
 
         prices = pd.DataFrame()
         for direction in contract.tariffs:
@@ -602,6 +614,10 @@ class PVsystemModel:
             )
 
         prices = prices.set_axis([t for t in contract.tariffs.keys() if contract.tariffs[t] is not None], axis=1)
+        if not use_export:
+            self.log(f"Ignoring export pricing because Use Export is turned off")
+            discharge = False
+            prices["export"] = 0
 
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
@@ -667,11 +683,12 @@ class PVsystemModel:
                 done = True
 
             import_cost = ((df["import"] * df["grid"]).clip(0) / 2000)[available]
+
             if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 max_slot = import_cost[import_cost == max_import_cost].index[0]
 
-                max_slot_energy = df["grid"].loc[max_slot] / 2000  # kWh
+                max_slot_energy = round(df["grid"].loc[max_slot] / 2000, 2)  # kWh
 
                 if max_slot_energy > 0:
                     round_trip_energy_required = (
@@ -692,7 +709,7 @@ class PVsystemModel:
                     x = x[x["soc_end"] <= 97]
 
                     search_window = x.index
-                    str_log = f"{max_slot.strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
+                    str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
                     if len(search_window) > 0:
                         # str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
                         pass
@@ -707,7 +724,7 @@ class PVsystemModel:
 
                         cost_at_min_price = round_trip_energy_required * min_price
 
-                        str_log += f"<==> {start_window.strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
+                        str_log += f"<==> {start_window.tz_convert(self.tz).strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
                         str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
                         factors = []
                         for slot in window:
@@ -731,7 +748,7 @@ class PVsystemModel:
                                         round(
                                             min(
                                                 round_trip_energy_required * 2000 * factor,
-                                                self.inverter.charger_power - x["forced"].loc[slot],
+                                                max(self.inverter.charger_power - x["forced"].loc[slot], 0),
                                                 ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity)
                                                 * 2
                                                 * factor,
@@ -754,14 +771,15 @@ class PVsystemModel:
                             str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
                             net_cost_opt = net_cost[-1]
                             str_log += f"Net: {net_cost_opt:6.1f}"
-                            if self.host.debug:
+                            if log:
                                 self.log(str_log)
-                                xx = pd.concat(
-                                    [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
-                                ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
-                                xx["Diff"] = xx["New"] - xx["Old"]
-                                self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
-                                # yy = False
+                                if self.host.debug:
+                                    xx = pd.concat(
+                                        [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
+                                    ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
+                                    xx["Diff"] = xx["New"] - xx["Old"]
+                                    self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
+                                    # yy = False
                         else:
                             available[max_slot] = False
                 else:
@@ -781,9 +799,10 @@ class PVsystemModel:
         net_cost_opt = round(contract.net_cost(df).sum(), 1)
 
         if base_cost - net_cost_opt <= self.host.get_config("pass_threshold_p"):
-            self.log(
-                f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
-            )
+            if log:
+                self.log(
+                    f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
+                )
             slots = []
             net_cost_opt = base_cost
             df = pd.concat(
