@@ -624,6 +624,9 @@ class PVsystemModel:
             axis=1,
         )
         base_cost = round(contract.net_cost(df).sum(), 1)
+        if log:
+            self.log(f"Base cost:  {base_cost}")
+        base_cost = plunge_cost
 
         slots = []
 
