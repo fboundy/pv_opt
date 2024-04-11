@@ -744,19 +744,27 @@ class PVsystemModel:
 
                         if round(cost_at_min_price, 1) < round(max_import_cost, 1):
                             for slot, factor in zip(window, factors):
+                                slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
+                                slot_charger_power_available = max(
+                                    self.inverter.charger_power - x["forced"].loc[slot], 0
+                                )
+                                slot_available_capacity = max(
+                                    ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0
+                                )
+                                min_power = min(
+                                    slot_power_required, slot_charger_power_available, slot_available_capacity
+                                )
+                                if log:
+                                    str_log_x = (
+                                        f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
+                                        + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
+                                        + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
+                                    )
+                                    self.log(str_log_x)
                                 slots.append(
                                     (
                                         slot,
-                                        round(
-                                            min(
-                                                round_trip_energy_required * 2000 * factor,
-                                                max(self.inverter.charger_power - x["forced"].loc[slot], 0),
-                                                ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity)
-                                                * 2
-                                                * factor,
-                                            ),
-                                            0,
-                                        ),
+                                        round(min_power, 0),
                                     )
                                 )
 
