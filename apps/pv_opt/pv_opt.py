@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.0"
+VERSION = "3.14.1"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -217,8 +217,8 @@ DEFAULT_CONFIG = {
         "domain": "number",
         "attributes": {
             "min": 2000,
-            "max": 20000,
-            "step": 100,
+            "max": 30000,
+            "step": 500,
             "unit_of_measurement": "Wh",
             "device_class": "energy",
             "mode": "slider",
