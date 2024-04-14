@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.1"
+VERSION = "3.14.2"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -2273,6 +2273,7 @@ class PVOpt(hass.Hass):
             df.index = pd.to_datetime(df.index)
             x = df.diff().clip(0).fillna(0).cumsum() + df.iloc[0]
             x.index = x.index.round("1s")
+            x = x[~x.index.duplicated()]
             y = -pd.concat([x.resample("1s").interpolate().resample("30min").asfreq(), x.iloc[-1:]]).diff(-1)
             dt = y.index.diff().total_seconds() / pd.Timedelta("60min").total_seconds() / 1000
             df = y[1:-1] / dt[2:]
