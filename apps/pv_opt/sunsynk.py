@@ -198,7 +198,7 @@ class InverterController:
                     self.config["json_gen_discharge_enable"]: False,
                 } | {x: "00:00" for x in self.config["json_timed_discharge_unused"]}
 
-                self._solarsynk_set_helper(params)
+                self._solarsynk_set_helper(**params)
 
             else:
                 params = {
