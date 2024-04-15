@@ -38,6 +38,10 @@ INVERTER_DEFS = {
             "id_consumption": "sensor.{device_name}_{inverter_sn}_load_power",
             "id_grid_import_today": "sensor.{device_name}_{inverter_sn}_day_grid_import",
             "id_grid_export_today": "sensor.{device_name}_{inverter_sn}_day_grid_export",
+            "id_solar_power": [
+                "sensor.{device_name}_{inverter_sn}_pv1_power",
+                "sensor.{device_name}_{inverter_sn}_pv2_power",
+            ],
             "supports_hold_soc": False,
             "update_cycle_seconds": 300,
         },
@@ -198,7 +202,7 @@ class InverterController:
                     self.config["json_gen_discharge_enable"]: False,
                 } | {x: "00:00" for x in self.config["json_timed_discharge_unused"]}
 
-                self._solarsynk_set_helper(params)
+                self._solarsynk_set_helper(**params)
 
             else:
                 params = {

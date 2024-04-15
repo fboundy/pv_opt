@@ -228,9 +228,13 @@ pv_opt:
   # supports_hold_soc: false
   # update_cycle_seconds: 300
 
+
 # Tariff comparison
   # id_daily_solar: sensor.{device_name}_power_generation_today
-  id_solar_power: sensor.{device_name}_pv_total_power
+  id_solar_power: 
+    - sensor.{device_name}_pv_power_1
+    - sensor.{device_name}_pv_power_2
+    
   alt_tariffs:
     - name: Agile_Fix
       octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
