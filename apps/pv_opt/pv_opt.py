@@ -650,7 +650,7 @@ class PVOpt(hass.Hass):
             self.log(f"Inverter type: {self.inverter_type}: inverter module: {inverter_brand}.py")
             self.inverter = InverterController(inverter_type=self.inverter_type, host=self)
             self.log(f"  Device name:   {self.device_name}")
-            self.log(f"  Serial number: {self.inverter_sn}")
+            self.rlog(f"  Serial number: {self.inverter_sn}")
 
         else:
             e = f"Inverter type {self.inverter_type} is not yet supported. Only read-only mode with explicit config from the YAML will work."
@@ -2557,34 +2557,26 @@ class PVOpt(hass.Hass):
             f"Getting yesterday's solar generation ({start.strftime(DATE_TIME_FORMAT_SHORT)} - {end.strftime(DATE_TIME_FORMAT_SHORT)}):"
         )
         # entity_id = self.config["id_daily_solar"]
-        entity_id = self.config["id_solar_power"]
-        if entity_id is None or not self.entity_exists(entity_id):
-            return
+        entity_ids = self.config["id_solar_power"]
+        if not isinstance(entity_ids, list):
+            entity_ids = [entity_ids]
 
-        # dt = pd.date_range(
-        #     start,
-        #     end,
-        #     freq="30min",
-        # )
-
+        df = None
         days = (pd.Timestamp.now(tz="UTC") - start).days + 1
-        # df = self.hass2df(entity_id, days=days).astype(float).resample("30min").ffill()
 
-        df = self.hass2df(entity_id, days=days)
-        if df is not None:
-
-            df = (self.riemann_avg(df).loc[start : end - pd.Timedelta("30min")] / 10).round(0) * 10
-
-        #     df.index = pd.to_datetime(df.index)
-        #     self.log(f"  - {df.loc[dt[-2]]:0.1f} kWh")
-        #     df = -df.loc[dt[0] : dt[-1]].diff(-1).clip(upper=0).iloc[:-1] * 2000
-        #     self.log(f"\n{df.to_string()}")
-        #     self.log(f"\n{df2.to_string()}")
-
-        else:
-            self.log("  - FAILED")
-        self.log("")
-        return df
+        for entity_id in entity_ids:
+            if self.entity_exists(entity_id):
+                x = self.hass2df(entity_id, days=days)
+                if x is not None:
+                    x = (self.riemann_avg(x).loc[start : end - pd.Timedelta("30min")] / 10).round(0) * 10
+                    if df is None:
+                        df = x
+                    else:
+                        df += x
+                else:
+                    self.log("  - FAILED")
+            self.log("")
+            return df
 
     def _check_tariffs_vs_bottlecap(self):
         self.ulog("Checking tariff prices vs Octopus Energy Integration:")
