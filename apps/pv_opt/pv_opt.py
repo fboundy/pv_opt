@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.3"
+VERSION = "3.15.0"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -2441,6 +2441,39 @@ class PVOpt(hass.Hass):
 
         self.log(f"  - Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
         return consumption
+
+    def _auto_cal(self):
+        self.ulog("Calibrating PV System Model")
+        end = pd.Timestamp.now(tz="UTC").normalize()
+        start = end - pd.Timedelta(24, "hours")
+
+        solar = self._get_solar(start, end)
+        consumption = self.load_consumption(start, end)
+        grid = self.load_grid(start, end)
+        soc = self.hass2df(self.config["id_battery_soc"], days=2, freq="30min").loc[start:end]
+
+    def load_grid(self, start, end):
+        self.log(
+            f"Getting yesterday's grid flows ({start.strftime(DATE_TIME_FORMAT_SHORT)} - {end.strftime(DATE_TIME_FORMAT_SHORT)}):"
+        )
+        # entity_id = self.config["id_daily_solar"]
+        mults = {"id_grid_import_power": 1, "id_grid_import_power": -1, "id_grid_power": 1}
+        days = (pd.Timestamp.now(tz="UTC") - start).days + 1
+        mults = {mults[id] for id in mults if id in self.config}
+        for id in mults:
+            entity_id = self.config[id]
+            if self.entity_exists(entity_id):
+                x = self.hass2df(entity_id, days=days)
+                if x is not None:
+                    x = (self.riemann_avg(x).loc[start : end - pd.Timedelta("30min")] / 10).round(0) * 10 * mults[id]
+                    if df is None:
+                        df = x
+                    else:
+                        df += x
+                else:
+                    self.log("  - FAILED")
+            self.log("")
+        return df
 
     def _compare_tariffs(self):
         self.ulog("Comparing yesterday's tariffs")

@@ -122,6 +122,10 @@ pv_opt:
   # id_grid_import_today: sensor.{device_name}_grid_import_today
   # id_grid_export_today: sensor.{device_name}_grid_export_today
 
+  id_grid_import_power: sensor.{device_name}_grid_import_power
+  id_grid_export_power: sensor.{device_name}_grid_export_power
+  # id_grid_power: 
+
   # id_battery_soc: sensor.{device_name}_battery_soc
   # id_timed_charge_start_hours: number.{device_name}_timed_charge_start_hours
   # id_timed_charge_start_minutes: number.{device_name}_timed_charge_start_minutes
