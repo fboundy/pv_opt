@@ -563,7 +563,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self.io_dispatch_attrib = self.get_state(self.io_entity, attribute="all")
         for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
-            self.log(f" {k:20s} {self.io_dispatch_attrib[k]}")
+            self.rlog(f" {k:20s} {self.io_dispatch_attrib[k]}")
 
         for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" in x]:
             self.log(f"  {k:20s} {'Start':20s} {'End':20s} {'Charge':12s} {'Source':12s}")
@@ -2677,8 +2677,8 @@ class PVOpt(hass.Hass):
 
     def hass2df(self, entity_id, days=2, log=False, freq=None):
         if log:
-            self.log(f">>> Getting {days} days' history for {entity_id}")
-            self.log(f">>> Entity exits: {self.entity_exists(entity_id)}")
+            self.rlog(f">>> Getting {days} days' history for {entity_id}")
+            self.log(f">>> Entity exists: {self.entity_exists(entity_id)}")
 
         hist = None
 
