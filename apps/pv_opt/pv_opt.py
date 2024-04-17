@@ -590,7 +590,7 @@ class PVOpt(hass.Hass):
     def _get_zappi(self, start, end, log=False):
         df = pd.DataFrame()
         for entity_id in self.zappi_entities:
-            df += self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end, log=log)
+            df = self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end, log=log)
             if log:
                 self.rlog(f">>> Zappi entity {entity_id}")
                 self.log(f">>>\n{df.to_string()}")
@@ -763,6 +763,7 @@ class PVOpt(hass.Hass):
         self.rlog("-----------------")
         self.tariff_codes = {}
         self.agile = False
+        self.intelligent = False
 
         i = 0
         n = 5
@@ -813,7 +814,9 @@ class PVOpt(hass.Hass):
                                     )
                                     self.bottlecap_entities[imp_exp] = entity
                                     if "AGILE" in tariff_code:
-                                        self.agile = True
+                                        self.agile = True          # Tariff is Octopus Agile
+                                    if "INTELLI" in tariff_code:
+                                        self.intelligent = True    # Tariff is Octopus Intelligent
 
                     self.contract = pv.Contract(
                         "current",
@@ -1520,6 +1523,15 @@ class PVOpt(hass.Hass):
         self.log(f"  Contract last loaded at {self.contract_last_loaded.strftime(DATE_TIME_FORMAT_SHORT)}")
 
         if self.agile:
+            if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
+                pd.Timestamp.now(tz=self.tz).hour >= 16
+            ):
+                self.log(
+                    f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}"
+                )
+                self._load_contract()
+
+        elif self.intelligent:   # If intelligent tariff, load at 4pm
             if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
                 pd.Timestamp.now(tz=self.tz).hour >= 16
             ):
