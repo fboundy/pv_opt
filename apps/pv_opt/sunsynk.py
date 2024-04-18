@@ -132,7 +132,7 @@ class InverterController:
         current_json = json.loads(self.host.get_config("id_control_helper"))
         new_json = json.dumps(current_json | kwargs)
         entity_id = self.host.config("id_control_helper")
-        self.rlog("Setting SolarSync input helper {entity_id} to {new_json}")
+        self.rlog(f"Setting SolarSynk input helper {entity_id} to {new_json}")
         #  self.host.set_state(entity_id=entity_id, state=new_json)
 
     def enable_timed_mode(self):
