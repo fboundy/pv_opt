@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.3"
+VERSION = "3.14.4"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -2029,7 +2029,11 @@ class PVOpt(hass.Hass):
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
-            self.charge_current = self.charge_power / self.get_config("battery_voltage", default=50)
+            voltage = self.get_config("battery_voltage", default=50)
+            if voltage > 0:
+                self.charge_current = self.charge_power / voltage
+            else:
+                self.charge_current = None
             self.charge_start_datetime = self.windows["start"].iloc[0].tz_convert(self.tz)
             self.charge_end_datetime = self.windows["end"].iloc[0].tz_convert(self.tz)
             self.charge_target_soc = self.windows["soc_end"].iloc[0]
@@ -2192,16 +2196,17 @@ class PVOpt(hass.Hass):
             },
         )
 
-        self.write_to_hass(
-            entity=f"sensor.{self.prefix}_charge_current",
-            state=round(self.charge_current, 2),
-            attributes={
-                "friendly_name": "PV Opt Charging Current",
-                "unit_of_measurement": "A",
-                "state_class": "measurement",
-                "device_class": "current",
-            },
-        )
+        if self.charge_current is not None:
+            self.write_to_hass(
+                entity=f"sensor.{self.prefix}_charge_current",
+                state=round(self.charge_current, 2),
+                attributes={
+                    "friendly_name": "PV Opt Charging Current",
+                    "unit_of_measurement": "A",
+                    "state_class": "measurement",
+                    "device_class": "current",
+                },
+            )
 
         for offset in [1, 4, 8, 12]:
             loc = pd.Timestamp.now(tz="UTC") + pd.Timedelta(offset, "hours")
