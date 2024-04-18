@@ -804,7 +804,7 @@ class PVOpt(hass.Hass):
                                     BOTTLECAP_DAVE["tariff_code"], None
                                 )
                                 if self.debug:
-                                    self.log(f">>> {tariff_code}")
+                                    self.log(f">>>_load_contract {tariff_code}")
 
                                 if tariff_code is not None:
                                     tariffs[imp_exp] = pv.Tariff(
@@ -812,6 +812,7 @@ class PVOpt(hass.Hass):
                                         export=(imp_exp == "export"),
                                         host=self,
                                     )
+                                    self.log(tariffs)
                                     self.bottlecap_entities[imp_exp] = entity
                                     if "AGILE" in tariff_code:
                                         self.agile = True          # Tariff is Octopus Agile
@@ -955,9 +956,14 @@ class PVOpt(hass.Hass):
                 )
                 if "AGILE" in tariff.name:
                     self.agile = True
+                if "INTELLI" in tariff.name:
+                    self.intelligent = True
 
         if self.agile:
             self.log("  AGILE tariff detected. Rates will update at 16:00 daily")
+
+        if self.intelligent:
+            self.log("  Intelligent tariff detected. Rates will be downloiaded at 16:00")
 
     def _load_saving_events(self):
         if (
@@ -1530,14 +1536,10 @@ class PVOpt(hass.Hass):
                     f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}"
                 )
                 self._load_contract()
-
-        elif self.intelligent:   # If intelligent tariff, load at 4pm
-            if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
-                pd.Timestamp.now(tz=self.tz).hour >= 16
-            ):
-                self.log(
-                    f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}"
-                )
+        # If intelligent tariff, load at 4.40pm (rather than 4pm to cut down number of reloads)
+        elif self.intelligent:
+            if (pd.Timestamp.now(tz=self.tz).hour == 16) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
+                self.log("   About to reload Octopus Intelligent Tariff")
                 self._load_contract()
 
         elif self.contract_last_loaded.day != pd.Timestamp.now(tz="UTC").day:
@@ -2615,7 +2617,6 @@ class PVOpt(hass.Hass):
                     ],
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
-                # self.log(df)
 
                 # Drop any Savings Sessions
 
