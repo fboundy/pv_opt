@@ -812,7 +812,6 @@ class PVOpt(hass.Hass):
                                         export=(imp_exp == "export"),
                                         host=self,
                                     )
-                                    self.log(tariffs)
                                     self.bottlecap_entities[imp_exp] = entity
                                     if "AGILE" in tariff_code:
                                         self.agile = True          # Tariff is Octopus Agile
@@ -2617,7 +2616,8 @@ class PVOpt(hass.Hass):
                     ],
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
-
+                # self.log (df)
+                
                 # Drop any Savings Sessions
 
                 for id in self.saving_events:
