@@ -812,7 +812,6 @@ class PVOpt(hass.Hass):
                                         export=(imp_exp == "export"),
                                         host=self,
                                     )
-                                    self.log(tariffs)
                                     self.bottlecap_entities[imp_exp] = entity
                                     if "AGILE" in tariff_code:
                                         self.agile = True          # Tariff is Octopus Agile
@@ -2030,7 +2029,11 @@ class PVOpt(hass.Hass):
                 )
 
             self.charge_power = self.windows["forced"].iloc[0]
-            self.charge_current = self.charge_power / self.get_config("battery_voltage", default=50)
+            voltage = self.get_config("battery_voltage", default=50)
+            if voltage > 0:
+                self.charge_current = self.charge_power / voltage
+            else:
+                self.charge_current = None
             self.charge_start_datetime = self.windows["start"].iloc[0].tz_convert(self.tz)
             self.charge_end_datetime = self.windows["end"].iloc[0].tz_convert(self.tz)
             self.charge_target_soc = self.windows["soc_end"].iloc[0]
@@ -2192,17 +2195,17 @@ class PVOpt(hass.Hass):
                 "friendly_name": "PV Opt Next Charge Period End",
             },
         )
-
-        self.write_to_hass(
-            entity=f"sensor.{self.prefix}_charge_current",
-            state=round(self.charge_current, 2),
-            attributes={
-                "friendly_name": "PV Opt Charging Current",
-                "unit_of_measurement": "A",
-                "state_class": "measurement",
-                "device_class": "current",
-            },
-        )
+        if self.charge_current is not None:
+            self.write_to_hass(
+                entity=f"sensor.{self.prefix}_charge_current",
+                state=round(self.charge_current, 2),
+                attributes={
+                    "friendly_name": "PV Opt Charging Current",
+                    "unit_of_measurement": "A",
+                    "state_class": "measurement",
+                    "device_class": "current",
+                },
+            )
 
         for offset in [1, 4, 8, 12]:
             loc = pd.Timestamp.now(tz="UTC") + pd.Timedelta(offset, "hours")
@@ -2617,7 +2620,8 @@ class PVOpt(hass.Hass):
                     ],
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
-
+                # self.log(df)
+                
                 # Drop any Savings Sessions
 
                 for id in self.saving_events:
