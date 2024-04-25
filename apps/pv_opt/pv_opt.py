@@ -2654,13 +2654,13 @@ class PVOpt(hass.Hass):
                     ],
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
-                self.log("Now in function check_tariffs_vs_bottlecap")
-                self.log("about to log df")
-                self.log(".............................")
-                self.log(df)
-                self.log("about to log df as a string")
-                self.log(".............................")
-                self.log(f">>>\n{df.to_string()}")
+                # self.log("Now in function check_tariffs_vs_bottlecap")
+                # self.log("about to log df")
+                # self.log(".............................")
+                # self.log(df)
+                # self.log("about to log df as a string")
+                # self.log(".............................")
+                # self.log(f">>>\n{df.to_string()}")
        
 
                 # Drop any Savings Sessions
@@ -2683,7 +2683,7 @@ class PVOpt(hass.Hass):
 
             self.log(f"  {direction.title()}: {str_log}")
             # SVB added
-            self.rlog(self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1], day_ahead=False))
+            # self.rlog(self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1], day_ahead=False))
             #if err:
             #    self.rlog(self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1], day_ahead=False))
 
