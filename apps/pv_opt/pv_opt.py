@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.5"
+VERSION = "3.14.6"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -815,9 +815,9 @@ class PVOpt(hass.Hass):
                                     )
                                     self.bottlecap_entities[imp_exp] = entity
                                     if "AGILE" in tariff_code:
-                                        self.agile = True          # Tariff is Octopus Agile
+                                        self.agile = True  # Tariff is Octopus Agile
                                     if "INTELLI" in tariff_code:
-                                        self.intelligent = True    # Tariff is Octopus Intelligent
+                                        self.intelligent = True  # Tariff is Octopus Intelligent
 
                     self.contract = pv.Contract(
                         "current",
@@ -965,7 +965,7 @@ class PVOpt(hass.Hass):
             self.log("  AGILE tariff detected. Rates will update at 16:00 daily")
 
         if self.intelligent:
-            self.log("  Intelligent tariff detected. Rates will be downloiaded at 16:00")
+            self.log("  Intelligent tariff detected. Rates will be downloaded at 16:00")
 
     def _load_saving_events(self):
         if (
@@ -2398,29 +2398,31 @@ class PVOpt(hass.Hass):
             if (start < time_now) and (end < time_now):
                 consumption["consumption"] = df.loc[start:end]
             else:
-                df_EV = None                                       # To store EV consumption
-                df_EV_Total = None                                 # To store EV consumption and Total consumption
+                df_EV = None  # To store EV consumption
+                df_EV_Total = None  # To store EV consumption and Total consumption
                 dfx = None
 
                 if self.get_config("ev_part_of_house_load", True):
-                    self.log ("EV charger is seen as house load, so subtracting EV charging from Total consumption")
-                    df_EV_Total = pd.concat([ev_power, df], axis = 1)  # concatenate total consumption and ev consumption into a single dataframe (as they are different lengths)
-                    df_EV_Total.columns = ['EV', 'Total']              # Set column names
-                    df_EV_Total = df_EV_Total.fillna(0)                # fill any missing values with 0
-                
-                    #self.log("Attempt to concatenate is")
-                    #self.log(df_EV_Total)
-                    #self.log("Attempt to concatenate is")
-                    #self.log(df_EV_Total.to_string())
+                    self.log("EV charger is seen as house load, so subtracting EV charging from Total consumption")
+                    df_EV_Total = pd.concat(
+                        [ev_power, df], axis=1
+                    )  # concatenate total consumption and ev consumption into a single dataframe (as they are different lengths)
+                    df_EV_Total.columns = ["EV", "Total"]  # Set column names
+                    df_EV_Total = df_EV_Total.fillna(0)  # fill any missing values with 0
 
-                    df_EV = df_EV_Total["EV"].squeeze()                #Extract EV consumption to Series
-                    df_Total = df_EV_Total["Total"].squeeze()          #Extract total consumption to Series
-                    df = df_Total - df_EV                              #Substract EV consumption from Total Consumption
-                
+                    # self.log("Attempt to concatenate is")
+                    # self.log(df_EV_Total)
+                    # self.log("Attempt to concatenate is")
+                    # self.log(df_EV_Total.to_string())
+
+                    df_EV = df_EV_Total["EV"].squeeze()  # Extract EV consumption to Series
+                    df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
+                    df = df_Total - df_EV  # Substract EV consumption from Total Consumption
+
                     self.log("Result of subtraction is")
                     self.log(df.to_string())
 
-                #Add consumption margin
+                # Add consumption margin
                 df = df * (1 + self.get_config("consumption_margin") / 100)
                 self.log("Df after adding consumption margin is.......")
                 self.log(df.to_string())
@@ -2655,14 +2657,6 @@ class PVOpt(hass.Hass):
                     ],
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
-                # self.log("Now in function check_tariffs_vs_bottlecap")
-                # self.log("about to log df")
-                # self.log(".............................")
-                # self.log(df)
-                # self.log("about to log df as a string")
-                # self.log(".............................")
-                # self.log(f">>>\n{df.to_string()}")
-       
 
                 # Drop any Savings Sessions
 
@@ -2683,10 +2677,6 @@ class PVOpt(hass.Hass):
                     err = True
 
             self.log(f"  {direction.title()}: {str_log}")
-            # SVB added
-            # self.rlog(self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1], day_ahead=False))
-            #if err:
-            #    self.rlog(self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1], day_ahead=False))
 
     def ulog(self, strlog, underline="-", words=False):
         self.log("")
