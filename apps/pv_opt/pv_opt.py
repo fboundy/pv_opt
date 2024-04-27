@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.4"
+VERSION = "3.14.5"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -2598,6 +2598,7 @@ class PVOpt(hass.Hass):
                     self.get_state_retry(self.bottlecap_entities[direction], attribute=("rates"))
                 ).set_index("start")["value_inc_vat"]
                 df.index = pd.to_datetime(df.index)
+                df.index = df.index.tz_convert("UTC")
                 df *= 100
                 df = pd.concat(
                     [

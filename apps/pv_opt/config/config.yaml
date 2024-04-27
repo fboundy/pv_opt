@@ -231,9 +231,10 @@ pv_opt:
 
 # Tariff comparison
   # id_daily_solar: sensor.{device_name}_power_generation_today
-  id_solar_power: 
-    - sensor.{device_name}_pv_power_1
-    - sensor.{device_name}_pv_power_2
+  # id_solar_power: 
+  # #   - sensor.{device_name}_pv_power_1
+  # #   - sensor.{device_name}_pv_power_2
+  id_solar_power: sensor.{device_name}_pv_total_power
     
   alt_tariffs:
     - name: Agile_Fix
