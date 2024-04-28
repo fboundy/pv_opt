@@ -479,6 +479,7 @@ class PVOpt(hass.Hass):
         # self._estimate_capacity()
         self._load_pv_system_model()
         self._load_contract()
+        self.ev = self.get_config("ev_charger") in DEFAULT_CONFIG['ev_charger']['attributes']['options'][1:]
         self._check_for_zappi()
 
         if self.get_config("alt_tariffs") is not None:
@@ -2398,29 +2399,30 @@ class PVOpt(hass.Hass):
             if (start < time_now) and (end < time_now):
                 consumption["consumption"] = df.loc[start:end]
             else:
-                df_EV = None  # To store EV consumption
-                df_EV_Total = None  # To store EV consumption and Total consumption
-                dfx = None
+                if self.ev:
+                    df_EV = None  # To store EV consumption
+                    df_EV_Total = None  # To store EV consumption and Total consumption
+                    dfx = None
 
-                if self.get_config("ev_part_of_house_load", True):
-                    self.log("EV charger is seen as house load, so subtracting EV charging from Total consumption")
-                    df_EV_Total = pd.concat(
-                        [ev_power, df], axis=1
-                    )  # concatenate total consumption and ev consumption into a single dataframe (as they are different lengths)
-                    df_EV_Total.columns = ["EV", "Total"]  # Set column names
-                    df_EV_Total = df_EV_Total.fillna(0)  # fill any missing values with 0
+                    if self.get_config("ev_part_of_house_load", False):
+                        self.log("EV charger is seen as house load, so subtracting EV charging from Total consumption")
+                        df_EV_Total = pd.concat(
+                            [ev_power, df], axis=1
+                        )  # concatenate total consumption and ev consumption into a single dataframe (as they are different lengths)
+                        df_EV_Total.columns = ["EV", "Total"]  # Set column names
+                        df_EV_Total = df_EV_Total.fillna(0)  # fill any missing values with 0
 
-                    # self.log("Attempt to concatenate is")
-                    # self.log(df_EV_Total)
-                    # self.log("Attempt to concatenate is")
-                    # self.log(df_EV_Total.to_string())
+                        # self.log("Attempt to concatenate is")
+                        # self.log(df_EV_Total)
+                        # self.log("Attempt to concatenate is")
+                        # self.log(df_EV_Total.to_string())
 
-                    df_EV = df_EV_Total["EV"].squeeze()  # Extract EV consumption to Series
-                    df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
-                    df = df_Total - df_EV  # Substract EV consumption from Total Consumption
+                        df_EV = df_EV_Total["EV"].squeeze()  # Extract EV consumption to Series
+                        df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
+                        df = df_Total - df_EV  # Substract EV consumption from Total Consumption
 
-                    self.log("Result of subtraction is")
-                    self.log(df.to_string())
+                        self.log("Result of subtraction is")
+                        self.log(df.to_string())
 
                 # Add consumption margin
                 df = df * (1 + self.get_config("consumption_margin") / 100)
