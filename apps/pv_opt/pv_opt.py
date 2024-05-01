@@ -2620,7 +2620,7 @@ class PVOpt(hass.Hass):
                 log=False,
             )
 
-            # opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+            opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
 
             attributes = {
                 "state_class": "measurement",
@@ -2628,8 +2628,7 @@ class PVOpt(hass.Hass):
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison {contract.name}",
                 "net_base": round(net_base.sum() / 100, 2),
-                # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
-            }
+            } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
 
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
