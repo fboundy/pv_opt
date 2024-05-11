@@ -579,6 +579,11 @@ class PVsystemModel:
         df["soc"] = (df["chg"] / self.battery.capacity) * 100
         df["soc_end"] = (df["chg_end"] / self.battery.capacity) * 100
 
+        #self.log("Self.flows completed.")
+        #self.log("df = ")
+        #self.log(df.to_string())
+
+
         return df
 
     def optimised_force(self, initial_soc, static_flows, contract: Contract, **kwargs):
@@ -661,6 +666,7 @@ class PVsystemModel:
         net_cost_opt = base_cost
 
         done = False
+        #self.log("Resetting i to 0")
         i = 0
         df = pd.concat(
             [
@@ -670,6 +676,9 @@ class PVsystemModel:
             ],
             axis=1,
         )
+
+
+
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
         net_cost = [base_cost]
         slot_count = [0]
@@ -678,16 +687,29 @@ class PVsystemModel:
             old_cost = contract.net_cost(df)
             old_soc = df["soc_end"]
             i += 1
+            #self.log("Incrementing i")
             if (i > 96) or (available.sum() == 0):
                 done = True
 
             import_cost = ((df["import"] * df["grid"]).clip(0) / 2000)[available]
 
+            #self.log("Inport cost is...")
+            #self.log(import_cost)
+
             if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 max_slot = import_cost[import_cost == max_import_cost].index[0]
-
                 max_slot_energy = round(df["grid"].loc[max_slot] / 2000, 2)  # kWh
+            #    self.log("")
+            #    self.log("Value of i is...")
+            #    self.log(i)
+            #    self.log("")
+            #    self.log("Max_slot_energy is...")
+            #    self.log(max_slot_energy)
+            #    self.log("Max_import_cost is")
+            #    self.log(max_import_cost)
+            #    self.log("")
+
 
                 if max_slot_energy > 0:
                     round_trip_energy_required = (
@@ -707,13 +729,19 @@ class PVsystemModel:
 
                     x = x[x["soc_end"] <= 97]
 
+                    #self.log("")
+                    #self.log("Printing X")
+                    #self.log(x.to_string())
+
                     search_window = x.index
                     str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
                     if len(search_window) > 0:
-                        # str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
+                        # SVB logging
+                        #str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
                         pass
                     else:
-                        # str_log = "No available window."
+                        # SVB logging
+                        #str_log = "No available window."
                         done = True
                     if len(x) > 0:
                         min_price = x["import"].min()
@@ -726,18 +754,35 @@ class PVsystemModel:
                         str_log += f"<==> {start_window.tz_convert(self.tz).strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
                         str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
                         factors = []
+
+                        # Times recorded in 'slot' are naive UTC, pd.timestamp.now is in local time. 
+                        # As tz.localize(None) does no actual conversion to local time, when BST is active the factors are applied one hour ahead of where they should be.
+                        # Therefore, timenow needs to also be naive UTC. For this, use pd.Timestamp.utcnow().tz_localize(None)
+
+
+                        #Each slot is assigned a value of 1, if already in a slot then factor for time already gone.
+                        
                         for slot in window:
-                            if pd.Timestamp.now() > slot.tz_localize(None):
+                            if pd.Timestamp.utcnow().tz_localize(None) > slot.tz_localize(None):
                                 factors.append(
                                     (
-                                        (slot.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.now()
+                                        (slot.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.utcnow().tz_localize(None)
                                     ).total_seconds()
                                     / 1800
                                 )
                             else:
                                 factors.append(1)
 
+                        #Assign a factor to each slot so all slots sum to 1. 
+
                         factors = [f / sum(factors) for f in factors]
+                        #self.log("Factors =")
+                        #self.log(factors)
+
+                        #The reduction of the current slot reduces the power so the .flows algorithm calculates the correct charge added to the battery in the partial slot (I think)
+                        # However, this same value should not then be used to program the inverter. The inverter should stick at the power assigned at the start of the slot. 
+                        # We should factor this reduced power back up again just prior to inverter programming. 
+
 
                         if round(cost_at_min_price, 1) < round(max_import_cost, 1):
                             for slot, factor in zip(window, factors):
@@ -751,19 +796,27 @@ class PVsystemModel:
                                 min_power = min(
                                     slot_power_required, slot_charger_power_available, slot_available_capacity
                                 )
-                                # if log:
-                                #     str_log_x = (
-                                #         f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
-                                #         + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
-                                #         + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
-                                #     )
-                                #     self.log(str_log_x)
+                                if log:
+                                    str_log_x = (
+                                        f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
+                                        + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
+                                        + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
+                                    )
+                                    self.log(str_log_x)
                                 slots.append(
                                     (
                                         slot,
                                         round(min_power, 0),
                                     )
                                 )
+                                #self.log("")
+                                #self.log("Result of slots = ")
+                                #self.log(slots)
+                                #self.log("")
+                            #self.log("")
+                            #self.log("Final result of slots = ")
+                            #self.log(slots)
+
 
                             df = pd.concat(
                                 [
@@ -780,11 +833,13 @@ class PVsystemModel:
                             str_log += f"Net: {net_cost_opt:6.1f}"
                             if log:
                                 self.log(str_log)
+                                ## SVB logging
                                 if self.host.debug:
                                     xx = pd.concat(
                                         [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
                                     ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
                                     xx["Diff"] = xx["New"] - xx["Old"]
+                                    self.log("")
                                     self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
                                     # yy = False
                         else:
@@ -877,12 +932,14 @@ class PVsystemModel:
                     available.loc[start_window] = False
                     str_log = f"{available.sum():>2d} Min import price {min_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} {x.loc[start_window]['forced']:4.0f}W "
 
-                    if (pd.Timestamp.now() > start_window.tz_localize(None)) and (
-                        pd.Timestamp.now() < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
+                    ## SVB changed so all times are in naive UTC
+
+                    if (pd.Timestamp.utcnow().tz_localize(None) > start_window.tz_localize(None)) and (
+                        pd.Timestamp.utcnow().tz_localize(None) < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
                     ):
                         str_log += "* "
                         factor = (
-                            (start_window.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.now()
+                            (start_window.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.utcnow().tz_localize(None)
                         ).total_seconds() / 1800
                     else:
                         str_log += "  "
@@ -985,12 +1042,12 @@ class PVsystemModel:
                         available.loc[start_window] = False
                         str_log = f"{available.sum():>2d} Max export price {max_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} "
 
-                        if (pd.Timestamp.now() > start_window.tz_localize(None)) and (
-                            pd.Timestamp.now() < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
+                        if (pd.Timestamp.utcnow().tz_localize(None) > start_window.tz_localize(None)) and (
+                            pd.Timestamp.utcnow().tz_localize(None) < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
                         ):
                             str_log += "* "
                             factor = (
-                                (start_window.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.now()
+                                (start_window.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.utcnow().tz_localize(None)
                             ).total_seconds() / 1800
                         else:
                             str_log += "  "
