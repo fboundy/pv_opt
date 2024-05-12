@@ -2059,21 +2059,21 @@ class PVOpt(hass.Hass):
 
         # If we are already in the first slot (e.g. 10 mins in or 20 mins in) then the value of "forced" will have been factored so .flows works. 
         # However, a factored "forced" value means that it result in a seperate charge window for the remaining time, and for IOG that will result in needless
-        # needless writes to the inverter and a big charge power towards the end of the night. 
-        # As the .flows calls are all done with now, the "forced" power can be set back to what the inverter needs it to be, which is the original value. 
+        # writes to the inverter and an increasing charge power towards the end of the night to compensate. 
+        # As the .flows calls are all done with now, the "forced" power can be set back to what the inverter needs it to be, which is the original value prior to factoring
 
         # Get the time of the first slot
 
         self.opt["start"] = self.opt.index.tz_convert(self.tz)
         
-        self.charge_start_datetime = self.opt.iat[0, 15]    #"Start" is the 16th column. 
+        self.charge_start_datetime = self.opt.iat[0, 15]    #"Start" is the 16th column. (###SVB Ideally change this for code that does a label lookup)
         
-        self.log("")
-        self.log("TimeNow is")
-        self.log(pd.Timestamp.now(self.tz))
-        self.log("")
-        self.log("Charge_start_datetime is")
-        self.log(self.charge_start_datetime)
+        #self.log("")
+        #self.log("TimeNow is")
+        #self.log(pd.Timestamp.now(self.tz))
+        #self.log("")
+        #self.log("Charge_start_datetime is")
+        #self.log(self.charge_start_datetime)
 
         slot_left_factor = 0
 
@@ -2085,7 +2085,7 @@ class PVOpt(hass.Hass):
         self.log("Print slot_left_factor")
         self.log(slot_left_factor)
 
-        #If we are in a slot, then "forced" has already been factored by the slot time remaining to ensure the power flow calclations are correct
+        # If we are in a slot, then "forced" has already been factored by the slot time remaining to ensure the power flow calclations are correct
         # We need to remove that factor so the inverter charge power remains unchanged in the slot. 
         # If forced = 0 (i.e no charging) the result remains zero so no need to gate with forced > 0.
 
@@ -2103,91 +2103,12 @@ class PVOpt(hass.Hass):
         # Now changed this so its based on the value of forced_power_group_tolerance (currently set to 100W), say half of it (50W). 
         ### SVB We do need to ensure that a change from positive to negative or vice versa (charge to discharge or vice versa) creates a different period - yet to do
 
-        # Andy : start here
-
-        # What I want to do is:
-        # Increment the value of "period" in self.opt if either 
-        # 1) 'forced' differs from the previous row by more than half the power tolerance
-        # or
-        # 2) 'ioslot' has a 0 on the previous row and 1 on the current one.  
-
-        # Case 2 above is the one I'm adding (this is all about preventing house battery in an Intelligent Octopus Go car charging slot)
-        # I can do both individually, but I can't find a code line that looks at two columns simultaneously and increments if either is true (bitwise OR)
-        # Uncommented code runs without error and certainly works if either the charge power differs or the io slot isnt contiguous, but I havent managed to generate a test case that proves both are handled. 
-
         tolerance = self.get_config("forced_power_group_tolerance")
 
-        #next row is what I want but generates an error -  "ValueError: The truth value of a Series is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all()."
-        #self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) or ((self.opt["ioslot"].diff() > 0))).cumsum()      # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected. 
+        # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected. 
 
-        self.opt["period"] = (self.opt["forced"].diff() > (tolerance/2)).cumsum()      # Increment "period" if charge power varies by more than half the power tolerance
-        # self.opt["period"] = (self.opt["ioslot"].diff() > 0).cumsum()                # Increment "period" if non-contiguous IO slot detected
-
-        self.opt["period"] = self.opt["period"] + (self.opt["ioslot"].diff() > 0).cumsum()   #and then increment period for non-contiguous IOG slots (after already incrementing it for charge power changes)
- 
-        # Typical dataframe for self.opt is below. (The value of period increments by one at the start of each IO slot)
-
-
-#                              import  export  Solcast  Solcast_p10  Solcast_p90  weighted  consumption      chg  chg_end      battery   grid  forced         soc     soc_end  ioslot                     start  period
-#2024-05-11 19:30:00+00:00  26.520375       0     18.3         11.0         40.3      18.3   431.118620   9804.0   9591.2   412.832000   -0.0       0   86.000000   84.133333       0 2024-05-11 20:30:00+01:00       0
-#2024-05-11 20:00:00+00:00  26.520375       0      0.0          0.0          0.0       0.0  1521.151597   9591.2   8807.1  1521.154000   -0.0       0   84.133333   77.255263       0 2024-05-11 21:00:00+01:00       0
-#2024-05-11 20:30:00+00:00  26.520375       0      0.0          0.0          0.0       0.0   963.135647   8807.1   8310.6   963.210000   -0.0       0   77.255263   72.900000       0 2024-05-11 21:30:00+01:00       0
-#2024-05-11 21:00:00+00:00  26.520375       0      0.0          0.0          0.0       0.0   462.502613   8310.6   8072.2   462.496000    0.0       0   72.900000   70.808772       0 2024-05-11 22:00:00+01:00       0
-#2024-05-11 21:30:00+00:00  26.520375       0      0.0          0.0          0.0       0.0   422.134051   8072.2   7854.6   422.144000   -0.0       0   70.808772   68.900000       0 2024-05-11 22:30:00+01:00       0
-#2024-05-11 22:00:00+00:00  26.520375       0      0.0          0.0          0.0       0.0   507.038273   7854.6   7593.2   507.116000   -0.0       0   68.900000   66.607018       0 2024-05-11 23:00:00+01:00       0
-#2024-05-11 22:30:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   339.611205   7593.2   7418.1   339.694000   -0.0       0   66.607018   65.071053       0 2024-05-11 23:30:00+01:00       0
-#2024-05-11 23:00:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   394.271591   7418.1   7214.9   394.208000    0.0       0   65.071053   63.288596       0 2024-05-12 00:00:00+01:00       0
-#2024-05-11 23:30:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   898.385985   7214.9   6751.8   898.414000   -0.0       0   63.288596   59.226316       0 2024-05-12 00:30:00+01:00       0
-#2024-05-12 00:00:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   535.795649   6751.8   6475.6   535.828000   -0.0       0   59.226316   56.803509       1 2024-05-12 01:00:00+01:00       1
-#2024-05-12 00:30:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   496.946298   6475.6   6219.4   497.028000   -0.0       0   56.803509   54.556140       1 2024-05-12 01:30:00+01:00       1
-#2024-05-12 01:00:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   571.220158   6219.4   5925.0   571.136000    0.0       0   54.556140   51.973684       1 2024-05-12 02:00:00+01:00       1
-#2024-05-12 01:30:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   785.901549   5925.0   5519.9   785.894000    0.0       0   51.973684   48.420175       1 2024-05-12 02:30:00+01:00       1
-#2024-05-12 02:00:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   464.391455   5519.9   5280.5   464.436000   -0.0       0   48.420175   46.320175       1 2024-05-12 03:00:00+01:00       1
-#2024-05-12 02:30:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   536.399830   5280.5   5004.0   536.410000   -0.0       0   46.320175   43.894737       1 2024-05-12 03:30:00+01:00       1
-#2024-05-12 03:00:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   405.324762   5004.0   4795.1   405.266000    0.0       0   43.894737   42.062281       1 2024-05-12 04:00:00+01:00       1
-#2024-05-12 03:30:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   897.600670   4795.1   4332.4   897.638000   -0.0       0   42.062281   38.003509       1 2024-05-12 04:30:00+01:00       1
-#2024-05-12 04:00:00+00:00   7.499940       0      1.9          1.9          3.8       1.9   497.612277   4332.4   4076.9   495.670000    0.0       0   38.003509   35.762281       1 2024-05-12 05:00:00+01:00       1
-#2024-05-12 04:30:00+00:00  26.520375       0     24.8         13.3         34.3      24.8   433.685557   4076.9   3866.1   408.952000   -0.0       0   35.762281   33.913158       0 2024-05-12 05:30:00+01:00       1
-#2024-05-12 05:00:00+00:00  26.520375       0     62.9         36.2         87.7      62.9   446.468590   3866.1   3668.4   383.538000    0.0       0   33.913158   32.178947       0 2024-05-12 06:00:00+01:00       1
-#2024-05-12 05:30:00+00:00  26.520375       0    114.3         58.5        195.8     114.3   733.749955   3668.4   3349.1   619.442000    0.0       0   32.178947   29.378070       0 2024-05-12 06:30:00+01:00       1
-#2024-05-12 06:00:00+00:00  26.520375       0    220.9         86.8        286.6     220.9   434.748089   3349.1   3238.9   213.788000    0.0       0   29.378070   28.411404       0 2024-05-12 07:00:00+01:00       1
-#2024-05-12 06:30:00+00:00  26.520375       0    359.0        144.4        377.0     359.0   381.505628   3238.9   3227.3    22.504000    0.0       0   28.411404   28.309649       0 2024-05-12 07:30:00+01:00       1
-#2024-05-12 07:00:00+00:00  26.520375       0    537.5        240.7        564.4     537.5   496.913197   3227.3   3245.8   -40.659341    0.0       0   28.309649   28.471930       0 2024-05-12 08:00:00+01:00       1
-#2024-05-12 07:30:00+00:00  26.520375       0    676.2        392.8        710.0     676.2   378.254034   3245.8   3381.4  -298.021978    0.0       0   28.471930   29.661404       0 2024-05-12 08:30:00+01:00       1
-#2024-05-12 08:00:00+00:00  26.520375       0    820.8        560.3        861.8     820.8   402.921607   3381.4   3571.5  -417.802198   -0.0       0   29.661404   31.328947       0 2024-05-12 09:00:00+01:00       1
-#2024-05-12 08:30:00+00:00  26.520375       0   1001.1        714.5       1057.8    1001.1   323.619119   3571.5   3879.8  -677.582418    0.0       0   31.328947   34.033333       0 2024-05-12 09:30:00+01:00       1
-#2024-05-12 09:00:00+00:00  26.520375       0   1201.1        871.7       1338.8    1201.1   386.378380   3879.8   4250.5  -814.725275    0.0       0   34.033333   37.285088       0 2024-05-12 10:00:00+01:00       1
-#2024-05-12 09:30:00+00:00  26.520375       0   1416.6       1012.8       1610.4    1416.6   302.214534   4250.5   4757.5 -1114.285714   -0.0       0   37.285088   41.732456       0 2024-05-12 10:30:00+01:00       1
-#2024-05-12 10:00:00+00:00  26.520375       0   1623.7       1130.5       1854.9    1623.7   365.502601   4757.5   5330.0 -1258.241758    0.0       0   41.732456   46.754386       0 2024-05-12 11:00:00+01:00       1
-#2024-05-12 10:30:00+00:00  26.520375       0   1806.8       1209.3       2066.3    1806.8   339.469101   5330.0   5997.6 -1467.252747   -0.0       0   46.754386   52.610526       0 2024-05-12 11:30:00+01:00       1
-#2024-05-12 11:00:00+00:00  26.520375       0   1918.5       1230.7       2220.7    1918.5   323.792040   5997.6   6723.2 -1594.725275    0.0       0   52.610526   58.975439       0 2024-05-12 12:00:00+01:00       1
-#2024-05-12 11:30:00+00:00  26.520375       0   1973.9       1198.7       2359.9    1973.9   412.574241   6723.2   7433.6 -1561.318681   -0.0       0   58.975439   65.207018       0 2024-05-12 12:30:00+01:00       1
-#2024-05-12 12:00:00+00:00  26.520375       0   1982.9       1129.1       2468.4    1982.9   402.608361   7433.6   8152.6 -1580.219780   -0.0       0   65.207018   71.514035       0 2024-05-12 13:00:00+01:00       1#
-#2024-05-12 12:30:00+00:00  26.520375       0   1939.5       1039.7       2535.1    1939.5   387.349858   8152.6   8858.8 -1552.087912   -0.0       0   71.514035   77.708772       0 2024-05-12 13:30:00+01:00       #1
-#2024-05-12 13:00:00+00:00  26.520375       0   1844.7        968.3       2546.6    1844.7   315.781988   8858.8   9554.5 -1529.010989    0.0       0   77.708772   83.811404       0 2024-05-12 14:00:00+01:00       1
-#2024-05-12 13:30:00+00:00  26.520375       0   1731.5        902.3       2523.6    1731.5   329.751864   9554.5  10192.3 -1401.758242    0.0       0   83.811404   89.406140       0 2024-05-12 14:30:00+01:00       1
-#2024-05-12 14:00:00+00:00  26.520375       0   1594.9        829.7       2463.2    1594.9   508.187302  10192.3  10686.8 -1086.813187    0.0       0   89.406140   93.743860       0 2024-05-12 15:00:00+01:00       1
-#2024-05-12 14:30:00+00:00  26.520375       0   1422.0        722.8       2333.9    1422.0   643.865955  10686.8  11040.9  -778.241758    0.0       0   93.743860   96.850000       0 2024-05-12 15:30:00+01:00       1
-#2024-05-12 15:00:00+00:00  26.520375       0   1134.7        561.1       2068.2    1134.7   465.488867  11040.9  11345.4  -669.230769    0.0       0   96.850000   99.521053       0 2024-05-12 16:00:00+01:00       1
-#2024-05-12 15:30:00+00:00  26.520375       0    779.7        364.0       1661.5     779.7   323.373904  11345.4  11400.0  -120.000000 -336.0       0   99.521053  100.000000       0 2024-05-12 16:30:00+01:00       1
-#2024-05-12 16:00:00+00:00  26.520375       0    601.9        244.5       1394.7     601.9   989.436177  11400.0  11200.2   387.612000   -0.0       0  100.000000   98.247368       0 2024-05-12 17:00:00+01:00       1
-#2024-05-12 16:30:00+00:00  26.520375       0    497.3        183.8       1257.3     497.3   861.834228  11200.2  11012.3   364.526000    0.0       0   98.247368   96.599123       0 2024-05-12 17:30:00+01:00       1
-#2024-05-12 17:00:00+00:00  26.520375       0    403.6        145.4       1047.2     403.6   465.727767  11012.3  10980.3    62.080000    0.0       0   96.599123   96.318421       0 2024-05-12 18:00:00+01:00       1
-#2024-05-12 17:30:00+00:00  26.520375       0    303.1        112.3        788.4     303.1   390.511395  10980.3  10935.2    87.494000   -0.0       0   96.318421   95.922807       0 2024-05-12 18:30:00+01:00       1
-#2024-05-12 18:00:00+00:00  26.520375       0    191.7         77.7        476.0     191.7   373.888083  10935.2  10841.3   182.166000    0.0       0   95.922807   95.099123       0 2024-05-12 19:00:00+01:00       1
-#2024-05-12 18:30:00+00:00  26.520375       0     97.2         48.6        208.1      97.2   348.528942  10841.3  10711.7   251.424000   -0.0       0   95.099123   93.962281       0 2024-05-12 19:30:00+01:00       1
-#2024-05-12 19:00:00+00:00  26.520375       0     50.5         26.2         74.8      50.5   392.579529  10711.7  10535.4   342.022000    0.0       0   93.962281   92.415789       0 2024-05-12 20:00:00+01:00       1
-#2024-05-12 19:30:00+00:00  26.520375       0     17.0          7.5         24.5      17.0   369.147511  10535.4  10353.9   352.110000    0.0       0   92.415789   90.823684       0 2024-05-12 20:30:00+01:00       1
-#2024-05-12 20:00:00+00:00  26.520375       0      0.0          0.0          0.0       0.0  1176.232298  10353.9   9747.6  1176.222000    0.0       0   90.823684   85.505263       0 2024-05-12 21:00:00+01:00       1
-#2024-05-12 20:30:00+00:00  26.520375       0      0.0          0.0          0.0       0.0   957.341777   9747.6   9254.1   957.390000   -0.0       0   85.505263   81.176316       0 2024-05-12 21:30:00+01:00       1
-#2024-05-12 21:00:00+00:00  26.520375       0      0.0          0.0          0.0       0.0   755.489190   9254.1   8864.7   755.436000    0.0       0   81.176316   77.760526       0 2024-05-12 22:00:00+01:00       1
-#2024-05-12 21:30:00+00:00  26.520375       0      0.0          0.0          0.0       0.0   469.759855   8864.7   8622.6   469.674000    0.0       0   77.760526   75.636842       0 2024-05-12 22:30:00+01:00       1
-#2024-05-12 22:00:00+00:00  26.520375       0      0.0          0.0          0.0       0.0   481.049209   8622.6   8374.6   481.120000   -0.0       0   75.636842   73.461404       0 2024-05-12 23:00:00+01:00       1
-#2024-05-12 22:30:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   345.525949   8374.6   8196.5   345.514000    0.0       0   73.461404   71.899123       0 2024-05-12 23:30:00+01:00       1
-#2024-05-12 23:00:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   428.612182   8196.5   7975.6   428.546000    0.0       0   71.899123   69.961404       0 2024-05-13 00:00:00+01:00       1
-#2024-05-12 23:30:00+00:00   7.499940       0      0.0          0.0          0.0       0.0   904.852483   7975.6   7509.2   904.816000    0.0       0   69.961404   65.870175       0 2024-05-13 00:30:00+01:00       1
-
-        
+        self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) | ((self.opt["ioslot"].diff() > 0))).cumsum()      
+          
         self.log("")
         self.log("After assignment of 'period', self.opt is........")
         self.log(self.opt.to_string())
@@ -2256,13 +2177,6 @@ class PVOpt(hass.Hass):
 
             # Create the window by taking the first and the last entry for each period.
 
-            ### SVB Whilst it will work, ideally we don't want to select the first and the last period for IOG hold slots, we want to keep them as seperate windows. This will allow
-            # the house to use the battery when the car is not charging
-            # "Period" will always be a single value as forced = 0 by definition. 
-            # Not sure how we do this but it will involve mods to the concat routine below where we load "windows" with "x". Is probably just concat on its own? 
-            # Just ensure a different period value for each IO slot? Period splits are based on value of forced only. 
-            # Increment the value of period if either 'forced' changes or 'ioslot' changes compared to the previous row. 
-
             windows_io = pd.concat(
                 [
                     x.groupby("period").first()[["start", "soc", "forced"]],
@@ -2271,15 +2185,10 @@ class PVOpt(hass.Hass):
                 axis=1,
             )
 
-
-
-
-
             # SVB logging
             self.log("")
             self.log("Printing Window_io for IOG slots")
             self.log(windows_io.to_string())
-
 
             self.windows = pd.concat([windows_io, self.windows]).sort_values("start")
 
@@ -2322,7 +2231,7 @@ class PVOpt(hass.Hass):
                 self.windows.loc[
                     (self.windows["forced"] == 0),
                     "hold_soc",
-                ] = "<="
+                ] = "<=(IOG)"
             
             self.log("")
             self.log("Printing Combined Window after <= added for any IO slots.....")
@@ -2334,7 +2243,6 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
                 )
-
 
             self.charge_start_datetime = self.windows["start"].iloc[0].tz_convert(self.tz)
             self.charge_end_datetime = self.windows["end"].iloc[0].tz_convert(self.tz)
@@ -2369,29 +2277,26 @@ class PVOpt(hass.Hass):
                 self.charge_current = self.charge_power / voltage
             else:
                 self.charge_current = None
-            #self.charge_start_datetime = self.windows["start"].iloc[0].tz_convert(self.tz)
-            #self.charge_end_datetime = self.windows["end"].iloc[0].tz_convert(self.tz)
             self.charge_target_soc = self.windows["soc_end"].iloc[0]
+
             self.hold = [
                 {
-                    "active": self.windows["hold_soc"].iloc[i] == "<=",
+                    "active": (self.windows["hold_soc"].iloc[i] == "<=") or (self.windows["hold_soc"].iloc[i] == "<=(IOG)"),
                     "soc": self.windows["soc_end"].iloc[i],
                 }
                 for i in range(0, min(len(self.windows), 1))
             ]
 
             # SVB logging
-            #self.log("Printing final result of _create_windows....")
-            #self.log("Charge_start_datetime = ")
-            #self.log(self.charge_start_datetime)
-            #self.log("Charge_end_datetime = ")
-            #self.log(self.charge_end_datetime)
-            #self.log("Charge_target_soc = ")
-            #self.log(self.charge_target_soc)
-            #self.log("Hold = ")
-            #self.log(self.hold)
-
-
+            self.log("Printing final result of _create_windows....")
+            self.log("Charge_start_datetime = ")
+            self.log(self.charge_start_datetime)
+            self.log("Charge_end_datetime = ")
+            self.log(self.charge_end_datetime)
+            self.log("Charge_target_soc = ")
+            self.log(self.charge_target_soc)
+            self.log("Hold = ")
+            self.log(self.hold)
 
         else:
             self.log(f"No charging slots")
