@@ -2097,8 +2097,8 @@ class PVOpt(hass.Hass):
 
         # SVB Previous code created a seperate period if the power stored in "forced" differed between rows (1/2 hour slots) by anything bigger than 0. 
         # On IOG, as all high cost swaps are shared equally between the 12 1/2 hour slots, we only need a small rounding error for the value of "forced" to end up different
-        # and thus generate a new charge window. This rounding error equally applies to the restoration of the forced value prior to factoring. This almost guarantees the 6 hour charge window to
-        # end up as one hold slot after another, rather than what should be a 6 hour charge slot at a fixed rate. 
+        # and thus generate a new charge window. This rounding error equally applies to the restoration of the forced value prior to factoring. This "">0" test 
+        # almost guarantees the 6 hour charge window to end up as one hold slot after another, rather than what should be a 6 hour charge slot at a fixed charge rate. 
         
         # Now changed this so its based on the value of forced_power_group_tolerance (currently set to 100W), say half of it (50W). 
         ### SVB We do need to ensure that a change from positive to negative or vice versa (charge to discharge or vice versa) creates a different period - yet to do
@@ -2106,6 +2106,8 @@ class PVOpt(hass.Hass):
         tolerance = self.get_config("forced_power_group_tolerance")
 
         # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected. 
+        ### SVB: this actually needs to be "Increment 'period' if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected if power != 0". 
+        ### to avoid generating splitting the 6 hour charge window into one for each IO period. 
 
         self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) | ((self.opt["ioslot"].diff() > 0))).cumsum()      
           
@@ -2190,6 +2192,9 @@ class PVOpt(hass.Hass):
             self.log("Printing Window_io for IOG slots")
             self.log(windows_io.to_string())
 
+            # for IOG slots, set 'soc_end' to equal 'soc', as the slot is now a hold slot. 
+            windows_io["soc_end"] = windows_io["soc"]
+
             self.windows = pd.concat([windows_io, self.windows]).sort_values("start")
 
             self.log("")
@@ -2227,11 +2232,12 @@ class PVOpt(hass.Hass):
                 self.log(self.windows.to_string())
 
                 self.log("")
-                self.log("Setting IO slots to hold")         # If forced = 0 then the window is an IO slot  (that might have "soc_end" significantly less than "soc" so gets missed by the 'SOC change less than 3%' check)
+                self.log("Setting IO slots to hold")         # If forced = 0 then the window is an IO slot. It will already have a "<=" set, but its useful to differentiate an IOG hold from a true hold in case we want
+                                                             # to setup the inverter differently in the future for an IOG hold rather than a normal hold. 
                 self.windows.loc[
                     (self.windows["forced"] == 0),
                     "hold_soc",
-                ] = "<=(IOG)"
+                ] = "<=IOG"
             
             self.log("")
             self.log("Printing Combined Window after <= added for any IO slots.....")
@@ -2281,7 +2287,7 @@ class PVOpt(hass.Hass):
 
             self.hold = [
                 {
-                    "active": (self.windows["hold_soc"].iloc[i] == "<=") or (self.windows["hold_soc"].iloc[i] == "<=(IOG)"),
+                    "active": (self.windows["hold_soc"].iloc[i] == "<=") or (self.windows["hold_soc"].iloc[i] == "<=IOG"),
                     "soc": self.windows["soc_end"].iloc[i],
                 }
                 for i in range(0, min(len(self.windows), 1))
