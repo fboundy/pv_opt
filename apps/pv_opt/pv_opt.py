@@ -2102,14 +2102,13 @@ class PVOpt(hass.Hass):
         
         # Now changed this so its based on the value of forced_power_group_tolerance (currently set to 100W), say half of it (50W). 
         ### SVB We do need to ensure that a change from positive to negative or vice versa (charge to discharge or vice versa) creates a different period - yet to do
+        ### SVB still don't understand why its an increment only and not a difference that generates a new charging window. 
 
         tolerance = self.get_config("forced_power_group_tolerance")
 
-        # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected. 
-        ### SVB: this actually needs to be "Increment 'period' if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected if power != 0". 
-        ### to avoid generating splitting the 6 hour charge window into one for each IO period. 
+        # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected (when charge power = 0). 
 
-        self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) | ((self.opt["ioslot"].diff() > 0))).cumsum()      
+        self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) | ((self.opt["ioslot"].diff() > 0) & (self.opt["forced"] == 0))).cumsum()      
           
         self.log("")
         self.log("After assignment of 'period', self.opt is........")
@@ -2145,6 +2144,10 @@ class PVOpt(hass.Hass):
             x = self.opt[self.opt["forced"] < 0].copy()
             x["start"] = x.index.tz_convert(self.tz)
             x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+
+            self.log("")
+            self.log("Printing X for discharge slots.....")
+            self.log(x.to_string())
 
             windows_d = pd.concat(
                 [
