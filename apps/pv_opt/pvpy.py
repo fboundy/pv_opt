@@ -862,6 +862,11 @@ class PVsystemModel:
 
         if base_cost - net_cost_opt <= self.host.get_config("pass_threshold_p"):
             if log:
+                self.log("Base cost =")
+                self.log(base_cost)
+                self.log("Net Cost Opt =")
+                self.log(net_cost_opt)
+
                 self.log(
                     f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
                 )
