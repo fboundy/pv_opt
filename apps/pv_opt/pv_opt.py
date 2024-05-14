@@ -13,7 +13,7 @@ from numpy import nan
 from datetime import datetime
 import re
 
-VERSION = "3.15.1"
+VERSION = "3.15.2"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -376,7 +376,7 @@ DEFAULT_CONFIG = {
         "domain": "select",
         "attributes": {"options": ["mean", "median", "max"]},
     },
-    "forced_power_group_tolerance": {
+    "forced_power_group_tolerance1": {
         "default": 100,
         "domain": "number",
         "attributes": {
@@ -468,6 +468,8 @@ class PVOpt(hass.Hass):
 
         self.saving_events = {}
         self.contract = None
+        self.car_plugin_detected = 0
+        self.tariff_reloaded = 0
 
         self.bottlecap_entities = {"import": None, "export": None}
 
@@ -594,6 +596,7 @@ class PVOpt(hass.Hass):
         # SVB logging
         self.log("") 
         self.ulog(" Octopus Intelligent Go Smart Charging Schedule is.... ")
+
         #### SVB Does this need gating if users contract isnt IOG? 
         # self.log(df.to_string())
         # self.log(df.dtypes)
@@ -609,19 +612,48 @@ class PVOpt(hass.Hass):
 
         return df
 
+    
+    def _check_car_plugin(self):
 
+        if (len(self.zappi_plug_entities) > 0) and (self.get_config("ev_charger") == "Zappi"):
+            for entity_id in self.zappi_plug_entities:
+                plug_status = self.get_state(entity_id)
+                #self.log(plug_status)
+                if ((plug_status == "EV Connected") and (self.tariff_reloaded == 0)):
+                    self.car_plugin_detected = 1
+                    self.log("EV plug-in event detected, tariff load scheduled for next optimiser run")
+                elif (plug_status == "EV Connected") and (self.tariff_reloaded == 1):
+                    self.log("EV is connected but IOG tariff load already caried out")
+                    self.car_plugin_detected = 0
+                else:
+                    self.log("EV not plugged in, or charging")
+                    self.car_plugin_detected = 0
+             
 
     def _check_for_zappi(self):
         self.ulog("Checking for Zappi Sensors")
         sensor_entities = self.get_state("sensor")
         self.zappi_entities = [k for k in sensor_entities if "zappi" in k for x in ["charge_added_session"] if x in k]
+        self.zappi_plug_entities = [k for k in sensor_entities if "zappi" in k for x in ["plug_status"] if x in k]
+        
         if len(self.zappi_entities) > 0:
             for entity_id in self.zappi_entities:
                 zappi_sn = entity_id.split("_")[2]
                 self.redact_regex.append(zappi_sn)
                 self.rlog(f"  {entity_id}")
         else:
-            self.log("No Zappi sensors found")
+            self.log("No Zappi Consumption sensors found")
+        
+        if len(self.zappi_plug_entities) > 0:
+            for entity_id in self.zappi_plug_entities:
+                zappi_sn = entity_id.split("_")[2]
+                self.redact_regex.append(zappi_sn)
+                self.rlog(f"  {entity_id}")
+        else:
+            self.log("No Zappi Plug Status sensors found")
+
+
+        
         self.log("")
 
     def _get_zappi(self, start, end, log=False):
@@ -1553,7 +1585,6 @@ class PVOpt(hass.Hass):
         if self.io:
             io_slots = self._get_io()     
 
-
         if self.get_config("forced_discharge") and (self.get_config("supports_forced_discharge", True)):
             discharge_enable = "enabled"
         else:
@@ -1581,14 +1612,18 @@ class PVOpt(hass.Hass):
             #self.log("Printing time.....")
             #self.log(pd.Timestamp.now(tz=self.tz).hour)
             if (pd.Timestamp.now(tz=self.tz).hour == 16) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
-                self.log("   About to reload Octopus Intelligent Tariff")
+                self.log("   About to reload Octopus Intelligent Tariff - 16:40")
                 self._load_contract()
             if (pd.Timestamp.now(tz=self.tz).hour == 0) and (pd.Timestamp.now(tz=self.tz).minute <= 20):
-                self.log("   About to reload Octopus Intelligent Tariff")
+                self.log("   About to reload Octopus Intelligent Tariff - 00:20")
                 self._load_contract()
             if (pd.Timestamp.now(tz=self.tz).hour == 4) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
-                self.log("   About to reload Octopus Intelligent Tariff")
+                self.log("   About to reload Octopus Intelligent Tariff - 04:40")
                 self._load_contract()
+            if (self.car_plugin_detected == 1):
+                self.log("Car plugin detected. About to reload Octopus Intelligent Tariff")
+                self._load_contract()
+                self.tariff_reloaded = 1
 
         elif self.contract_last_loaded.day != pd.Timestamp.now(tz="UTC").day:
             self._load_contract()
@@ -1789,6 +1824,14 @@ class PVOpt(hass.Hass):
                         io_on.iat[i] = 1
         
         self.opt = pd.concat([self.opt, io_on], axis=1)   #Add ioslot flags to self.opt
+
+
+        
+        
+        if self.io:
+            self.log("")
+            self.ulog("Checking EV Status")
+            self._check_car_plugin()
 
         self.log("")
         self.log("About to call create_windows. self.opt is........")
@@ -2104,7 +2147,7 @@ class PVOpt(hass.Hass):
         ### SVB We do need to ensure that a change from positive to negative or vice versa (charge to discharge or vice versa) creates a different period - yet to do
         ### SVB still don't understand why its an increment only and not a difference that generates a new charging window. 
 
-        tolerance = self.get_config("forced_power_group_tolerance")
+        tolerance = self.get_config("forced_power_group_tolerance1")
 
         # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected (when charge power = 0). 
 
@@ -2206,7 +2249,7 @@ class PVOpt(hass.Hass):
 
             self.windows["hold_soc"] = ""
                      
-            tolerance = self.get_config("forced_power_group_tolerance")
+            tolerance = self.get_config("forced_power_group_tolerance1")
             if tolerance > 0:
                 self.windows["forced"] = ((self.windows["forced"] / tolerance).round(0) * tolerance).astype(int)
 
