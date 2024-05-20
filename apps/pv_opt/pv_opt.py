@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.6"
+VERSION = "3.14.7"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -479,7 +479,7 @@ class PVOpt(hass.Hass):
         # self._estimate_capacity()
         self._load_pv_system_model()
         self._load_contract()
-        self.ev = self.get_config("ev_charger") in DEFAULT_CONFIG['ev_charger']['attributes']['options'][1:]
+        self.ev = self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]
         self._check_for_zappi()
 
         if self.get_config("alt_tariffs") is not None:
