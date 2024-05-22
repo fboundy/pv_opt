@@ -685,110 +685,112 @@ class PVsystemModel:
 
             if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
-                max_slot = import_cost[import_cost == max_import_cost].index[0]
+                if len(import_cost[import_cost == max_import_cost]) > 0:
+                    max_slot = import_cost[import_cost == max_import_cost].index[0]
 
-                max_slot_energy = round(df["grid"].loc[max_slot] / 2000, 2)  # kWh
+                    max_slot_energy = round(df["grid"].loc[max_slot] / 2000, 2)  # kWh
 
-                if max_slot_energy > 0:
-                    round_trip_energy_required = (
-                        max_slot_energy / self.inverter.charger_efficiency / self.inverter.inverter_efficiency
-                    )
+                    if max_slot_energy > 0:
+                        round_trip_energy_required = (
+                            max_slot_energy / self.inverter.charger_efficiency / self.inverter.inverter_efficiency
+                        )
 
-                    # potential windows end at the max_slot
-                    x = df.loc[:max_slot].copy()
+                        # potential windows end at the max_slot
+                        x = df.loc[:max_slot].copy()
 
-                    # count back to find the slots where soc_end < 100
-                    x["countback"] = (x["soc_end"] >= 97).sum() - (x["soc_end"] >= 97).cumsum()
+                        # count back to find the slots where soc_end < 100
+                        x["countback"] = (x["soc_end"] >= 97).sum() - (x["soc_end"] >= 97).cumsum()
 
-                    x = x[x["countback"] == 0]
+                        x = x[x["countback"] == 0]
 
-                    # ignore slots which are already fully charging
-                    x = x[x["forced"] < self.inverter.charger_power]
+                        # ignore slots which are already fully charging
+                        x = x[x["forced"] < self.inverter.charger_power]
 
-                    x = x[x["soc_end"] <= 97]
+                        x = x[x["soc_end"] <= 97]
 
-                    search_window = x.index
-                    str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
-                    if len(search_window) > 0:
-                        # str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
-                        pass
-                    else:
-                        # str_log = "No available window."
-                        done = True
-                    if len(x) > 0:
-                        min_price = x["import"].min()
-
-                        window = x[x["import"] == min_price].index
-                        start_window = window[0]
-
-                        cost_at_min_price = round_trip_energy_required * min_price
-
-                        str_log += f"<==> {start_window.tz_convert(self.tz).strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
-                        str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
-                        factors = []
-                        for slot in window:
-                            if pd.Timestamp.now() > slot.tz_localize(None):
-                                factors.append(
-                                    (
-                                        (slot.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.now()
-                                    ).total_seconds()
-                                    / 1800
-                                )
-                            else:
-                                factors.append(1)
-
-                        factors = [f / sum(factors) for f in factors]
-
-                        if round(cost_at_min_price, 1) < round(max_import_cost, 1):
-                            for slot, factor in zip(window, factors):
-                                slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
-                                slot_charger_power_available = max(
-                                    self.inverter.charger_power - x["forced"].loc[slot], 0
-                                )
-                                slot_available_capacity = max(
-                                    ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0
-                                )
-                                min_power = min(
-                                    slot_power_required, slot_charger_power_available, slot_available_capacity
-                                )
-                                # if log:
-                                #     str_log_x = (
-                                #         f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
-                                #         + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
-                                #         + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
-                                #     )
-                                #     self.log(str_log_x)
-                                slots.append(
-                                    (
-                                        slot,
-                                        round(min_power, 0),
-                                    )
-                                )
-
-                            df = pd.concat(
-                                [
-                                    prices,
-                                    consumption,
-                                    self.flows(initial_soc, static_flows, slots=slots, **kwargs),
-                                ],
-                                axis=1,
-                            )
-                            net_cost.append(round(contract.net_cost(df).sum(), 1))
-                            slot_count.append(len(factors))
-                            str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
-                            net_cost_opt = net_cost[-1]
-                            str_log += f"Net: {net_cost_opt:6.1f}"
-                            if log:
-                                self.log(str_log)
-                                if self.host.debug:
-                                    xx = pd.concat(
-                                        [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
-                                    ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
-                                    xx["Diff"] = xx["New"] - xx["Old"]
-                                    self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
-                                    # yy = False
+                        search_window = x.index
+                        str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
+                        if len(search_window) > 0:
+                            # str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
+                            pass
                         else:
-                            available[max_slot] = False
+                            # str_log = "No available window."
+                            done = True
+                        if len(x) > 0:
+                            min_price = x["import"].min()
+
+                            window = x[x["import"] == min_price].index
+                            start_window = window[0]
+
+                            cost_at_min_price = round_trip_energy_required * min_price
+
+                            str_log += f"<==> {start_window.tz_convert(self.tz).strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
+                            str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
+                            factors = []
+                            for slot in window:
+                                if pd.Timestamp.now() > slot.tz_localize(None):
+                                    factors.append(
+                                        (
+                                            (slot.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.now()
+                                        ).total_seconds()
+                                        / 1800
+                                    )
+                                else:
+                                    factors.append(1)
+
+                            factors = [f / sum(factors) for f in factors]
+
+                            if round(cost_at_min_price, 1) < round(max_import_cost, 1):
+                                for slot, factor in zip(window, factors):
+                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
+                                    slot_charger_power_available = max(
+                                        self.inverter.charger_power - x["forced"].loc[slot], 0
+                                    )
+                                    slot_available_capacity = max(
+                                        ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0
+                                    )
+                                    min_power = min(
+                                        slot_power_required, slot_charger_power_available, slot_available_capacity
+                                    )
+                                    # if log:
+                                    #     str_log_x = (
+                                    #         f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
+                                    #         + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
+                                    #         + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
+                                    #     )
+                                    #     self.log(str_log_x)
+                                    slots.append(
+                                        (
+                                            slot,
+                                            round(min_power, 0),
+                                        )
+                                    )
+
+                                df = pd.concat(
+                                    [
+                                        prices,
+                                        consumption,
+                                        self.flows(initial_soc, static_flows, slots=slots, **kwargs),
+                                    ],
+                                    axis=1,
+                                )
+                                net_cost.append(round(contract.net_cost(df).sum(), 1))
+                                slot_count.append(len(factors))
+                                str_log += f"New SOC: {df.loc[start_window]['soc']:5.1f}%->{df.loc[start_window]['soc_end']:5.1f}% "
+                                net_cost_opt = net_cost[-1]
+                                str_log += f"Net: {net_cost_opt:6.1f}"
+                                if log:
+                                    self.log(str_log)
+                                    if self.host.debug:
+                                        xx = pd.concat(
+                                            [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]],
+                                            axis=1,
+                                        ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
+                                        xx["Diff"] = xx["New"] - xx["Old"]
+                                        self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
+                                        # yy = False
+                            else:
+                                available[max_slot] = False
                 else:
                     done = True
             else:
