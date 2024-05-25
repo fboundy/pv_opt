@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.8"
+VERSION = "3.14.9"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -1377,7 +1377,7 @@ class PVOpt(hass.Hass):
                 isinstance(self.get_ha_value(entity_id), str)
                 and (self.get_ha_value(entity_id) not in attributes.get("options", {}))
                 and (domain not in ["text", "button"])
-            ):
+            ) or (self.get_ha_value(entity_id) is None):
 
                 state = self._state_from_value(self.get_default_config(item))
 
@@ -1388,7 +1388,7 @@ class PVOpt(hass.Hass):
             elif item in self.yaml_config:
                 state = self.get_state_retry(entity_id)
                 new_state = str(self._state_from_value(self.config[item]))
-                if over_write and state != new_state:
+                if (over_write and state != new_state) or (state is None):
                     if not over_write_log:
                         self.log("")
                         self.log("Over-writing HA from YAML:")
@@ -2809,7 +2809,11 @@ class PVOpt(hass.Hass):
                 )
                 time.sleep(GET_STATE_WAIT)
 
-        if not valid_state:
+        if not valid_state and "entity_id" in kwargs:
+            # try:
+            #     state = self.get_entity_default(kwargs.get("entity_id"))
+            #     self.log(f"  - Using default value of {state}")
+            # except:
             self.log("  - FAILED", level="ERROR")
             return None
         else:
@@ -2822,6 +2826,16 @@ class PVOpt(hass.Hass):
         avg = (integral.diff().shift(-1)[:-1] / pd.Timedelta(freq).total_seconds()).fillna(0).round(1)
         # self.log(avg)
         return avg
+
+    def get_item_from_entity(self, entity_id):
+        item = entity_id.split(".")[-1]
+        if item in DEFAULT_CONFIG:
+            return item
+
+    def get_entity_default(self, entity_id):
+        item = self.get_item_from_entity(entity_id)
+        if item is not None:
+            return DEFAULT_CONFIG[item]["default"]
 
 
 # %%

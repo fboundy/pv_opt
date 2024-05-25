@@ -592,6 +592,8 @@ class PVsystemModel:
         use_export = kwargs.pop("export", True)
         max_iters = kwargs.pop("max_iters", MAX_ITERS)
 
+        self.log(f">>> {kwargs}")
+
         prices = pd.DataFrame()
         for direction in contract.tariffs:
             if contract.tariffs[direction] is not None:
@@ -1003,7 +1005,7 @@ class PVsystemModel:
                         slot = (
                             start_window,
                             -min(
-                                self.inverter.inverter_power,
+                                self.inverter.inverter_power - x[kwargs.get("solar", "solar")].loc[start_window],
                                 ((x["soc_end"].loc[start_window] - self.battery.max_dod) / 100 * self.battery.capacity)
                                 * 2
                                 * factor,
