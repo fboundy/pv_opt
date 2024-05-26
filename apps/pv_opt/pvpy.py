@@ -2,6 +2,7 @@
 import pandas as pd
 import requests
 from copy import copy
+from numpy import isnan
 
 # from scipy.stats import linregress
 from datetime import datetime
@@ -525,7 +526,8 @@ class PVsystemModel:
             timed_slot_flows = pd.Series(index=df.index, data=0)
 
             for t, c in slots:
-                timed_slot_flows.loc[t] += int(c)
+                if not isnan(c):
+                    timed_slot_flows.loc[t] += int(c)
 
             chg_mask = timed_slot_flows != 0
             battery_flows[chg_mask] = timed_slot_flows[chg_mask]
