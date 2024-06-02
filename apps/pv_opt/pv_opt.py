@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.14.10"
+VERSION = "3.15.0"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -52,10 +52,6 @@ BOTTLECAP_DAVE = {
     "rates": "current_day_rates",
 }
 
-CONSUMPTION_SHAPE = {
-    "hour": [0, 0.5, 6, 8, 15.5, 17, 22, 24],
-    "consumption": [300, 200, 150, 500, 500, 750, 750, 300],
-}
 
 INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN", "SUNSYNK_SOLARSYNK2", "SOLAX_X1"]
 
@@ -370,6 +366,18 @@ DEFAULT_CONFIG = {
         },
     },
     "shape_consumption_profile": {"default": True, "domain": "switch"},
+    "consumption_shape": {
+        "default": [
+            {"hour": 0, "consumption": 300},
+            {"hour": 0.5, "consumption": 200},
+            {"hour": 6, "consumption": 150},
+            {"hour": 8, "consumption": 500},
+            {"hour": 15.5, "consumption": 500},
+            {"hour": 17, "consumption": 750},
+            {"hour": 22, "consumption": 750},
+            {"hour": 24, "consumption": 300},
+        ]
+    },
     "consumption_grouping": {
         "default": "mean",
         "domain": "select",
@@ -384,6 +392,30 @@ DEFAULT_CONFIG = {
             "step": 100,
             "unit_of_measurement": "W",
             "device_class": "power",
+            "mode": "slider",
+        },
+    },
+    "maximum_soc": {
+        "default": 100,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "unit_of_measurement": "%",
+            "device_class": "battery",
+            "mode": "slider",
+        },
+    },
+    "wakeup_soc": {
+        "default": 0,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "unit_of_measurement": "%",
+            "device_class": "battery",
             "mode": "slider",
         },
     },
@@ -1131,6 +1163,22 @@ class PVOpt(hass.Hass):
 
                     self.rlog(f"    {str1:34s} {str2} {x['name']:27s} Import: {x['octopus_import_tariff_code']:>36s}")
                     self.rlog(f"    {'':34s}   {'':27s} Export: {x['octopus_export_tariff_code']:>36s}")
+                self.yaml_config[item] = self.config[item]
+
+            elif item == "consumption_shape":
+                self.config[item] = values
+                for i, x in enumerate(values):
+                    if i == 0:
+                        str1 = item
+                        str2 = "="
+                        str3 = "Hour:"
+                        str4 = "Consumption:"
+                    else:
+                        str1 = ""
+                        str2 = " "
+                        str3 = "     "
+                        str4 = "            "
+                    self.rlog(f"    {str1:34s} {str2} {str3} {x['hour']:5.2f} {str4} {x['consumption']:5.0f} W")
                 self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
@@ -2492,7 +2540,7 @@ class PVOpt(hass.Hass):
             if self.get_config("shape_consumption_profile"):
                 self.log("    and typical usage profile.")
                 daily = (
-                    pd.DataFrame(CONSUMPTION_SHAPE)
+                    pd.DataFrame(self.get_config("consumption_shape"))
                     .set_index("hour")
                     .reindex(np.arange(0, 24.5, 0.5))
                     .interpolate()
@@ -2515,6 +2563,39 @@ class PVOpt(hass.Hass):
             self.log("Printing final result of routine load_consumption.....")
             self.log(consumption.to_string())
         return consumption
+
+    def _auto_cal(self):
+        self.ulog("Calibrating PV System Model")
+        end = pd.Timestamp.now(tz="UTC").normalize()
+        start = end - pd.Timedelta(24, "hours")
+
+        solar = self._get_solar(start, end)
+        consumption = self.load_consumption(start, end)
+        grid = self.load_grid(start, end)
+        soc = self.hass2df(self.config["id_battery_soc"], days=2, freq="30min").loc[start:end]
+
+    def load_grid(self, start, end):
+        self.log(
+            f"Getting yesterday's grid flows ({start.strftime(DATE_TIME_FORMAT_SHORT)} - {end.strftime(DATE_TIME_FORMAT_SHORT)}):"
+        )
+        # entity_id = self.config["id_daily_solar"]
+        mults = {"id_grid_import_power": 1, "id_grid_import_power": -1, "id_grid_power": 1}
+        days = (pd.Timestamp.now(tz="UTC") - start).days + 1
+        mults = {mults[id] for id in mults if id in self.config}
+        for id in mults:
+            entity_id = self.config[id]
+            if self.entity_exists(entity_id):
+                x = self.hass2df(entity_id, days=days)
+                if x is not None:
+                    x = (self.riemann_avg(x).loc[start : end - pd.Timedelta("30min")] / 10).round(0) * 10 * mults[id]
+                    if df is None:
+                        df = x
+                    else:
+                        df += x
+                else:
+                    self.log("  - FAILED")
+            self.log("")
+        return df
 
     def _compare_tariffs(self):
         self.ulog("Comparing yesterday's tariffs")
@@ -2606,7 +2687,7 @@ class PVOpt(hass.Hass):
                 log=False,
             )
 
-            # opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+            opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
 
             attributes = {
                 "state_class": "measurement",
@@ -2614,8 +2695,7 @@ class PVOpt(hass.Hass):
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison {contract.name}",
                 "net_base": round(net_base.sum() / 100, 2),
-                # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
-            }
+            } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
 
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")

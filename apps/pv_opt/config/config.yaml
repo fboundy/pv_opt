@@ -71,12 +71,29 @@ pv_opt:
   # Consumption forecast parameters
   # ========================================
   #
-  # use_consumption_history: true
-  consumption_history_days: 6
+  use_consumption_history: false
+  # consumption_history_days: 6
   #
-  # daily_consumption_kwh: 17
-  # shape_consumption_profile: true
-
+  daily_consumption_kwh: 17
+  shape_consumption_profile: true
+  consumption_shape:
+    - hour: 0
+      consumption: 300
+    - hour: 0.5
+      consumption: 200
+    - hour: 6
+      consumption: 150
+    - hour: 8
+      consumption: 500
+    - hour: 15.5
+      consumption: 500
+    - hour: 17
+      consumption: 750
+    - hour: 22
+      consumption: 750
+    - hour: 24
+      consumption: 300
+  
   # ========================================
   # Octopus account parameters
   # ========================================
@@ -161,7 +178,7 @@ pv_opt:
   # id_inverter_ac_power: sensor.{device_name}_inverter_ac_power
   # id_battery_soc: sensor.{device_name}_battery_soc
 
-  # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
+  # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour 
   # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
   # id_timed_charge_end_hours: sensor.{device_name}_timed_charge_end_hour
   # id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
