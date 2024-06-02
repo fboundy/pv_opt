@@ -2003,6 +2003,8 @@ class PVOpt(hass.Hass):
                     and (time_to_slot_start < self.get_config("optimise_frequency_minutes"))
                     and (len(self.windows) > 0)
                     ) or (self.get_config("id_battery_soc") < self.get_config("sleep_soc")):
+                    # Next slot starts before the next optimiser run. This implies we are not currently in
+                    # a charge or discharge slot
 
                     if self.get_config("id_battery_soc") < self.get_config("sleep_soc"):
                         self.log(
