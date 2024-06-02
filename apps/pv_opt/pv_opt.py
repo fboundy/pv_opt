@@ -52,10 +52,6 @@ BOTTLECAP_DAVE = {
     "rates": "current_day_rates",
 }
 
-CONSUMPTION_SHAPE = {
-    "hour": [0, 0.5, 6, 8, 15.5, 17, 22, 24],
-    "consumption": [300, 200, 150, 500, 500, 750, 750, 300],
-}
 
 INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN", "SUNSYNK_SOLARSYNK2", "SOLAX_X1"]
 
@@ -370,6 +366,18 @@ DEFAULT_CONFIG = {
         },
     },
     "shape_consumption_profile": {"default": True, "domain": "switch"},
+    "consumption_shape": {
+        "default": [
+            {"hour": 0, "consumption": 300},
+            {"hour": 0.5, "consumption": 200},
+            {"hour": 6, "consumption": 150},
+            {"hour": 8, "consumption": 500},
+            {"hour": 15.5, "consumption": 500},
+            {"hour": 17, "consumption": 750},
+            {"hour": 22, "consumption": 750},
+            {"hour": 24, "consumption": 300},
+        ]
+    },
     "consumption_grouping": {
         "default": "mean",
         "domain": "select",
@@ -1155,6 +1163,22 @@ class PVOpt(hass.Hass):
 
                     self.rlog(f"    {str1:34s} {str2} {x['name']:27s} Import: {x['octopus_import_tariff_code']:>36s}")
                     self.rlog(f"    {'':34s}   {'':27s} Export: {x['octopus_export_tariff_code']:>36s}")
+                self.yaml_config[item] = self.config[item]
+
+            elif item == "consumption_shape":
+                self.config[item] = values
+                for i, x in enumerate(values):
+                    if i == 0:
+                        str1 = item
+                        str2 = "="
+                        str3 = "Hour:"
+                        str4 = "Consumption:"
+                    else:
+                        str1 = ""
+                        str2 = " "
+                        str3 = "     "
+                        str4 = "            "
+                    self.rlog(f"    {str1:34s} {str2} {str3} {x['hour']:5.2f} {str4} {x['consumption']:5.0f} W")
                 self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
@@ -2516,7 +2540,7 @@ class PVOpt(hass.Hass):
             if self.get_config("shape_consumption_profile"):
                 self.log("    and typical usage profile.")
                 daily = (
-                    pd.DataFrame(CONSUMPTION_SHAPE)
+                    pd.DataFrame(self.get_config("consumption_shape"))
                     .set_index("hour")
                     .reindex(np.arange(0, 24.5, 0.5))
                     .interpolate()
