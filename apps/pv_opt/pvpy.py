@@ -876,13 +876,13 @@ class PVsystemModel:
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
                                     )
-                                    if log:
-                                        str_log_x = (
-                                            f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
-                                            + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
-                                            + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
-                                        )
-                                        self.log(str_log_x)
+                                    #if log:
+                                    #    str_log_x = (
+                                    #        f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
+                                    #        + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
+                                    #        + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
+                                    #    )
+                                    #    self.log(str_log_x)
                                     slots.append(
                                         (
                                             slot,
@@ -905,7 +905,6 @@ class PVsystemModel:
                                 str_log += f"Net: {net_cost_opt:6.1f}"
                                 if log:
                                     self.log(str_log)
-                                    ## SVB logging
                                     if self.host.debug:
                                         xx = pd.concat(
                                             [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
