@@ -594,8 +594,6 @@ class PVsystemModel:
         use_export = kwargs.pop("export", True)
         max_iters = kwargs.pop("max_iters", MAX_ITERS)
 
-        self.log(f">>> {kwargs}")
-
         prices = pd.DataFrame()
         for direction in contract.tariffs:
             if contract.tariffs[direction] is not None:
