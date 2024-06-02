@@ -2844,9 +2844,9 @@ class PVOpt(hass.Hass):
                     days=days,
                     log=self.debug,
                 )
-                # SVB logging
-                #self.log("Df after first load is:......")
-                #self.log(df.to_string())
+                if self.debug:
+                    self.log("Df after first load is:......")
+                    self.log(df.to_string())
 
             if df is None:
                 self._status("ERROR: No consumption history.")
@@ -2918,9 +2918,9 @@ class PVOpt(hass.Hass):
 
                 # Add consumption margin
                 df = df * (1 + self.get_config("consumption_margin") / 100)
-                # SVB logging
-                # self.log("Df after adding consumption margin is.......")
-                # self.log(df.to_string())
+                if self.debug:
+                    self.log("Df after adding consumption margin is.......")
+                    self.log(df.to_string())
 
                 dfx = pd.Series(index=df.index, data=df.to_list())
 
@@ -2985,15 +2985,15 @@ class PVOpt(hass.Hass):
 
             self.log("  - Consumption estimated OK")
 
+        self.log("")
         self.log(
-            f"    House consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
+            f"    Total consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
         )
-        self.log(f"  - House consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
+        self.log(f"  - Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
 
-
-        # SVB logging
-        #self.log("Printing final result of routine load_consumption.....")
-        #self.log(consumption.to_string())
+        if self.debug:
+            self.log("Printing final result of routine load_consumption.....")
+            self.log(consumption.to_string())
         return consumption
 
     def _auto_cal(self):
