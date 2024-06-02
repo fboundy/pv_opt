@@ -2002,17 +2002,13 @@ class PVOpt(hass.Hass):
                     (time_to_slot_start > 0)
                     and (time_to_slot_start < self.get_config("optimise_frequency_minutes"))
                     and (len(self.windows) > 0)
-                ):
-                    # Next slot starts before the next optimiser run. This implies we are not currently in
-                    # a charge or discharge slot
+                    ) or (self.get_config("id_battery_soc") < self.get_config("sleep_soc")):
 
-                    ### SVB might need to add a "self.charge_power = 0" to this, to setup the hold slot. 
-                    # not sure why we currently wait until inside the slot before doing a hold_soc?
-                    #  Ah - I know, its because until recently it was using backup mode, which does not use the inverter start and end times
-
-                    self.log("Not in charge/discharge slot, but next one starts before next optimiser run")
-
-                    if len(self.windows) > 0:
+                    if self.get_config("id_battery_soc") < self.get_config("sleep_soc"):
+                        self.log(
+                            f"Current SOC of {self.get_config('id_battery_soc'):0.1f}% is less than battery_sleep SOC of {self.get_config('sleep_soc'):0.1f}%"
+                        )
+                    elif len(self.windows) > 0:
                         self.log(f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes.")
                     else:
                         self.log("No charge/discharge windows planned.")
@@ -2911,10 +2907,9 @@ class PVOpt(hass.Hass):
                         df_EV = df_EV_Total["EV"].squeeze()  # Extract EV consumption to Series
                         df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
                         df = df_Total - df_EV  # Substract EV consumption from Total Consumption
-
-                        # SVB logging
-                        #self.log("Result of subtraction is")
-                        #self.log(df.to_string())
+                        if self.debug:
+                            self.log("Result of subtraction is")
+                            self.log(df.to_string())
 
                 # Add consumption margin
                 df = df * (1 + self.get_config("consumption_margin") / 100)
@@ -2990,6 +2985,7 @@ class PVOpt(hass.Hass):
             f"    Total consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
         )
         self.log(f"  - Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
+
 
         if self.debug:
             self.log("Printing final result of routine load_consumption.....")
