@@ -391,6 +391,18 @@ DEFAULT_CONFIG = {
     "charge_active": {"default": True, "domain": "switch"},
     "discharge_active": {"default": True, "domain": "switch"},
     "hold_soc_active": {"default": True, "domain": "switch"},
+    "sleep_soc": {
+        "default": 0,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 20,
+            "step": 1,
+            "unit_of_measurement": "%",
+            "device_class": "battery",
+            "mode": "slider",
+        },
+    },
 }
 
 
@@ -515,7 +527,7 @@ class PVOpt(hass.Hass):
         self.ulog("Test")
 
         test = {
-            item: self.get_ha_value(self.ha_entities[f"test_{item}"])
+            item: self.get_ha_value(entity_id=self.ha_entities[f"test_{item}"])
             for item in ["start", "end", "power", "enable", "function", "target_soc"]
         }
 
@@ -730,12 +742,12 @@ class PVOpt(hass.Hass):
 
         if item in self.config:
             if isinstance(self.config[item], str) and self.entity_exists(self.config[item]):
-                x = self.get_ha_value(self.config[item])
+                x = self.get_ha_value(entity_id=self.config[item])
                 return x
             elif isinstance(self.config[item], list):
                 if min([isinstance(x, str)] for x in self.config[item])[0]:
-                    if min([self.entity_exists(e) for e in self.config[item]]):
-                        l = [self.get_ha_value(e) for e in self.config[item]]
+                    if min([self.entity_exists(entity_id=entity_id) for entity_id in self.config[item]]):
+                        l = [self.get_ha_value(entity_id=entity_id) for entity_id in self.config[item]]
                         try:
                             return sum(l)
                         except:
@@ -1374,10 +1386,10 @@ class PVOpt(hass.Hass):
                 self.mqtt.mqtt_subscribe(state_topic)
 
             elif (
-                isinstance(self.get_ha_value(entity_id), str)
-                and (self.get_ha_value(entity_id) not in attributes.get("options", {}))
+                isinstance(self.get_ha_value(entity_id=entity_id), str)
+                and (self.get_ha_value(entity_id=entity_id) not in attributes.get("options", {}))
                 and (domain not in ["text", "button"])
-            ) or (self.get_ha_value(entity_id) is None):
+            ) or (self.get_ha_value(entity_id=entity_id) is None):
 
                 state = self._state_from_value(self.get_default_config(item))
 
@@ -1772,11 +1784,15 @@ class PVOpt(hass.Hass):
                     (time_to_slot_start > 0)
                     and (time_to_slot_start < self.get_config("optimise_frequency_minutes"))
                     and (len(self.windows) > 0)
-                ):
+                ) or (self.get_config("id_battery_soc") < self.get_config("sleep_soc")):
                     # Next slot starts before the next optimiser run. This implies we are not currently in
                     # a charge or discharge slot
 
-                    if len(self.windows) > 0:
+                    if self.get_config("id_battery_soc") < self.get_config("sleep_soc"):
+                        self.log(
+                            f"Current SOC of {self.get_config('id_battery_soc'):0.1f}% is less than battery_sleep SOC of {self.get_config('sleep_soc'):0.1f}%"
+                        )
+                    elif len(self.windows) > 0:
                         self.log(f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes.")
                     else:
                         self.log("No charge/discharge windows planned.")
@@ -2356,8 +2372,9 @@ class PVOpt(hass.Hass):
                     days=days,
                     log=self.debug,
                 )
-                self.log("Df after first load is:......")
-                self.log(df.to_string())
+                if self.debug:
+                    self.log("Df after first load is:......")
+                    self.log(df.to_string())
 
             if df is None:
                 self._status("ERROR: No consumption history.")
@@ -2420,14 +2437,15 @@ class PVOpt(hass.Hass):
                         df_EV = df_EV_Total["EV"].squeeze()  # Extract EV consumption to Series
                         df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
                         df = df_Total - df_EV  # Substract EV consumption from Total Consumption
-
-                        self.log("Result of subtraction is")
-                        self.log(df.to_string())
+                        if self.debug:
+                            self.log("Result of subtraction is")
+                            self.log(df.to_string())
 
                 # Add consumption margin
                 df = df * (1 + self.get_config("consumption_margin") / 100)
-                self.log("Df after adding consumption margin is.......")
-                self.log(df.to_string())
+                if self.debug:
+                    self.log("Df after adding consumption margin is.......")
+                    self.log(df.to_string())
 
                 dfx = pd.Series(index=df.index, data=df.to_list())
 
@@ -2493,8 +2511,9 @@ class PVOpt(hass.Hass):
             self.log("  - Consumption estimated OK")
 
         self.log(f"  - Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
-        self.log("Printing final result of routine load_consumption.....")
-        self.log(consumption.to_string())
+        if self.debug:
+            self.log("Printing final result of routine load_consumption.....")
+            self.log(consumption.to_string())
         return consumption
 
     def _compare_tariffs(self):
