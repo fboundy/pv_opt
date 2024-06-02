@@ -317,6 +317,7 @@ class InverterController:
             self._solis_control_charge_discharge(direction, enable, **kwargs)
 
     def _solis_control_charge_discharge(self, direction, enable, **kwargs):
+        self.log("Entered _solis_control_charge_discharge")
         status = self._solis_state()
 
         times = {
@@ -368,8 +369,10 @@ class InverterController:
                         changed, written = self.host.write_and_poll_value(
                             entity_id=entity_id, value=value, verbose=True
                         )
+                        self.log("Write and poll value called")
                     elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                         changed, written = self._solis_write_time_register(direction, limit, unit, value)
+                        #self.log("Calling _solis_write_time_register")
 
                     else:
                         e = "Unknown inverter type"
@@ -391,6 +394,7 @@ class InverterController:
             if self.type == "SOLIS_SOLAX_MODBUS" and write_flag:
                 entity_id = self.host.config["id_timed_charge_discharge_button"]
                 self.host.call_service("button/press", entity_id=entity_id)
+                #self.log("call service button/press")
                 time.sleep(0.5)
                 try:
                     time_pressed = pd.Timestamp(self.host.get_state_retry(entity_id))
@@ -417,6 +421,7 @@ class InverterController:
             self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
             if self.type == "SOLIS_SOLAX_MODBUS":
                 changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
+                self.log("Curent being written")
             elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self._solis_write_current_register(direction, current, tolerance=1)
             else:
@@ -467,6 +472,7 @@ class InverterController:
                 self.log(f">>> Inverter Mode: {mode}")
 
             self.host.set_select("inverter_mode", mode)
+            self.log("Set select inverter mode called")
 
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
@@ -511,8 +517,13 @@ class InverterController:
                     f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                 )
             time_now = pd.Timestamp.now(tz=self.tz)
+            entity_id = self.host.config[f"id_timed_{direction}_current"]
             status[direction]["current"] = float(
-                self.host.get_state_retry(self.host.config[f"id_timed_{direction}_current"])
+                self.host.get_state_retry(entity_id)
+
+
+            #status[direction]["current"] = float(
+            #    self.host.get_state_retry(self.host.config[f"id_timed_{direction}_current"])
             )
 
             status[direction]["active"] = (
