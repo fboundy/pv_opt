@@ -132,3 +132,5 @@ cards:
         name: Threshold per slot (p)
       - entity: number.pvopt_forced_power_group_tolerance
         name: Power Resolution
+      - entity: number.pvopt_sleep_soc
+        name: Sleep SOC
