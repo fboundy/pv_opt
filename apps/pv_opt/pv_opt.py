@@ -610,7 +610,7 @@ class PVOpt(hass.Hass):
             df ["start_dt"] = pd.to_datetime(df["start"])
             df ["end_dt"] = pd.to_datetime(df["end"])
 
-        # SVB logging
+        # SVB updates
         self.log("") 
         self.ulog("Octopus Intelligent Go Smart Charging Schedule is.... ")
 
@@ -651,9 +651,10 @@ class PVOpt(hass.Hass):
             x.index = pd.to_datetime(x.index)
             x.index = x.index.tz_convert("UTC")
             x *= 100
-            self.log("")
-            self.log(f"Reading current day IOG prices from  {entity_id1}")
-            self.log(x.to_string())
+            # SVB logging
+            #self.log("")
+            #self.log(f"Reading current day IOG prices from  {entity_id1}")
+            #self.log(x.to_string())
         else:
             self.log("No data found in current day rate")
 
@@ -671,9 +672,10 @@ class PVOpt(hass.Hass):
             y.index = pd.to_datetime(y.index)
             y.index = y.index.tz_convert("UTC")
             y *= 100    
-            self.log("")
-            self.log(f"Reading next day IOG prices from  {entity_id1}")
-            self.log(y.to_string())
+            # SVB logging
+            #self.log("")
+            #self.log(f"Reading next day IOG prices from  {entity_id1}")
+            #self.log(y.to_string())
         else:
             self.log("No data found in next day rate")
 
