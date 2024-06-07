@@ -87,9 +87,10 @@ class Tariff:
         self.area = kwargs.get("area", None)
         self.day_ahead = None
         self.eco7_start = pd.Timestamp(eco7_start, tz="UTC")
-
-        self.log(" .Tariff - IO prices passed in are")
-        self.log(io_prices)
+        
+        # SVB logging
+        #self.log(" .Tariff - IO prices passed in are")
+        #self.log(io_prices)
 
         if octopus:
             self.get_octopus(**kwargs)
