@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.15.0"
+VERSION = "3.15.1"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -2598,6 +2598,7 @@ class PVOpt(hass.Hass):
         return df
 
     def _compare_tariffs(self):
+        self._status("Comparing Tariffs")
         self.ulog("Comparing yesterday's tariffs")
         end = pd.Timestamp.now(tz="UTC").normalize()
         start = end - pd.Timedelta(24, "hours")

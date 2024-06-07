@@ -637,10 +637,18 @@ class PVsystemModel:
                 self.log("Agile Plunge Pricing")
                 self.log("--------------------")
                 self.log("")
+                # self.log((f">>>{static_flows.columns}"))
 
+            if "solar" in static_flows.columns:
+                col = "solar"
+            else:
+                col = "weighted"
             plunge_threshold = self.host.get_config("plunge_threshold_p_kwh")
-            plunge = df["import"][df["import"] < plunge_threshold]
-            slots = [(p, self.inverter.charger_power) for p in plunge.index.to_list()]
+            plunge = (self.inverter.charger_power - static_flows[col])[df["import"] < plunge_threshold]
+            # if log:
+            #     self.log(f">>>{plunge.to_string()}")
+
+            slots = [(p, max(plunge.loc[p], 0)) for p in plunge.index.to_list()]
             df = pd.concat(
                 [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
                 axis=1,
