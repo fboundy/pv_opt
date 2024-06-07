@@ -13,7 +13,7 @@ from numpy import nan
 from datetime import datetime
 import re
 
-VERSION = "3.15.3"
+VERSION = "3.15.4"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -392,6 +392,18 @@ DEFAULT_CONFIG = {
     "charge_active": {"default": True, "domain": "switch"},
     "discharge_active": {"default": True, "domain": "switch"},
     "hold_soc_active": {"default": True, "domain": "switch"},
+    "sleep_soc": {
+        "default": 0,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 20,
+            "step": 1,
+            "unit_of_measurement": "%",
+            "device_class": "battery",
+            "mode": "slider",
+        },
+    },
 }
 
 
@@ -564,7 +576,6 @@ class PVOpt(hass.Hass):
     def _get_io(self):
 
         # Get Planned dispatches from Intelligent Dispatcing sensor 
-
         self.ulog("Intelligent Octopus Status")
         self.io_dispatch_active = self.get_state(self.io_entity)
         self.log(f"  Active: {self.io_dispatch_active}")
@@ -907,6 +918,7 @@ class PVOpt(hass.Hass):
         self.contract = None
 
         # Set self.io flag if IO detected. Note, this is based on Zappi flag so IOG currently only works if the Zappi charger is integrated.
+        ### SVB next bit doesnt work, as we haevn't auto detected the Octopus Account details this needs. 
         self._check_for_io()         
             
         # Load both current_day_rate and next_day_rate from the Octopus Energy Integration.
@@ -1011,7 +1023,7 @@ class PVOpt(hass.Hass):
                     )
                     self.contract = None
 
-            if self.contract is None:
+            if self.contract is None:   # Try loading using Octopus Account number and API ket
                 if ("octopus_account" in self.config) and ("octopus_api_key" in self.config):
                     if (self.config["octopus_account"] is not None) and (self.config["octopus_api_key"] is not None):
                         for x in ["octopus_account", "octopus_api_key"]:
@@ -2387,15 +2399,15 @@ class PVOpt(hass.Hass):
             # Combine charge and discharge windows
             self.windows = pd.concat([windows_c, windows_d]).sort_values("start")
 
-            # Create a Hold slot for all IOG slots and set forced to "1"
+            # Create a Hold slot for all IOG slots and set forced to "5" (to generate a non-zero current)
             x = self.opt[self.opt["ioslot"] == 1].copy()
             x["start"] = x.index.tz_convert(self.tz)
             x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
-            x["forced"] = 1
+            x["forced"] = 5
 
-            # Delete any entries where charging is already scheduled (Forced > 0)
+            # Delete any entries where charging is already scheduled (Forced > 5)
             
-            x = x.drop(x[x["forced"] > 1].index)
+            x = x.drop(x[x["forced"] > 5].index)
         
             self.log("")
             self.log("Printing X for Hold (IOG) slots (if not already charging)")
@@ -2507,8 +2519,10 @@ class PVOpt(hass.Hass):
 
             self.charge_power = self.windows["forced"].iloc[0]
             voltage = self.get_config("battery_voltage", default=50)
-            if voltage > 0:
+            if voltage > 0 and not self.charge_power == 1:
                 self.charge_current = self.charge_power / voltage
+            elif voltage > 0 and self.charge_power == 1:
+                self.charge_current = 0.1 # Set a non-zero charge current so IOG slots are seen as charge slots (to make use of start and stop times)
             else:
                 self.charge_current = None
             self.charge_target_soc = self.windows["soc_end"].iloc[0]
