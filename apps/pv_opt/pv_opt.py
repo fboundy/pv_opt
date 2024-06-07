@@ -2399,15 +2399,15 @@ class PVOpt(hass.Hass):
             # Combine charge and discharge windows
             self.windows = pd.concat([windows_c, windows_d]).sort_values("start")
 
-            # Create a Hold slot for all IOG slots and set forced to "5" (to generate a non-zero current)
+            # Create a Hold slot for all IOG slots and set forced to "1" (to generate a non-zero current)
             x = self.opt[self.opt["ioslot"] == 1].copy()
             x["start"] = x.index.tz_convert(self.tz)
             x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
-            x["forced"] = 5
+            x["forced"] = 1
 
-            # Delete any entries where charging is already scheduled (Forced > 5)
+            # Delete any entries where charging is already scheduled (Forced > 1)
             
-            x = x.drop(x[x["forced"] > 5].index)
+            x = x.drop(x[x["forced"] > 1].index)
         
             self.log("")
             self.log("Printing X for Hold (IOG) slots (if not already charging)")
