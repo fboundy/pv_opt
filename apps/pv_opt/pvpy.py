@@ -46,6 +46,9 @@ AGILE_FACTORS = {
     },
 }
 
+# Tariff Class
+# Calls "get octopus" to load the pricing information
+# outputs self.unit. 
 
 class Tariff:
     def __init__(
@@ -462,7 +465,8 @@ class OctopusAccount:
         str = f"Account Number: {self.account_number}\n"
         str += f"API Key: {self.api_key}"
 
-# Class Contract. Has the tariff code passed in, or gets it from your Octopus Account
+# Contract Class. 
+# Has the tariff code passed in, or gets it from your Octopus Account using your Octopus Account details
 # Also contains the function net_cost, which calculates cost based on predicted power flows.
 # No other functions. 
 class Contract:
