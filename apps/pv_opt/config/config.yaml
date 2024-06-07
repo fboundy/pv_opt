@@ -71,28 +71,28 @@ pv_opt:
   # Consumption forecast parameters
   # ========================================
   #
-  use_consumption_history: false
-  # consumption_history_days: 6
-  #
-  daily_consumption_kwh: 17
-  shape_consumption_profile: true
-  consumption_shape:
-    - hour: 0
-      consumption: 300
-    - hour: 0.5
-      consumption: 200
-    - hour: 6
-      consumption: 150
-    - hour: 8
-      consumption: 500
-    - hour: 15.5
-      consumption: 500
-    - hour: 17
-      consumption: 750
-    - hour: 22
-      consumption: 750
-    - hour: 24
-      consumption: 300
+  # use_consumption_history: false
+  # # consumption_history_days: 6
+  # #
+  # daily_consumption_kwh: 17
+  # shape_consumption_profile: true
+  # consumption_shape:
+  #   - hour: 0
+  #     consumption: 300
+  #   - hour: 0.5
+  #     consumption: 200
+  #   - hour: 6
+  #     consumption: 150
+  #   - hour: 8
+  #     consumption: 500
+  #   - hour: 15.5
+  #     consumption: 500
+  #   - hour: 17
+  #     consumption: 750
+  #   - hour: 22
+  #     consumption: 750
+  #   - hour: 24
+  #     consumption: 300
   
   # ========================================
   # Octopus account parameters
