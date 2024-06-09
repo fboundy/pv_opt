@@ -616,12 +616,11 @@ class PVOpt(hass.Hass):
         self.log("") 
         self.ulog("Octopus Intelligent Go Smart Charging Schedule is.... ")
 
-        self.log(df.to_string())
-        self.log(df.dtypes)
-        self.log(df.info)
+        #self.log(df.to_string())
+        #self.log(df.dtypes)
+        #self.log(df.info)
         
         
-
         for window in df.iterrows():
             self.log(
                 f"{window[1]['start_dt'].tz_convert(self.tz).strftime('%H:%M'):>7s} to {window[1]['end_dt'].tz_convert(self.tz).strftime('%H:%M'):<7s}  Charge: {window[1]['charge_in_kwh']:7.2f}kWh"
