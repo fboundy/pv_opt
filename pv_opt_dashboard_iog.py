@@ -495,7 +495,7 @@ views:
                      return [new Date(entry.period_start), entry.forced];
                    });
               - entity: >-
-                  event.octopus_energy_electricity_22j0102472_1800020136985_current_day_rates
+                  event.octopus_energy_electricity_xxxxxxxxxxxxxx_xxxxxxxxxx_current_day_rates
                 yaxis_id: price
                 name: Historic Import Price
                 color: yellow
@@ -550,11 +550,11 @@ views:
       - type: entities
         entities:
           - entity: sensor.solis_house_load_today
-          - entity: sensor.myenergi_zappi_12027800_charge_added_session
+          - entity: sensor.myenergi_zappi_xxxxxxxx_charge_added_session
           - entity: sensor.solis_house_load_yesterday
           - entity: sensor.pvopt_opt_cost
           - entity: sensor.pvopt_charge_start
-          - entity: sensor.myenergi_zappi_12027800_plug_status
+          - entity: sensor.myenergi_zappi_xxxxxxxxx_plug_status
           - entity: sensor.pvopt_iog_slots
       - square: false
         type: grid
