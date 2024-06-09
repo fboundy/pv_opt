@@ -609,14 +609,16 @@ class PVOpt(hass.Hass):
             #if df is not None:  (gate doesnt work for some reason, using df.empty instead)
             df ["start_dt"] = pd.to_datetime(df["start"])
             df ["end_dt"] = pd.to_datetime(df["end"])
+            df ["start_local"] = df["start_dt"].dt.tz_convert(self.tz)
+            df ["end_local"] = df["end_dt"].dt.tz_convert(self.tz)
 
         # SVB updates
         self.log("") 
         self.ulog("Octopus Intelligent Go Smart Charging Schedule is.... ")
 
-        # self.log(df.to_string())
-        # self.log(df.dtypes)
-        # self.log(df.info)
+        self.log(df.to_string())
+        self.log(df.dtypes)
+        self.log(df.info)
         
         
 
@@ -1709,6 +1711,7 @@ class PVOpt(hass.Hass):
 
         if self.io:
             io_slots = self._get_io()     
+            self.io_slots = io_slots
 
         if self.get_config("forced_discharge") and (self.get_config("supports_forced_discharge", True)):
             discharge_enable = "enabled"
@@ -1946,7 +1949,7 @@ class PVOpt(hass.Hass):
         if not io_slots.empty:
             for h in range(len(io_slots)):
                 for i in range(len(y)): 
-                    if (y.iat[i, 2] >= io_slots.iat[h, 5]) and (y.iat[i, 2] < io_slots.iat[h, 6]):
+                    if (y.iat[i, 2] >= io_slots.iat[h, 5]) and (y.iat[i, 2] < io_slots.iat[h, 6]):  ### SVB Need to lose the IATs for label based operations
                         io_on.iat[i] = 1
         
         self.opt = pd.concat([self.opt, io_on], axis=1)   #Add ioslot flags to self.opt
@@ -2293,13 +2296,12 @@ class PVOpt(hass.Hass):
 
     def _create_windows(self):
 
-        # If we are already in the first slot (e.g. 10 mins in or 20 mins in) then the value of "forced" will have been factored so .flows works. 
+        # If we are already in the first slot (e.g. 10 mins in or 20 mins in) then the value of "forced" is factored so I think .flows calculations continue to work for 20 and then 10 mins remaining. 
         # However, a factored "forced" value means that it result in a seperate charge window for the remaining time, and for IOG that will result in needless
         # writes to the inverter every 10 minutes and an increasing charge power towards the end of the night to compensate. 
         # As the .flows calls are all done with now, the "forced" power can be set back to what the inverter needs it to be, which is the original value prior to factoring
 
         # Get the time of the first slot
-
         self.opt["start"] = self.opt.index.tz_convert(self.tz)
         
         self.charge_start_datetime = self.opt.iat[0, 15]    #"Start" is the 16th column. (###SVB Ideally change this for code that does a label lookup)
@@ -2325,7 +2327,9 @@ class PVOpt(hass.Hass):
         # We need to remove that factor so the inverter charge power remains unchanged in the slot. 
         # If forced = 0 (i.e no charging) the result remains zero so no need to gate with forced > 0.
 
-        ### SVB this needs a "not to exceed" limit to handle programme restarts at time values very close to the half hour boundaries. 
+        ### SVB this needs a "not to exceed" limit to:
+        # Handle large multiplication factors for programme restarts at time values very close to the half hour boundaries
+        # To handle slots that even when factored, are still limited by the inverter power - these ones we don't want to multiply. 
 
         if not slot_left_factor == 0:
             self.opt["forced"].iloc[0] = self.opt["forced"].iloc[0] * slot_left_factor
@@ -2342,9 +2346,9 @@ class PVOpt(hass.Hass):
 
         tolerance = self.get_config("forced_power_group_tolerance1")
 
-        # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected (when charge power = 0). 
+        # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected (when charge power = 1). 
 
-        self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) | ((self.opt["ioslot"].diff() > 0) & (self.opt["forced"] == 0))).cumsum()      
+        self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) | ((self.opt["ioslot"].diff() > 0) & (self.opt["forced"] == 1))).cumsum()      
           
         self.log("")
         self.log("After assignment of 'period', self.opt is........")
@@ -2450,16 +2454,16 @@ class PVOpt(hass.Hass):
 
             # SVB logging
             self.log("")
-            self.log("Printing Combined Window after power tolerancing")
+            self.log("Printing Combined Window after power rounding")
             self.log(self.windows.to_string())
 
-            # Add the IOG slots. this is done after hold tolerancing to ensure the Forced = 1 setting remains
+
+            # Add the IOG slots. this is done after power value rounding to ensure the Forced = 1 setting remains
             self.windows = pd.concat([windows_io, self.windows]).sort_values("start")
 
             # Round SOC to integers
             self.windows["soc"] = self.windows["soc"].round(0).astype(int)
             self.windows["soc_end"] = self.windows["soc_end"].round(0).astype(int)
-
             self.windows["hold_soc"] = ""            
 
             
@@ -2476,14 +2480,16 @@ class PVOpt(hass.Hass):
                 self.log("Printing Combined Window after Hold SOC check.....")
                 self.log(self.windows.to_string())
 
-                self.log("")
-                self.log("Setting IO slots to hold")         # If forced = 1 then the window is an IO slot. It will already have a "<=" set as we made start SOC = end SOC, but we
-                                                             # want to differentiate the two for later processing.  
-                self.windows.loc[
-                    (self.windows["forced"] == 1),
-                    "hold_soc",
-                ] = "<=IOG"
-            
+
+            self.log("")
+            self.log("Setting IO slots to hold")         # If forced = 1 then the window is an IO slot. It will already have a "<=" set as we made start SOC = end SOC, but we
+                                                         # possibly want to differentiate the two for later processing.  
+            self.windows.loc[
+                (self.windows["forced"] == 1),
+                "hold_soc",
+            ] = "<=IOG"
+
+
             self.log("")
             self.log("Printing Combined Window after <=IOG added for any IO slots.....")
             self.log(self.windows.to_string())
@@ -2696,6 +2702,32 @@ class PVOpt(hass.Hass):
                 ],
             },
         )
+
+        if len(self.io_slots) > 0:
+            io_slot_datetime = self.io_slots["start_dt"].iloc[0].tz_convert(self.tz)
+        else:
+            io_slot_datetime = self.static.index[0].tz_convert(self.tz)
+        
+        self.write_to_hass(
+            entity=f"sensor.{self.prefix}_iog_slots",
+            state=io_slot_datetime,
+            attributes={
+                "friendly_name": "Pv Opt Intelligent Octopus Go Charging Slots",
+                "device_class": "timestamp",
+                "windows": [
+                    {
+                        k: window1[1][k]
+                        for k in [
+                            "start_local",
+                            "end_local",
+                            "charge_in_kwh",
+                        ]
+                    }
+                    for window1 in self.io_slots.iterrows()
+                ],
+            },
+        )
+
 
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_charge_end",
