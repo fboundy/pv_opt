@@ -13,7 +13,7 @@ from numpy import nan
 from datetime import datetime
 import re
 
-VERSION = "3.15.4"
+VERSION = "3.15.5"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -564,7 +564,9 @@ class PVOpt(hass.Hass):
     def _check_for_io(self):
         self.ulog("Checking for Intelligent Octopus")
         entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
+        entity_id1 = f"number.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_charge_limit"
         self.rlog(f">>> {entity_id}")
+        self.rlog(f">>> {entity_id1}")
         io_dispatches = self.get_state(entity_id)
         self.log(f">>> IO entity state:  {io_dispatches}")
         self.io = io_dispatches is not None
@@ -572,7 +574,10 @@ class PVOpt(hass.Hass):
             self.rlog(f"IO entity {entity_id} found")
             self.log("")
             self.io_entity = entity_id
-
+            self.io_charge_to_add = self.get_state(entity_id1)    #Load the current charge to add value
+            self.old_io_charge_to_add = self.io_charge_to_add        #And set historic value to be the same
+            self.io_entity1 = entity_id1
+        
     def _get_io(self):
 
         # Get Planned dispatches from Intelligent Dispatcing sensor 
@@ -581,22 +586,19 @@ class PVOpt(hass.Hass):
         self.log(f"  Active: {self.io_dispatch_active}")
         self.log("")
 
-        ## Leave for now but all of the following code can be deleted or set behind a debug switch. 
+        if self.debug:
+            self.io_dispatch_attrib = self.get_state(self.io_entity, attribute="all")
+            for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
+                self.rlog(f" {k:20s} {self.io_dispatch_attrib[k]}")
 
-        self.io_dispatch_attrib = self.get_state(self.io_entity, attribute="all")
-        for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
-            self.rlog(f" {k:20s} {self.io_dispatch_attrib[k]}")
-
-        for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" in x]:
-            self.log(f"  {k:20s} {'Start':20s} {'End':20s} {'Charge':12s} {'Source':12s}")
-            self.log(f"  {'-'*20} {'-'*20} {'-'*20} {'-'*12} {'-'*12} ")
-            for z in self.io_dispatch_attrib[k]:
-                self.log(
-                    f"  {z['start'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['end'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['charge_in_kwh']:12.3f}  {z['source']:12s}"
-                )
-            self.log("")
-        ## End of deletions
-
+            for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" in x]:
+                self.log(f"  {k:20s} {'Start':20s} {'End':20s} {'Charge':12s} {'Source':12s}")
+                self.log(f"  {'-'*20} {'-'*20} {'-'*20} {'-'*12} {'-'*12} ")
+                for z in self.io_dispatch_attrib[k]:
+                    self.log(
+                        f"  {z['start'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['end'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['charge_in_kwh']:12.3f}  {z['source']:12s}"
+                    )
+                
         # Get Planned dispatches from Intelligent Dispatcing sensor 
         df = pd.DataFrame(
             self.get_state_retry(self.io_entity, attribute=("planned_dispatches"))
@@ -604,6 +606,7 @@ class PVOpt(hass.Hass):
         #self.log("df after first dataload is")
         #self.log(df)
         #self.log(df.info)
+
         # If Charging plan exists, convert dispatch start and end times to datetime format and append to df. 
         if not df.empty: 
             #if df is not None:  (gate doesnt work for some reason, using df.empty instead)
@@ -620,14 +623,11 @@ class PVOpt(hass.Hass):
         #self.log(df.dtypes)
         #self.log(df.info)
         
-        
         for window in df.iterrows():
             self.log(
                 f"{window[1]['start_dt'].tz_convert(self.tz).strftime('%H:%M'):>7s} to {window[1]['end_dt'].tz_convert(self.tz).strftime('%H:%M'):<7s}  Charge: {window[1]['charge_in_kwh']:7.2f}kWh"
             )
-
-            #static["period_start"] = static.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
-        
+      
         if len(df) == 0:
             self.log("  No Smart Charging Schedule found.")
 
@@ -707,7 +707,13 @@ class PVOpt(hass.Hass):
                 else:
                     self.log("EV not plugged in, or already charging. IOG tariff not reloaded")
                     self.car_plugin_detected = 0
-             
+            
+                # If EV plugged in, check charge to add hasnt changed
+                self.io_charge_to_add = self.get_state(self.io_entity1)
+                if ((self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected")):
+                    self.car_plugin_detected = 1
+                    self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
+
 
     def _check_for_zappi(self):
         self.ulog("Checking for Zappi Sensors")
@@ -1748,7 +1754,7 @@ class PVOpt(hass.Hass):
                 self.log("   About to reload Octopus Intelligent Tariff - 04:40")
                 self._load_contract()
             if (self.car_plugin_detected == 1):
-                self.log("Car plugin detected. About to reload Octopus Intelligent Tariff")
+                self.log("Car plugin detected or charge to add value changed. About to reload Octopus Intelligent Tariff")
                 self._load_contract()
                 self.tariff_reloaded = 1
 
@@ -1764,8 +1770,8 @@ class PVOpt(hass.Hass):
             self.log("  Tariffs OK")
             self.log("")
 
-        if self.io:
-            self._get_io     #get IO slots as a dataframe
+        #if self.io:
+        #    self._get_io     #get IO slots as a dataframe
             # SVB logging
             #self.log("")
             #self.log("IO slots are:")
@@ -1952,9 +1958,6 @@ class PVOpt(hass.Hass):
                         io_on.iat[i] = 1
         
         self.opt = pd.concat([self.opt, io_on], axis=1)   #Add ioslot flags to self.opt
-
-
-        
         
         if self.io:
             self.log("")
@@ -2345,9 +2348,9 @@ class PVOpt(hass.Hass):
 
         tolerance = self.get_config("forced_power_group_tolerance1")
 
-        # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected (when charge power = 1). 
+        # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous IO slot detected (when charge power = 0). 
 
-        self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) | ((self.opt["ioslot"].diff() > 0) & (self.opt["forced"] == 1))).cumsum()      
+        self.opt["period"] = ((self.opt["forced"].diff() > (tolerance/2)) | ((self.opt["ioslot"].diff() > 0) & (self.opt["forced"] == 0))).cumsum()      
           
         self.log("")
         self.log("After assignment of 'period', self.opt is........")
