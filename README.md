@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.15.1
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.15.2
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -183,12 +183,13 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
 
 5. Click on <b>Configuration</b> at the top
 
-6. Click the 3 dots and <b>Edit in YAML</b> to add `pandas` as a Python package:
+6. Click the 3 dots and <b>Edit in YAML</b> to add `pandas` and `numpy` as Python packages. Note that `numpy` has to be set to version `1.26.4` due to an unresolved compatability issue between Home Assistant and `2.0.0`:
 
    ```
    init_commands: []
    python_packages:
      - pandas
+     - numpy==1.26.4
    system_packages: []
 
    ```
