@@ -13,7 +13,7 @@ from numpy import nan
 from datetime import datetime
 import re
 
-VERSION = "3.15.5"
+VERSION = "3.15.6"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -2246,7 +2246,7 @@ class PVOpt(hass.Hass):
                             did_something = True
 
                     if status["hold_soc"]["active"]:
-                        self.inverter.hold_soc(enable=False)
+                        self.inverter.hold_soc_old(enable=False)
                         str_log += " but inverter is holding SOC. Disabling."
                         self.log(str_log)
                         did_something = True
