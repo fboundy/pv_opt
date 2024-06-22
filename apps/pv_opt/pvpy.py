@@ -613,7 +613,7 @@ class PVsystemModel:
                     timed_slot_flows.loc[t] += int(c)
 
             chg_mask = timed_slot_flows != 0
-            battery_flows[chg_mask] = timed_slot_flows[chg_mask]
+            battery_flows[chg_mask] += timed_slot_flows[chg_mask]
             forced_charge[chg_mask] = timed_slot_flows[chg_mask]
 
         if soc_now is None:
@@ -676,7 +676,7 @@ class PVsystemModel:
         # self.log("Called optimised_force")
         log = kwargs.pop("log", True)
 
-        cols = {k: kwargs.get(k, k) for k in ["consumption"]}
+        cols = {k: kwargs.get(k, k) for k in ["consumption", "solar"]}
         consumption = static_flows[cols["consumption"]]
         consumption.name = "consumption"
 
@@ -726,27 +726,31 @@ class PVsystemModel:
 
         slots = []
 
-        if self.host.agile:
-            # --------------------------------------------------------------------------------------------
-            #  Plunge Pricing
-            # --------------------------------------------------------------------------------------------
-            if log:
-                self.log("")
-                self.log("Agile Plunge Pricing")
-                self.log("--------------------")
-                self.log("")
+        # if self.host.agile:
+        # --------------------------------------------------------------------------------------------
+        #  Plunge Pricing
+        # --------------------------------------------------------------------------------------------
+        # if log:
+        #     self.log("")
+        #     self.log("Agile Plunge Pricing")
+        #     self.log("--------------------")
+        #     self.log("")
+        #     # self.log((f">>>{static_flows.columns}"))
 
-            plunge_threshold = self.host.get_config("plunge_threshold_p_kwh")
-            plunge = df["import"][df["import"] < plunge_threshold]
-            slots = [(p, self.inverter.charger_power) for p in plunge.index.to_list()]
-            df = pd.concat(
-                [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
-                axis=1,
-            )
-            plunge_cost = round(contract.net_cost(df).sum(), 1)
-            if log:
-                self.log(f"Plunge cost: {plunge_cost}")
-            base_cost = plunge_cost
+        # plunge_threshold = self.host.get_config("plunge_threshold_p_kwh")
+        # plunge = (self.inverter.charger_power - static_flows[kwargs["solar"]])[df["import"] < plunge_threshold]
+        # if log:
+        #     self.log(f">>>{plunge.to_string()}")
+
+        # slots = [(p, max(plunge.loc[p], 0)) for p in plunge.index.to_list()]
+        # df = pd.concat(
+        #     [prices, consumption, self.flows(initial_soc, static_flows, slots=slots, **kwargs)],
+        #     axis=1,
+        # )
+        # plunge_cost = round(contract.net_cost(df).sum(), 1)
+        # if log:
+        #     self.log(f"Plunge cost: {plunge_cost}")
+        # base_cost = plunge_cost
 
         # --------------------------------------------------------------------------------------------
         #  Charging 1st Pass
@@ -757,6 +761,7 @@ class PVsystemModel:
             self.log("---------------------")
             self.log("")
 
+        self.log(slots)
         net_cost = []
         net_cost_opt = base_cost
 
@@ -776,6 +781,7 @@ class PVsystemModel:
 
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
         net_cost = [base_cost]
+        plunge_slots = slots
         slot_count = [0]
         yy = True
         while not done:
@@ -791,8 +797,6 @@ class PVsystemModel:
             if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 if len(import_cost[import_cost == max_import_cost]) > 0:
-                
-                
                     max_slot = import_cost[import_cost == max_import_cost].index[0]
                     max_slot_energy = round(df["grid"].loc[max_slot] / 2000, 2)  # kWh
 
@@ -873,7 +877,11 @@ class PVsystemModel:
                                 for slot, factor in zip(window, factors):
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
                                     slot_charger_power_available = max(
-                                        self.inverter.charger_power - x["forced"].loc[slot], 0
+
+                                        self.inverter.charger_power
+                                        - x["forced"].loc[slot]
+                                        - x[cols["solar"]].loc[slot],
+                                        0,
                                     )
                                     slot_available_capacity = max(
                                         ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0
@@ -881,13 +889,13 @@ class PVsystemModel:
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
                                     )
-                                    #if log:
-                                    #    str_log_x = (
-                                    #        f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
-                                    #        + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
-                                    #        + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
-                                    #    )
-                                    #    self.log(str_log_x)
+                                    if log:
+                                        str_log_x = (
+                                            f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
+                                            + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
+                                            + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
+                                        )
+                                        self.log(str_log_x)
                                     slots.append(
                                         (
                                             slot,
@@ -912,12 +920,11 @@ class PVsystemModel:
                                     self.log(str_log)
                                     if self.host.debug:
                                         xx = pd.concat(
-                                            [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]], axis=1
+                                            [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]],
+                                            axis=1,
                                         ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
                                         xx["Diff"] = xx["New"] - xx["Old"]
-                                        self.log("")
                                         self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
-                                        # yy = False
                             else:
                                 available[max_slot] = False
                 else:
@@ -947,7 +954,7 @@ class PVsystemModel:
                 self.log(
                     f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
                 )
-            slots = []
+            slots = plunge_slots
             net_cost_opt = base_cost
             df = pd.concat(
                 [
@@ -1030,7 +1037,9 @@ class PVsystemModel:
                     str_log += f"SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
 
                     forced_charge = min(
-                        self.inverter.charger_power - x["forced"].loc[start_window],
+                        self.inverter.charger_power
+                        - x["forced"].loc[start_window]
+                        - x[cols["solar"]].loc[start_window],
                         ((100 - x["soc_end"].loc[start_window]) / 100 * self.battery.capacity) * 2 * factor,
                     )
 
@@ -1140,7 +1149,7 @@ class PVsystemModel:
                         slot = (
                             start_window,
                             -min(
-                                self.inverter.inverter_power,
+                                self.inverter.inverter_power - x[kwargs.get("solar", "solar")].loc[start_window],
                                 ((x["soc_end"].loc[start_window] - self.battery.max_dod) / 100 * self.battery.capacity)
                                 * 2
                                 * factor,

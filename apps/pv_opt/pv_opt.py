@@ -13,7 +13,8 @@ from numpy import nan
 from datetime import datetime
 import re
 
-VERSION = "3.15.6"
+
+VERSION = "3.15.1"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -53,10 +54,6 @@ BOTTLECAP_DAVE = {
     "rates": "current_day_rates",
 }
 
-CONSUMPTION_SHAPE = {
-    "hour": [0, 0.5, 6, 8, 15.5, 17, 22, 24],
-    "consumption": [300, 200, 150, 500, 500, 750, 750, 300],
-}
 
 INVERTER_TYPES = ["SOLIS_SOLAX_MODBUS", "SOLIS_CORE_MODBUS", "SOLIS_SOLARMAN", "SUNSYNK_SOLARSYNK2", "SOLAX_X1"]
 
@@ -196,9 +193,9 @@ DEFAULT_CONFIG = {
     "plunge_threshold_p_kwh": {
         "default": -5.0,
         "attributes": {
-            "min": -5.0,
+            "min": -15.0,
             "max": 10.0,
-            "step": 0.5,
+            "step": 1,
             "mode": "box",
         },
         "domain": "number",
@@ -371,6 +368,18 @@ DEFAULT_CONFIG = {
         },
     },
     "shape_consumption_profile": {"default": True, "domain": "switch"},
+    "consumption_shape": {
+        "default": [
+            {"hour": 0, "consumption": 300},
+            {"hour": 0.5, "consumption": 200},
+            {"hour": 6, "consumption": 150},
+            {"hour": 8, "consumption": 500},
+            {"hour": 15.5, "consumption": 500},
+            {"hour": 17, "consumption": 750},
+            {"hour": 22, "consumption": 750},
+            {"hour": 24, "consumption": 300},
+        ]
+    },
     "consumption_grouping": {
         "default": "mean",
         "domain": "select",
@@ -385,6 +394,30 @@ DEFAULT_CONFIG = {
             "step": 50,
             "unit_of_measurement": "W",
             "device_class": "power",
+            "mode": "slider",
+        },
+    },
+    "maximum_soc": {
+        "default": 100,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "unit_of_measurement": "%",
+            "device_class": "battery",
+            "mode": "slider",
+        },
+    },
+    "wakeup_soc": {
+        "default": 0,
+        "domain": "number",
+        "attributes": {
+            "min": 0,
+            "max": 100,
+            "step": 5,
+            "unit_of_measurement": "%",
+            "device_class": "battery",
             "mode": "slider",
         },
     },
@@ -530,7 +563,7 @@ class PVOpt(hass.Hass):
         self.ulog("Test")
 
         test = {
-            item: self.get_ha_value(self.ha_entities[f"test_{item}"])
+            item: self.get_ha_value(entity_id=self.ha_entities[f"test_{item}"])
             for item in ["start", "end", "power", "enable", "function", "target_soc"]
         }
 
@@ -882,12 +915,12 @@ class PVOpt(hass.Hass):
 
         if item in self.config:
             if isinstance(self.config[item], str) and self.entity_exists(self.config[item]):
-                x = self.get_ha_value(self.config[item])
+                x = self.get_ha_value(entity_id=self.config[item])
                 return x
             elif isinstance(self.config[item], list):
                 if min([isinstance(x, str)] for x in self.config[item])[0]:
-                    if min([self.entity_exists(e) for e in self.config[item]]):
-                        l = [self.get_ha_value(e) for e in self.config[item]]
+                    if min([self.entity_exists(entity_id=entity_id) for entity_id in self.config[item]]):
+                        l = [self.get_ha_value(entity_id=entity_id) for entity_id in self.config[item]]
                         try:
                             return sum(l)
                         except:
@@ -1320,6 +1353,22 @@ class PVOpt(hass.Hass):
                     self.rlog(f"    {'':34s}   {'':27s} Export: {x['octopus_export_tariff_code']:>36s}")
                 self.yaml_config[item] = self.config[item]
 
+            elif item == "consumption_shape":
+                self.config[item] = values
+                for i, x in enumerate(values):
+                    if i == 0:
+                        str1 = item
+                        str2 = "="
+                        str3 = "Hour:"
+                        str4 = "Consumption:"
+                    else:
+                        str1 = ""
+                        str2 = " "
+                        str3 = "     "
+                        str4 = "            "
+                    self.rlog(f"    {str1:34s} {str2} {str3} {x['hour']:5.2f} {str4} {x['consumption']:5.0f} W")
+                self.yaml_config[item] = self.config[item]
+
             elif "id_" in item:
                 if min([self.entity_exists(v) for v in values]):
                     if len(values) == 1:
@@ -1573,10 +1622,10 @@ class PVOpt(hass.Hass):
                 self.mqtt.mqtt_subscribe(state_topic)
 
             elif (
-                isinstance(self.get_ha_value(entity_id), str)
-                and (self.get_ha_value(entity_id) not in attributes.get("options", {}))
+                isinstance(self.get_ha_value(entity_id=entity_id), str)
+                and (self.get_ha_value(entity_id=entity_id) not in attributes.get("options", {}))
                 and (domain not in ["text", "button"])
-            ):
+            ) or (self.get_ha_value(entity_id=entity_id) is None):
 
                 state = self._state_from_value(self.get_default_config(item))
 
@@ -1587,7 +1636,7 @@ class PVOpt(hass.Hass):
             elif item in self.yaml_config:
                 state = self.get_state_retry(entity_id)
                 new_state = str(self._state_from_value(self.config[item]))
-                if over_write and state != new_state:
+                if (over_write and state != new_state) or (state is None):
                     if not over_write_log:
                         self.log("")
                         self.log("Over-writing HA from YAML:")
@@ -1826,6 +1875,7 @@ class PVOpt(hass.Hass):
             self.soc_now = x.iloc[-1]
 
         # x = x.astype(float)
+
         x = pd.to_numeric(x, errors="coerce").interpolate()
 
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
@@ -2021,7 +2071,7 @@ class PVOpt(hass.Hass):
                     (time_to_slot_start > 0)
                     and (time_to_slot_start < self.get_config("optimise_frequency_minutes"))
                     and (len(self.windows) > 0)
-                    ) or (self.get_config("id_battery_soc") < self.get_config("sleep_soc")):
+                ) or (self.get_config("id_battery_soc") < self.get_config("sleep_soc")):
                     # Next slot starts before the next optimiser run. This implies we are not currently in
                     # a charge or discharge slot
 
@@ -3017,7 +3067,7 @@ class PVOpt(hass.Hass):
             if self.get_config("shape_consumption_profile"):
                 self.log("    and typical usage profile.")
                 daily = (
-                    pd.DataFrame(CONSUMPTION_SHAPE)
+                    pd.DataFrame(self.get_config("consumption_shape"))
                     .set_index("hour")
                     .reindex(np.arange(0, 24.5, 0.5))
                     .interpolate()
@@ -3040,7 +3090,6 @@ class PVOpt(hass.Hass):
             f"    Total consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
         )
         self.log(f"  - Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
-
 
         if self.debug:
             self.log("Printing final result of routine load_consumption.....")
@@ -3081,6 +3130,7 @@ class PVOpt(hass.Hass):
         return df
 
     def _compare_tariffs(self):
+        self._status("Comparing Tariffs")
         self.ulog("Comparing yesterday's tariffs")
         end = pd.Timestamp.now(tz="UTC").normalize()
         start = end - pd.Timedelta(24, "hours")
@@ -3171,7 +3221,7 @@ class PVOpt(hass.Hass):
                 log=False,
             )
 
-            # opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+            opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
 
             attributes = {
                 "state_class": "measurement",
@@ -3179,8 +3229,7 @@ class PVOpt(hass.Hass):
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison {contract.name}",
                 "net_base": round(net_base.sum() / 100, 2),
-                # } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
-            }
+            } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
 
             net_opt = contract.net_cost(opt, day_ahead=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
@@ -3417,7 +3466,11 @@ class PVOpt(hass.Hass):
                 )
                 time.sleep(GET_STATE_WAIT)
 
-        if not valid_state:
+        if not valid_state and "entity_id" in kwargs:
+            # try:
+            #     state = self.get_entity_default(kwargs.get("entity_id"))
+            #     self.log(f"  - Using default value of {state}")
+            # except:
             self.log("  - FAILED", level="ERROR")
             return None
         else:
@@ -3430,6 +3483,16 @@ class PVOpt(hass.Hass):
         avg = (integral.diff().shift(-1)[:-1] / pd.Timedelta(freq).total_seconds()).fillna(0).round(1)
         # self.log(avg)
         return avg
+
+    def get_item_from_entity(self, entity_id):
+        item = entity_id.split(".")[-1]
+        if item in DEFAULT_CONFIG:
+            return item
+
+    def get_entity_default(self, entity_id):
+        item = self.get_item_from_entity(entity_id)
+        if item is not None:
+            return DEFAULT_CONFIG[item]["default"]
 
 
 # %%
