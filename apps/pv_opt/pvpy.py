@@ -46,11 +46,15 @@ AGILE_FACTORS = {
     },
 }
 
+# Tariff Class
+# Calls "get octopus" to load the pricing information
+# outputs self.unit. 
 
 class Tariff:
     def __init__(
         self,
         name,
+        io_prices,
         export=False,
         fixed=0,
         unit=0,
@@ -65,6 +69,8 @@ class Tariff:
     ) -> None:
         self.name = name
         self.host = host
+        self.io_prices = io_prices
+
         if host is None:
             self.log = print
             self.tz = "GB"
@@ -72,21 +78,32 @@ class Tariff:
             self.log = host.log
             self.tz = host.tz
 
+        self.log("Entered pv.Tariff")
+        self.log("name = ")
+        self.log(name)
+
         self.export = export
         self.eco7 = eco7
         self.area = kwargs.get("area", None)
         self.day_ahead = None
         self.eco7_start = pd.Timestamp(eco7_start, tz="UTC")
+        
+        # SVB logging
+        #self.log(" .Tariff - IO prices passed in are")
+        #self.log(io_prices)
 
         if octopus:
             self.get_octopus(**kwargs)
-
+            self.log("")
+            self.log("Returned from get_octopus")
         else:
             self.fixed = [{"value_inc_vat": fixed, "valid_from": valid_from}]
             self.unit = [{"value_inc_vat": unit, "valid_from": valid_from}]
             if eco7:
                 self.day = [{"value_inc_vat": day, "valid_from": valid_from}]
                 self.night = [{"value_inc_vat": night, "valid_from": valid_from}]
+
+        
 
     def _oct_time(self, d):
         # print(d)
@@ -134,6 +151,11 @@ class Tariff:
         else:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standard-unit-rates/"
             self.unit = requests.get(url, params=params).json()["results"]
+            self.log("")
+            self.log("Printing self.unit")
+            self.log(self.unit)
+            self.log("")
+
 
     def __str__(self):
         if self.export:
@@ -153,6 +175,13 @@ class Tariff:
         return max([pd.Timestamp(x["valid_to"]) for x in self.unit])
 
     def to_df(self, start=None, end=None, **kwargs):
+        
+        #self.log("To_df has been called")
+        #self.log(f">>> {self.name}")
+        #self.log(f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}")
+
+
+        
         if self.host.debug:
             self.log(f">>> {self.name}")
             self.log(f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}")
@@ -197,10 +226,21 @@ class Tariff:
             df.index = pd.to_datetime(df.index)
             df = df.sort_index()
 
+            # df at this point is a series of start and end times and not a series of 1/2 hour slots
+
+            # SVB logging
+            #self.log("Df loaded from self.unit")
+            #self.log(df)
+            #self.log("")
+            #self.log("Printing Df")
+            #self.log(df.to_string())
+
+
             if "AGILE" in self.name and use_day_ahead:
                 if self.day_ahead is not None and df.index[-1].day == end.day:
                     # reset the day ahead forecasts if we've got a forecast going into tomorrow
                     self.day_ahead = None
+                    
                     self.log("")
                     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
@@ -258,6 +298,39 @@ class Tariff:
                 df = df.loc[start:end]
             df.name = "unit"
 
+            ### SVB logging
+            #self.log("")
+            #self.log("Printin df just before concat.....")
+            #self.log(df.to_string())
+
+            if len(self.io_prices) > 0:
+                # Add IO slot prices as a column to dataframe. 
+                df = pd.concat([df, self.io_prices], axis = 1).set_axis(["unit", "io_unit"], axis=1)
+
+                #self.log("To_df, Printing concat")
+                #self.log(t.to_string())
+            
+                df = df.dropna(subset=['unit'])       #Drop Nans
+                mask = (df['io_unit'] < df['unit'])   #Mask is true if an IOslot
+                df['unit'][mask] = df['io_unit']      #Overwrite unit (prices from website) with io_unit (prices from OE integration) if in an IOslot. 
+                df = df.drop(['io_unit'], axis=1)     #remove IO prices column
+
+            #self.log("To_df, Printing result")
+            #self.log(t.to_string())
+
+            ##### SVB #####
+            # It is at this point that df now looks like the Dataframe that compare_tariffs loads. This is the point
+            # to overwrite the Df with IOG data from the BottlecapDave integration. 
+            # We need to load both current_day and next_day events.
+            # 
+            # To avoid reading HA every time, this should not be called every optimiser run. Therefore
+            # the bottlecap dave entity should be stored in an IOG dataframe when _load_contract is run, as this is already called at 
+            # certain times and when the car is plugged in. This will save HA data delays. Only import needs to be loaded. 
+            # DONE, (in _load_contract)
+
+            # We then need to overwrite the df data with the IOG dataframe here. 
+
+        # Add a column "fixed" for the standing charge. 
         if not self.export:
             x = pd.DataFrame(self.fixed).set_index("valid_from")["value_inc_vat"].sort_index()
             x.index = pd.to_datetime(x.index)
@@ -268,8 +341,13 @@ class Tariff:
 
             mask = df.index.time != pd.Timestamp("00:00", tz="UTC").time()
             df.loc[mask, "fixed"] = 0
-
+            
         df = pd.DataFrame(df)
+        ### SVB logging
+        #self.log("")
+        #self.log("Printing final result of to_df.....")
+        #self.log(df.to_string())
+
         # Update for Octopus Savings Events if they exists
         if (self.host is not None) and ("unit" in df.columns):
             events = self.host.saving_events
@@ -388,7 +466,10 @@ class OctopusAccount:
         str = f"Account Number: {self.account_number}\n"
         str += f"API Key: {self.api_key}"
 
-
+# Contract Class. 
+# Has the tariff code passed in, or gets it from your Octopus Account using your Octopus Account details
+# Also contains the function net_cost, which calculates cost based on predicted power flows.
+# No other functions. 
 class Contract:
     def __init__(
         self,
@@ -398,6 +479,7 @@ class Contract:
         octopus_account: OctopusAccount = None,
         host=None,
     ) -> None:
+        
         self.name = name
         self.host = host
         if self.host:
@@ -461,6 +543,7 @@ class Contract:
         return str
 
     def net_cost(self, grid_flow, **kwargs):
+        # self.log(">>> Called net_cost")
         if len(grid_flow) == 0:
             return pd.Series()
 
@@ -581,9 +664,16 @@ class PVsystemModel:
         df["soc"] = (df["chg"] / self.battery.capacity) * 100
         df["soc_end"] = (df["chg_end"] / self.battery.capacity) * 100
 
+        #self.log("Self.flows completed.")
+        #self.log("df = ")
+        #self.log(df.to_string())
+
+
         return df
 
     def optimised_force(self, initial_soc, static_flows, contract: Contract, **kwargs):
+        # SVB logging
+        # self.log("Called optimised_force")
         log = kwargs.pop("log", True)
 
         cols = {k: kwargs.get(k, k) for k in ["consumption", "solar"]}
@@ -606,6 +696,14 @@ class PVsystemModel:
                     ],
                     axis=1,
                 )
+        ### SVB logging
+        #self.log("")
+        #self.log("Prices is")
+        #self.log(prices)
+        #self.log("")
+        #self.log("Prices is")
+        #self.log(prices.to_string())
+        #self.log("")
 
         if log:
             self.log(
@@ -668,6 +766,7 @@ class PVsystemModel:
         net_cost_opt = base_cost
 
         done = False
+        #self.log("Resetting i to 0")
         i = 0
         df = pd.concat(
             [
@@ -677,6 +776,9 @@ class PVsystemModel:
             ],
             axis=1,
         )
+
+
+
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
         net_cost = [base_cost]
         plunge_slots = slots
@@ -686,6 +788,7 @@ class PVsystemModel:
             old_cost = contract.net_cost(df)
             old_soc = df["soc_end"]
             i += 1
+            
             if (i > 96) or (available.sum() == 0):
                 done = True
 
@@ -695,7 +798,6 @@ class PVsystemModel:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 if len(import_cost[import_cost == max_import_cost]) > 0:
                     max_slot = import_cost[import_cost == max_import_cost].index[0]
-
                     max_slot_energy = round(df["grid"].loc[max_slot] / 2000, 2)  # kWh
 
                     if max_slot_energy > 0:
@@ -716,13 +818,19 @@ class PVsystemModel:
 
                         x = x[x["soc_end"] <= 97]
 
+                        #self.log("")
+                        #self.log("Printing X")
+                        #self.log(x.to_string())
+
                         search_window = x.index
                         str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
                         if len(search_window) > 0:
-                            # str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
+                            # SVB logging
+                            #str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
                             pass
                         else:
-                            # str_log = "No available window."
+                            # SVB logging
+                            #str_log = "No available window."
                             done = True
                         if len(x) > 0:
                             min_price = x["import"].min()
@@ -735,23 +843,41 @@ class PVsystemModel:
                             str_log += f"<==> {start_window.tz_convert(self.tz).strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
                             str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
                             factors = []
+
+                            # Times recorded in 'slot' are naive UTC, pd.timestamp.now is in local time. 
+                            # As tz.localize(None) does no actual conversion to local time, when BST is active the factors are applied one hour ahead of where they should be.
+                            # Therefore, timenow needs to also be naive UTC. For this, use pd.Timestamp.utcnow().tz_localize(None)
+
+                            #Each slot is assigned a value of 1, if already in a slot then factor for time already gone.
+                        
                             for slot in window:
-                                if pd.Timestamp.now() > slot.tz_localize(None):
+                                if pd.Timestamp.utcnow().tz_localize(None) > slot.tz_localize(None):
                                     factors.append(
                                         (
-                                            (slot.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.now()
+                                            (slot.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.utcnow().tz_localize(None)
                                         ).total_seconds()
                                         / 1800
                                     )
                                 else:
                                     factors.append(1)
 
+                            #Assign a factor to each slot so all slots sum to 1. 
+
                             factors = [f / sum(factors) for f in factors]
+
+                            #self.log("Factors =")
+                            #self.log(factors)
+
+                            #The reduction of the current slot reduces the power so the .flows algorithm calculates the correct charge added to the battery in the partial slot (I think)
+                            # However, this same value should not then be used to program the inverter. The inverter should stick at the power assigned at the start of the slot. 
+                            # We should factor this reduced power back up again just prior to inverter programming. 
+
 
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
                                 for slot, factor in zip(window, factors):
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
                                     slot_charger_power_available = max(
+
                                         self.inverter.charger_power
                                         - x["forced"].loc[slot]
                                         - x[cols["solar"]].loc[slot],
@@ -799,7 +925,6 @@ class PVsystemModel:
                                         ).set_axis(["Old", "Old_SOC", "New", "New_SOC", "import"], axis=1)
                                         xx["Diff"] = xx["New"] - xx["Old"]
                                         self.log(f"\n{xx.loc[window[0] : max_slot].to_string()}")
-                                        # yy = False
                             else:
                                 available[max_slot] = False
                 else:
@@ -820,6 +945,12 @@ class PVsystemModel:
 
         if base_cost - net_cost_opt <= self.host.get_config("pass_threshold_p"):
             if log:
+                #SVB logging
+                #self.log("Base cost =")
+                #self.log(base_cost)
+                #self.log("Net Cost Opt =")
+                #self.log(net_cost_opt)
+
                 self.log(
                     f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
                 )
@@ -890,12 +1021,14 @@ class PVsystemModel:
                     available.loc[start_window] = False
                     str_log = f"{available.sum():>2d} Min import price {min_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} {x.loc[start_window]['forced']:4.0f}W "
 
-                    if (pd.Timestamp.now() > start_window.tz_localize(None)) and (
-                        pd.Timestamp.now() < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
+                    ## SVB changed so all times are in naive UTC
+
+                    if (pd.Timestamp.utcnow().tz_localize(None) > start_window.tz_localize(None)) and (
+                        pd.Timestamp.utcnow().tz_localize(None) < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
                     ):
                         str_log += "* "
                         factor = (
-                            (start_window.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.now()
+                            (start_window.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.utcnow().tz_localize(None)
                         ).total_seconds() / 1800
                     else:
                         str_log += "  "
@@ -1000,12 +1133,12 @@ class PVsystemModel:
                         available.loc[start_window] = False
                         str_log = f"{available.sum():>2d} Max export price {max_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} "
 
-                        if (pd.Timestamp.now() > start_window.tz_localize(None)) and (
-                            pd.Timestamp.now() < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
+                        if (pd.Timestamp.utcnow().tz_localize(None) > start_window.tz_localize(None)) and (
+                            pd.Timestamp.utcnow().tz_localize(None) < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
                         ):
                             str_log += "* "
                             factor = (
-                                (start_window.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.now()
+                                (start_window.tz_localize(None) + pd.Timedelta(30, "minutes")) - pd.Timestamp.utcnow().tz_localize(None)
                             ).total_seconds() / 1800
                         else:
                             str_log += "  "
