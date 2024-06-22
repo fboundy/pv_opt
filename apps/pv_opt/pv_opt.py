@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.15.0"
+VERSION = "3.15.1"
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -191,9 +191,9 @@ DEFAULT_CONFIG = {
     "plunge_threshold_p_kwh": {
         "default": -5.0,
         "attributes": {
-            "min": -5.0,
+            "min": -15.0,
             "max": 10.0,
-            "step": 0.5,
+            "step": 1,
             "mode": "box",
         },
         "domain": "number",
@@ -1669,6 +1669,7 @@ class PVOpt(hass.Hass):
             self.soc_now = x.iloc[-1]
 
         # x = x.astype(float)
+
         x = pd.to_numeric(x, errors="coerce").interpolate()
 
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
@@ -2598,6 +2599,7 @@ class PVOpt(hass.Hass):
         return df
 
     def _compare_tariffs(self):
+        self._status("Comparing Tariffs")
         self.ulog("Comparing yesterday's tariffs")
         end = pd.Timestamp.now(tz="UTC").normalize()
         start = end - pd.Timedelta(24, "hours")
