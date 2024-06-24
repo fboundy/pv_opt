@@ -530,7 +530,7 @@ class PVsystemModel:
                     timed_slot_flows.loc[t] += int(c)
 
             chg_mask = timed_slot_flows != 0
-            battery_flows[chg_mask] += timed_slot_flows[chg_mask]
+            battery_flows[chg_mask] = timed_slot_flows[chg_mask]
             forced_charge[chg_mask] = timed_slot_flows[chg_mask]
 
         if soc_now is None:
