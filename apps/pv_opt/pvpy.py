@@ -46,6 +46,14 @@ AGILE_FACTORS = {
     },
 }
 
+BOTTLECAP_DAVE = {
+    "domain": "event",
+    "tariff_code": "tariff_code",
+    "rates": "current_day_rates",
+}
+
+
+
 # Tariff Class
 # Calls "get octopus" to load the pricing information
 # outputs self.unit. 
@@ -54,7 +62,6 @@ class Tariff:
     def __init__(
         self,
         name,
-        io_prices,
         export=False,
         fixed=0,
         unit=0,
@@ -69,7 +76,6 @@ class Tariff:
     ) -> None:
         self.name = name
         self.host = host
-        self.io_prices = io_prices
 
         if host is None:
             self.log = print
@@ -78,6 +84,7 @@ class Tariff:
             self.log = host.log
             self.tz = host.tz
 
+        self.log("")
         self.log("Entered pv.Tariff")
         self.log("name = ")
         self.log(name)
@@ -88,14 +95,12 @@ class Tariff:
         self.day_ahead = None
         self.eco7_start = pd.Timestamp(eco7_start, tz="UTC")
         
-        # SVB logging
-        #self.log(" .Tariff - IO prices passed in are")
-        #self.log(io_prices)
+        self.io_prices = {}
 
         if octopus:
-            self.get_octopus(**kwargs)
-            self.log("")
-            self.log("Returned from get_octopus")
+            self.get_octopus_from_website(**kwargs)
+            #self.log("")
+            #self.log("Returned from get_octopus_from_website")
         else:
             self.fixed = [{"value_inc_vat": fixed, "valid_from": valid_from}]
             self.unit = [{"value_inc_vat": unit, "valid_from": valid_from}]
@@ -103,7 +108,33 @@ class Tariff:
                 self.day = [{"value_inc_vat": day, "valid_from": valid_from}]
                 self.night = [{"value_inc_vat": night, "valid_from": valid_from}]
 
-        
+        if "INTELLI" in name and not self.export:
+            if self.host.get_config("octopus_auto"):
+                try:
+                    self.log(f"Trying to find Octopus Intelligent Entities from Octopus Energy Integration:")
+                    octopus_import_entity = [
+                        name
+                        for name in self.host.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
+                        if (
+                            "octopus_energy_electricity" in name
+                            and BOTTLECAP_DAVE["rates"] in name
+                            and not "export" in name
+                        )
+                    ]
+                    self.log("Octopus Import Entity is = ")
+                    self.log(octopus_import_entity)
+
+                    self.io_prices = self.get_io_tariffs(octopus_import_entity[0])
+                    # self.io_prices = self._get_io_tariffs(octopus_import_entity)        # Error forcing: failure to load prices
+
+                except Exception as e:
+                    self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
+                    self.log(
+                        "Failed to find Octopus Intellgient tariffs from Octopus Energy Integration, extra IO slots will not be loaded",
+                        level="WARNING",
+                    )
+
+            
 
     def _oct_time(self, d):
         # print(d)
@@ -113,7 +144,7 @@ class Tariff:
             day=pd.Timestamp(d).day,
         )
 
-    def get_octopus(self, **kwargs):
+    def get_octopus_from_website(self, **kwargs):
         code = self.name
         product = code[5:-2]
         self.eco7 = code[:4] == "E-2R"
@@ -156,6 +187,61 @@ class Tariff:
             self.log(self.unit)
             self.log("")
 
+    def get_io_tariffs(self, entity_id1):
+
+        x = {}
+        y = {}
+
+        # Load tariffs from bottlecapdave .event sensors
+        self.log("")
+        self.log("Downloading IOG pricing information from Octopus Energy Integration")
+
+        x = pd.DataFrame(self.host.get_state_retry(entity_id1, attribute=("rates")))
+        # self.log("")
+        # self.log("Read of Bottlecap current day rate entity simplfied is.....")
+        # self.log(x.to_string())
+
+        if not x.empty:
+            x = x.set_index("start")["value_inc_vat"]
+            x.index = pd.to_datetime(x.index)
+            x.index = x.index.tz_convert("UTC")
+            x *= 100
+            # SVB logging
+            self.log("")
+            self.log(f"    Reading current day IOG prices from  {entity_id1}")
+            # self.log(x.to_string())
+        else:
+            self.log("No data found in current day rate")
+
+        # current_day_rates loaded, change the entity name to next_day_rates
+        entity_id1 = entity_id1.replace("_current_day_rates", "_next_day_rates")
+
+        y = pd.DataFrame(self.host.get_state_retry(entity_id1, attribute=("rates")))
+        # self.log("")
+        # self.log("Read of Bottlecap next day rate entity simplfied is.....")
+        # self.log(y.to_string())
+        if not y.empty:
+            y = y.set_index("start")["value_inc_vat"]
+            y.index = pd.to_datetime(y.index)
+            y.index = y.index.tz_convert("UTC")
+            y *= 100
+            # SVB logging
+            self.log("")
+            self.log(f"    Reading next day IOG prices from  {entity_id1}")
+            # self.log(y.to_string())
+        else:
+            self.log("No data found in next day rate")
+
+        # Concatenate todays and tomorrows tariffs into one DataSeries
+        if not x.empty:
+            z = x.combine_first(y)
+            #self.log("")
+            #self.log("IOG prices are")
+            #self.log(z.to_string())
+        else:
+            z = y
+
+        return z
 
     def __str__(self):
         if self.export:
@@ -199,7 +285,7 @@ class Tariff:
         if end is None:
             end = pd.Timestamp.now(tz=start.tzinfo).ceil("30min")
 
-        # self.get_octopus(area=self.area, period_from=start, period_to=end)
+        # self.get_octopus_from_website(area=self.area, period_from=start, period_to=end)
 
         if self.eco7:
             df = pd.concat(
@@ -303,6 +389,18 @@ class Tariff:
             #self.log("Printin df just before concat.....")
             #self.log(df.to_string())
 
+            ##### SVB #####
+            # It is at this point that df now looks like the Dataframe that compare_tariffs loads. This is the point
+            # to overwrite the Df with IOG data from the BottlecapDave integration. 
+            # We need to load both current_day and next_day events.
+            # 
+            # To avoid reading HA every time, this should not be called every optimiser run. Therefore
+            # the bottlecap dave entity should be stored in an IOG dataframe when _load_contract is run, as this is already called at 
+            # certain times and when the car is plugged in. This will save HA data delays. Only import needs to be loaded. 
+            # DONE, (in _load_contract)
+
+            # We then need to overwrite the df data with the IOG dataframe here. 
+
             if len(self.io_prices) > 0:
                 # Add IO slot prices as a column to dataframe. 
                 df = pd.concat([df, self.io_prices], axis = 1).set_axis(["unit", "io_unit"], axis=1)
@@ -318,17 +416,7 @@ class Tariff:
             #self.log("To_df, Printing result")
             #self.log(t.to_string())
 
-            ##### SVB #####
-            # It is at this point that df now looks like the Dataframe that compare_tariffs loads. This is the point
-            # to overwrite the Df with IOG data from the BottlecapDave integration. 
-            # We need to load both current_day and next_day events.
-            # 
-            # To avoid reading HA every time, this should not be called every optimiser run. Therefore
-            # the bottlecap dave entity should be stored in an IOG dataframe when _load_contract is run, as this is already called at 
-            # certain times and when the car is plugged in. This will save HA data delays. Only import needs to be loaded. 
-            # DONE, (in _load_contract)
 
-            # We then need to overwrite the df data with the IOG dataframe here. 
 
         # Add a column "fixed" for the standing charge. 
         if not self.export:
@@ -600,20 +688,21 @@ class PVsystemModel:
         solar = static_flows[cols["solar"]]
         consumption = static_flows[cols["consumption"]]
 
+       
         df = static_flows.copy()
 
         battery_flows = solar - consumption
         forced_charge = pd.Series(index=df.index, data=0)
-
+        
         if len(slots) > 0:
             timed_slot_flows = pd.Series(index=df.index, data=0)
-
+           
             for t, c in slots:
                 if not isnan(c):
                     timed_slot_flows.loc[t] += int(c)
 
             chg_mask = timed_slot_flows != 0
-            battery_flows[chg_mask] += timed_slot_flows[chg_mask]
+            battery_flows[chg_mask] = timed_slot_flows[chg_mask]
             forced_charge[chg_mask] = timed_slot_flows[chg_mask]
 
         if soc_now is None:
