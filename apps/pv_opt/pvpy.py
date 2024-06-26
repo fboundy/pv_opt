@@ -79,15 +79,18 @@ class Tariff:
 
         if host is None:
             self.log = print
+            self.rlog = print
             self.tz = "GB"
         else:
             self.log = host.log
+            self.rlog = host.rlog
             self.tz = host.tz
 
-        self.log("")
-        self.log("Entered pv.Tariff")
-        self.log("name = ")
-        self.log(name)
+        # SVB logging
+        #self.log("")
+        #self.log("Entered pv.Tariff")
+        #self.log("name = ")
+        #self.log(name)
 
         self.export = export
         self.eco7 = eco7
@@ -111,7 +114,7 @@ class Tariff:
         if "INTELLI" in name and not self.export:
             if self.host.get_config("octopus_auto"):
                 try:
-                    self.log(f"Trying to find Octopus Intelligent Entities from Octopus Energy Integration:")
+                    self.log(f"    Trying to find Octopus Intelligent Entities from Octopus Energy Integration:")
                     octopus_import_entity = [
                         name
                         for name in self.host.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
@@ -121,8 +124,8 @@ class Tariff:
                             and not "export" in name
                         )
                     ]
-                    self.log("Octopus Import Entity is = ")
-                    self.log(octopus_import_entity)
+                    self.rlog(f"      Octopus Intelligent Import Entity found: {octopus_import_entity}")
+                    
 
                     self.io_prices = self.get_io_tariffs(octopus_import_entity[0])
                     # self.io_prices = self._get_io_tariffs(octopus_import_entity)        # Error forcing: failure to load prices
@@ -182,10 +185,11 @@ class Tariff:
         else:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standard-unit-rates/"
             self.unit = requests.get(url, params=params).json()["results"]
-            self.log("")
-            self.log("Printing self.unit")
-            self.log(self.unit)
-            self.log("")
+            # SVB logging
+            #self.log("")
+            #self.log("Printing self.unit")
+            #self.log(self.unit)
+            #self.log("")
 
     def get_io_tariffs(self, entity_id1):
 
@@ -194,7 +198,7 @@ class Tariff:
 
         # Load tariffs from bottlecapdave .event sensors
         self.log("")
-        self.log("Downloading IOG pricing information from Octopus Energy Integration")
+        self.log("    Downloading IOG pricing information from Octopus Energy Integration")
 
         x = pd.DataFrame(self.host.get_state_retry(entity_id1, attribute=("rates")))
         # self.log("")
@@ -207,11 +211,10 @@ class Tariff:
             x.index = x.index.tz_convert("UTC")
             x *= 100
             # SVB logging
-            self.log("")
-            self.log(f"    Reading current day IOG prices from  {entity_id1}")
+            self.rlog(f"      Reading current day IOG prices from  {entity_id1}")
             # self.log(x.to_string())
         else:
-            self.log("No data found in current day rate")
+            self.log("      No data found in current day rate")
 
         # current_day_rates loaded, change the entity name to next_day_rates
         entity_id1 = entity_id1.replace("_current_day_rates", "_next_day_rates")
@@ -225,12 +228,10 @@ class Tariff:
             y.index = pd.to_datetime(y.index)
             y.index = y.index.tz_convert("UTC")
             y *= 100
-            # SVB logging
-            self.log("")
-            self.log(f"    Reading next day IOG prices from  {entity_id1}")
+            self.rlog(f"      Reading next day IOG prices from  {entity_id1}")
             # self.log(y.to_string())
         else:
-            self.log("No data found in next day rate")
+            self.log("      No data found in next day rate")
 
         # Concatenate todays and tomorrows tariffs into one DataSeries
         if not x.empty:
