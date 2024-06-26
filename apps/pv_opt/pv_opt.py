@@ -14,7 +14,7 @@ from datetime import datetime
 import re
 
 
-VERSION = "3.16.0 Beta-1"
+VERSION = "3.16.0-Beta-2"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -28,6 +28,7 @@ TIME_FORMAT = "%H:%M"
 REDACT_REGEX = [
     "[0-9]{2}m[0-9]{7}_[0-9]{13}",  # Serial_MPAN
     "[0-9]{2}e[0-9]{7}_[0-9]{13}",  # Serial_MPAN
+    "[a-zA-Z0-9]{10}_[0-9]{13}",    # MeterSerial_MPAN
     "[0-9]{2}m[0-9]{7}",  # Serial
     "[0-9]{2}e[0-9]{7}",  # Serial
     "^$|\d{13}$",  # MPAN
@@ -599,37 +600,54 @@ class PVOpt(hass.Hass):
 
     def _get_io_sensors(self):
         # Get Car charging plan and % charge to add from IO sensors in Bottlecap Dave integration
+        self.ulog("    Getting Car Charging Plan")
         if self.get_config("octopus_auto"):
             try:
-                self.log(f"Trying to find Octopus Intelligent Dispatching Sensor from Octopus Energy Integration:")
+                self.log(f"    Trying to find Octopus Intelligent Dispatching Sensor from Octopus Energy Integration")
                 io_dispatching_sensor = [
                     name
-                    for name in self.get_state_retry(BOTTLECAP_DAVE["domain1"]).keys()
+                    for name in self.get_state_retry(BOTTLECAP_DAVE["domain1"]).keys() 
                     if (
                         "octopus_energy_" in name
                         and "intelligent_dispatching" in name
                     )
                 ]
                 self.io_dispatching_sensor = io_dispatching_sensor[0]
-                self.io_charge_to_add_sensor = self.io_dispatching_sensor.replace("_intelligent_dispatching", "_intelligent_charge_limit") 
+                
+                self.rlog(f"    Found Dispatching Sensor:  {self.io_dispatching_sensor}")
+                self.log("")
+                self.log(f"    Trying to find Car % Charge to add from Octopus Energy Integration")
+                io_charge_to_add_sensor = [
+                    name
+                    for name in self.get_state_retry(BOTTLECAP_DAVE["domain2"]).keys()
+                    if (
+                        "octopus_energy_" in name
+                        and "intelligent_charge_limit" in name
+                    )
+                ]
+                self.io_charge_to_add_sensor = io_charge_to_add_sensor[0]
+                self.rlog(f"    Found Charge to Add entity:  {self.io_charge_to_add_sensor}")
+                
                 self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)  # Load the current charge to add value
                 self.old_io_charge_to_add = self.io_charge_to_add                     # And set historic value to be the same
+                self.rlog(f"    Charge to Add Value = :  {self.io_charge_to_add}")
                 
+
             except Exception as e:
                 self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
                 self.log(
-                    "Failed to find Octopus Intelligent Dispatching Sensor from Octopus Energy Integration. Car charging cannot be determined",
+                    "Failed to find Octopus Intelligent Dispatching Sensor and/or % Charge to Add from Octopus Energy Integration. Car charging cannot be determined",
                     level="WARNING",
                 )
 
 
     def _get_io_car_slots(self):
         # Get Planned dispatches from Intelligent Dispatcing sensor
-        self.ulog("Intelligent Octopus Status")
+        self.ulog("    Intelligent Octopus Status")
         self.io_dispatch_active = self.get_state(self.io_dispatching_sensor)
-        self.log(f"  Active: {self.io_dispatch_active}")
-        self.log("")
 
+        self.log(f"  Current Dispatch Status (On/off) = : {self.io_dispatch_active}")
+        
         if self.debug:
             self.io_dispatch_attrib = self.get_state(self.self.io_dispatching_sensor, attribute="all")
             for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
@@ -658,7 +676,7 @@ class PVOpt(hass.Hass):
 
         # SVB updates
         self.log("")
-        self.ulog("Octopus Intelligent Go Smart Charging Schedule is.... ")
+        self.log("    Octopus Intelligent Go Smart Charging Schedule is.... ")
 
         # self.log(df.to_string())
         # self.log(df.dtypes)
@@ -666,11 +684,11 @@ class PVOpt(hass.Hass):
 
         for window in df.iterrows():
             self.log(
-                f"{window[1]['start_dt'].tz_convert(self.tz).strftime('%H:%M'):>7s} to {window[1]['end_dt'].tz_convert(self.tz).strftime('%H:%M'):<7s}  Charge: {window[1]['charge_in_kwh']:7.2f}kWh"
+                f"    {window[1]['start_dt'].tz_convert(self.tz).strftime('%H:%M'):>7s} to {window[1]['end_dt'].tz_convert(self.tz).strftime('%H:%M'):<7s}  Charge: {window[1]['charge_in_kwh']:7.2f}kWh"
             )
 
         if len(df) == 0:
-            self.log("  No Smart Charging Schedule found.")
+            self.log("    No Smart Charging Schedule found.")
 
         return df
 
@@ -909,15 +927,15 @@ class PVOpt(hass.Hass):
         while self.contract is None and i < n:
             if self.get_config("octopus_auto"):
                 try:
-                    self.rlog(f"Trying to auto detect Octopus tariffs:")
+                    self.rlog(f"    Trying to auto detect Octopus tariffs:")
 
                     octopus_entities = [
                         name
                         for name in self.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
                         if ("octopus_energy_electricity" in name and BOTTLECAP_DAVE["rates"] in name)
                     ]
-                    self.log("Octopus Entities = ")
-                    self.log(octopus_entities)
+                    #self.log("Octopus Entities = ")
+                    #self.log(octopus_entities)
 
                     entities = {}
                     entities["import"] = [x for x in octopus_entities if not "export" in x]
@@ -929,12 +947,12 @@ class PVOpt(hass.Hass):
                                 BOTTLECAP_DAVE["tariff_code"], None
                             )
 
-                            self.rlog(f"  Found {imp_exp} entity {entity}: Tariff code: {tariff_code}")
+                            self.rlog(f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code}")
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
                         if self.debug:
-                            self.log(f">>>{imp_exp}: {entities[imp_exp]}")
+                            self.log(f"    >>>{imp_exp}: {entities[imp_exp]}")
 
                         if len(entities[imp_exp]) > 0:
                             for entity in entities[imp_exp]:
@@ -942,9 +960,9 @@ class PVOpt(hass.Hass):
                                     BOTTLECAP_DAVE["tariff_code"], None
                                 )
 
-                                # if self.debug:
-                                #    self.log(f">>>_load_contract {tariff_code}")
-                                self.log(f">>>_load_contract {tariff_code}")
+                                if self.debug:
+                                    self.log(f">>>_load_contract {tariff_code}")
+                                
 
                                 if tariff_code is not None:
                                     tariffs[imp_exp] = pv.Tariff(
@@ -958,10 +976,10 @@ class PVOpt(hass.Hass):
                                         self.agile = True  # Tariff is Octopus Agile
                                     if "INTELLI" in tariff_code:
                                         self.intelligent = True  # Tariff is Octopus Intelligent
-
-                    self.log("")
-                    self.log("Printing bottlecap entity list")
-                    self.log(self.bottlecap_entities)
+                    # SVB logging
+                    #self.log("")
+                    #self.log("Printing bottlecap entity list")
+                    #self.log(self.bottlecap_entities)
                      
                     self.contract = pv.Contract(
                         "current",
@@ -975,8 +993,8 @@ class PVOpt(hass.Hass):
                         io_slots = self._get_io_car_slots()     #Load the car slots
                         self.io_slots = io_slots
 
-
-                    self.rlog("Contract tariffs loaded OK")
+                    self.log("")
+                    self.log("Contract tariffs loaded OK")
 
                 except Exception as e:
                     self.rlog(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
@@ -1905,10 +1923,10 @@ class PVOpt(hass.Hass):
 
         self.opt = self.flows[self.selected_case]
 
-        # SVB logging
-        self.log("")
-        self.log("Returned from .flows. self.opt is........")
-        self.log(self.opt.to_string())
+        # SVB debug logging
+        #self.log("")
+        #self.log("Returned from .flows. self.opt is........")
+        #self.log(self.opt.to_string())
 
         # create a df with an index value the same as self.opt (just copy it from self.opt)
         # Copy two columns to force y to be a dataframe
@@ -1920,13 +1938,27 @@ class PVOpt(hass.Hass):
         # Note: self.opt will now include attribute "ioslot" regardless of actual tariff, but be set to 0 unless on IOG and dispatches are planned
         io_on = pd.Series(index=y.index, data=0, name="ioslot")
 
+        self.log("self.io_slots is")
+        self.log(self.io_slots.to_string())
+
+        self.log("y is")
+        self.log(y.to_string())
+
+
         # For each time range in the Octopus Charging Schedule, set 1/2 hour IOG slot flag to "1"
         if not self.io_slots.empty:
             for h in range(len(self.io_slots)):
                 for i in range(len(y)):
-                    if (y.iat[i, 2] >= self.io_slots.iat[h, 5]) and (
-                        y.iat[i, 2] < self.io_slots.iat[h, 6]
-                    ):  ### SVB Need to lose the IATs for label based operations
+                    #if (y.iat[i, 2] >= self.io_slots.iat[h, 5]) and (    #2 is label "start", #5 is label "start_dt"
+                    #    y.iat[i, 2] < self.io_slots.iat[h, 6]            #2 is label "start", #6 is label "end_dt"
+                    #):  
+                    if (y["start"].iloc[i] >= self.io_slots["start_dt"].iloc[h]) and (    #2 is label "start", #5 is label "start_dt"
+                        y["start"].iloc[i] < self.io_slots["end_dt"].iloc[h]           #2 is label "start", #6 is label "end_dt"
+                    ):  
+                        
+                    # self.windows["end"].iloc[0]
+                    ### SVB Need to lose the IATs for label based operations.
+                    ### .loc should do it: y.loc[i]["soc"]?
                         io_on.iat[i] = 1
 
         self.opt = pd.concat([self.opt, io_on], axis=1)  # Add ioslot flags to self.opt
@@ -2281,9 +2313,14 @@ class PVOpt(hass.Hass):
         # Get the time of the first slot
         self.opt["start"] = self.opt.index.tz_convert(self.tz)
 
-        self.charge_start_datetime = self.opt.iat[
-            0, 15
-        ]  # "Start" is the 16th column. (###SVB Ideally change this for code that does a label lookup)
+        #self.charge_start_datetime = self.opt.iat[
+        #    0, 15
+        #]  
+        
+        self.charge_start_datetime = self.opt["start"].iloc[0]
+
+        # "Start" is the 16th column. (###SVB Ideally change this for code that does a label lookup)
+                
 
         # self.log("")
         # self.log("TimeNow is")
@@ -2919,7 +2956,7 @@ class PVOpt(hass.Hass):
                     df_EV_Total = None  # To store EV consumption and Total consumption
                     dfx = None
 
-                    if self.get_config("ev_part_of_house_load", False):
+                    if self.get_config("ev_part_of_house_load", False):   ### This needs to be part of Config.yaml. 
                         self.log(
                             "      EV charger is seen as house load, so subtracting EV charging from Total consumption"
                         )
