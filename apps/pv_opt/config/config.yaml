@@ -123,11 +123,11 @@ pv_opt:
   # ========================================
   #
   # If you have a Zappi Charger, uncomment next line to allow Pv_opt to detect car plugin status
-  # for use with the Octopus Intelligent Tariff and to allow EV comsumption data to be read (if needed). 
+  # for use with the Octopus Intelligent Tariff and to allow EV consumption data to be read (if needed). 
   #
   # ev_charger: Zappi   # Default = None
   #
-  # By default, Zappi is set to seen as part of the house load to true to prevent house battery discharge during car charging and allow discounting of EV consumption
+  # By default, Zappi is set to seen as part of the house load to prevent house battery discharge during car charging and allow discounting of EV consumption
   # from house charging calculations. 
   #
   # If your Zappi is not seen as part of the house load, uncomment next line to set to False. 
