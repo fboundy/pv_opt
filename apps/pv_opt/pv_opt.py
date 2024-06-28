@@ -14,7 +14,11 @@ from datetime import datetime
 import re
 
 
-VERSION = "3.16.0-Beta-2"
+VERSION = "3.16.0-Beta-4"
+#Change history
+#-------
+#Beta-4:
+    #Add additional comment text
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -695,6 +699,9 @@ class PVOpt(hass.Hass):
 
     def _check_car_plugin(self):
 
+        # If Zappi entities previously found and EV charger is Zappi, schedule a tariff reload on the next optimizer run when its 
+        # detected the car has been plugged in. 
+
         if (len(self.zappi_plug_entities) > 0) and (self.get_config("ev_charger") == "Zappi"):
             for entity_id in self.zappi_plug_entities:
                 plug_status = self.get_state(entity_id)
@@ -716,6 +723,8 @@ class PVOpt(hass.Hass):
                     self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
 
     def _check_for_zappi(self):
+        # Check for Zappi sensors for power consumption and car connected/charging status. 
+        # Note: this requires the myEnergi integration https://github.com/cjne/ha-myenergi
         self.ulog("Checking for Zappi Sensors")
         sensor_entities = self.get_state("sensor")
         self.zappi_entities = [k for k in sensor_entities if "zappi" in k for x in ["charge_added_session"] if x in k]
@@ -1952,16 +1961,20 @@ class PVOpt(hass.Hass):
                     #if (y.iat[i, 2] >= self.io_slots.iat[h, 5]) and (    #2 is label "start", #5 is label "start_dt"
                     #    y.iat[i, 2] < self.io_slots.iat[h, 6]            #2 is label "start", #6 is label "end_dt"
                     #):  
-                    if (y["start"].iloc[i] >= self.io_slots["start_dt"].iloc[h]) and (    #2 is label "start", #5 is label "start_dt"
-                        y["start"].iloc[i] < self.io_slots["end_dt"].iloc[h]           #2 is label "start", #6 is label "end_dt"
+                    if (y["start"].iloc[i] >= self.io_slots["start_dt"].iloc[h]) and (  
+                        y["start"].iloc[i] < self.io_slots["end_dt"].iloc[h]     
                     ):  
-                        
-                    # self.windows["end"].iloc[0]
-                    ### SVB Need to lose the IATs for label based operations.
-                    ### .loc should do it: y.loc[i]["soc"]?
                         io_on.iat[i] = 1
 
         self.opt = pd.concat([self.opt, io_on], axis=1)  # Add ioslot flags to self.opt
+
+        # Clear off any expired io slots so dashboard displays correctly
+        if not self.io_slots.empty:
+            self.io_slots = self.io_slots.drop(self.io_slots[self.io_slots["end_dt"] < pd.Timestamp.now(self.tz)].index)
+            #SVB logging
+            self.log("IO slot clearance check")
+            self.log(self.io_slots["end_dt"])
+            self.log(pd.Timestamp.now(self.tz))
 
         if self.intelligent:
             self.log("")
@@ -2313,14 +2326,10 @@ class PVOpt(hass.Hass):
         # Get the time of the first slot
         self.opt["start"] = self.opt.index.tz_convert(self.tz)
 
-        #self.charge_start_datetime = self.opt.iat[
-        #    0, 15
-        #]  
-        
+   
         self.charge_start_datetime = self.opt["start"].iloc[0]
 
-        # "Start" is the 16th column. (###SVB Ideally change this for code that does a label lookup)
-                
+               
 
         # self.log("")
         # self.log("TimeNow is")
@@ -2948,6 +2957,7 @@ class PVOpt(hass.Hass):
                     self.log("")
                     self.log("  No power returned from Zappi")
 
+
             if (start < time_now) and (end < time_now):
                 consumption["consumption"] = df.loc[start:end]
             else:
@@ -2956,7 +2966,7 @@ class PVOpt(hass.Hass):
                     df_EV_Total = None  # To store EV consumption and Total consumption
                     dfx = None
 
-                    if self.get_config("ev_part_of_house_load", False):   ### This needs to be part of Config.yaml. 
+                    if self.get_config("ev_part_of_house_load"):
                         self.log(
                             "      EV charger is seen as house load, so subtracting EV charging from Total consumption"
                         )
