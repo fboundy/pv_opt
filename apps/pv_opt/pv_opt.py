@@ -19,6 +19,7 @@ VERSION = "3.16.0-Beta-4"
 #-------
 #Beta-4:
     #Add additional comment text
+    #Clear IOG car charging plan once end time is reached
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
