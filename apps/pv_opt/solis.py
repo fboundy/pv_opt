@@ -252,6 +252,7 @@ class InverterController:
             self.enable_timed_mode()
         self._control_charge_discharge("discharge", enable, **kwargs)
 
+    # Hold SOC by setting zero charge current
     def hold_soc(self, enable, soc=None, **kwargs):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             start = kwargs.get("start", pd.Timestamp.now(tz=self.tz).floor("1min"))
@@ -272,6 +273,7 @@ class InverterController:
         self.host.status(e)
         raise Exception(e)
 
+    # Hold SOC by selecting backup mode
     def hold_soc_old(self, enable, soc=None):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
 
@@ -529,7 +531,7 @@ class InverterController:
             status[direction]["active"] = (
                 time_now >= status[direction]["start"]
                 and time_now < status[direction]["end"]
-                and status[direction]["current"] > 0
+                and status[direction]["current"] >= 0      # SVB changed to ">=" so IOG slots are seen as charging (as they effectively use timed charge)
                 and status["switches"]["Timed"]
                 and status["switches"]["GridCharge"]
             )

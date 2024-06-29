@@ -14,7 +14,13 @@ from datetime import datetime
 import re
 
 
-VERSION = "3.16.0"
+VERSION = "3.16.0-Beta-4"
+#Change history
+#-------
+#Beta-4:
+    #Add additional comment text
+    #Clear IOG car charging plan once end time is reached
+
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -27,6 +33,7 @@ TIME_FORMAT = "%H:%M"
 REDACT_REGEX = [
     "[0-9]{2}m[0-9]{7}_[0-9]{13}",  # Serial_MPAN
     "[0-9]{2}e[0-9]{7}_[0-9]{13}",  # Serial_MPAN
+    "[a-zA-Z0-9]{10}_[0-9]{13}",    # MeterSerial_MPAN
     "[0-9]{2}m[0-9]{7}",  # Serial
     "[0-9]{2}e[0-9]{7}",  # Serial
     "^$|\d{13}$",  # MPAN
@@ -50,6 +57,8 @@ GET_STATE_WAIT = 0.5
 
 BOTTLECAP_DAVE = {
     "domain": "event",
+    "domain1": "binary_sensor",
+    "domain2": "number",
     "tariff_code": "tariff_code",
     "rates": "current_day_rates",
 }
@@ -594,33 +603,58 @@ class PVOpt(hass.Hass):
 
         self._log_inverter_status(self.inverter.status)
 
-    def _check_for_io(self):
-        self.ulog("Checking for Intelligent Octopus")
-        entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
-        entity_id1 = f"number.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_charge_limit"
-        self.rlog(f">>> {entity_id}")
-        self.rlog(f">>> {entity_id1}")
-        io_dispatches = self.get_state(entity_id)
-        self.log(f">>> IO entity state:  {io_dispatches}")
-        self.io = io_dispatches is not None
-        if self.io:
-            self.rlog(f"IO entity {entity_id} found")
-            self.log("")
-            self.io_entity = entity_id
-            self.io_charge_to_add = self.get_state(entity_id1)  # Load the current charge to add value
-            self.old_io_charge_to_add = self.io_charge_to_add  # And set historic value to be the same
-            self.io_entity1 = entity_id1
+    def _get_io_sensors(self):
+        # Get Car charging plan and % charge to add from IO sensors in Bottlecap Dave integration
+        self.ulog("    Getting Car Charging Plan")
+        if self.get_config("octopus_auto"):
+            try:
+                self.log(f"    Trying to find Octopus Intelligent Dispatching Sensor from Octopus Energy Integration")
+                io_dispatching_sensor = [
+                    name
+                    for name in self.get_state_retry(BOTTLECAP_DAVE["domain1"]).keys() 
+                    if (
+                        "octopus_energy_" in name
+                        and "intelligent_dispatching" in name
+                    )
+                ]
+                self.io_dispatching_sensor = io_dispatching_sensor[0]
+                
+                self.rlog(f"    Found Dispatching Sensor:  {self.io_dispatching_sensor}")
+                self.log("")
+                self.log(f"    Trying to find Car % Charge to add from Octopus Energy Integration")
+                io_charge_to_add_sensor = [
+                    name
+                    for name in self.get_state_retry(BOTTLECAP_DAVE["domain2"]).keys()
+                    if (
+                        "octopus_energy_" in name
+                        and "intelligent_charge_limit" in name
+                    )
+                ]
+                self.io_charge_to_add_sensor = io_charge_to_add_sensor[0]
+                self.rlog(f"    Found Charge to Add entity:  {self.io_charge_to_add_sensor}")
+                
+                self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)  # Load the current charge to add value
+                self.old_io_charge_to_add = self.io_charge_to_add                     # And set historic value to be the same
+                self.rlog(f"    Charge to Add Value = :  {self.io_charge_to_add}")
+                
 
-    def _get_io(self):
+            except Exception as e:
+                self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
+                self.log(
+                    "Failed to find Octopus Intelligent Dispatching Sensor and/or % Charge to Add from Octopus Energy Integration. Car charging cannot be determined",
+                    level="WARNING",
+                )
 
+
+    def _get_io_car_slots(self):
         # Get Planned dispatches from Intelligent Dispatcing sensor
-        self.ulog("Intelligent Octopus Status")
-        self.io_dispatch_active = self.get_state(self.io_entity)
-        self.log(f"  Active: {self.io_dispatch_active}")
-        self.log("")
+        self.ulog("    Intelligent Octopus Status")
+        self.io_dispatch_active = self.get_state(self.io_dispatching_sensor)
 
+        self.log(f"  Current Dispatch Status (On/off) = : {self.io_dispatch_active}")
+        
         if self.debug:
-            self.io_dispatch_attrib = self.get_state(self.io_entity, attribute="all")
+            self.io_dispatch_attrib = self.get_state(self.self.io_dispatching_sensor, attribute="all")
             for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
                 self.rlog(f" {k:20s} {self.io_dispatch_attrib[k]}")
 
@@ -633,14 +667,13 @@ class PVOpt(hass.Hass):
                     )
 
         # Get Planned dispatches from Intelligent Dispatcing sensor
-        df = pd.DataFrame(self.get_state_retry(self.io_entity, attribute=("planned_dispatches")))
+        df = pd.DataFrame(self.get_state_retry(self.io_dispatching_sensor, attribute=("planned_dispatches")))
         # self.log("df after first dataload is")
         # self.log(df)
         # self.log(df.info)
 
         # If Charging plan exists, convert dispatch start and end times to datetime format and append to df.
         if not df.empty:
-            # if df is not None:  (gate doesnt work for some reason, using df.empty instead)
             df["start_dt"] = pd.to_datetime(df["start"])
             df["end_dt"] = pd.to_datetime(df["end"])
             df["start_local"] = df["start_dt"].dt.tz_convert(self.tz)
@@ -648,7 +681,7 @@ class PVOpt(hass.Hass):
 
         # SVB updates
         self.log("")
-        self.ulog("Octopus Intelligent Go Smart Charging Schedule is.... ")
+        self.log("    Octopus Intelligent Go Smart Charging Schedule is.... ")
 
         # self.log(df.to_string())
         # self.log(df.dtypes)
@@ -656,92 +689,49 @@ class PVOpt(hass.Hass):
 
         for window in df.iterrows():
             self.log(
-                f"{window[1]['start_dt'].tz_convert(self.tz).strftime('%H:%M'):>7s} to {window[1]['end_dt'].tz_convert(self.tz).strftime('%H:%M'):<7s}  Charge: {window[1]['charge_in_kwh']:7.2f}kWh"
+                f"    {window[1]['start_dt'].tz_convert(self.tz).strftime('%H:%M'):>7s} to {window[1]['end_dt'].tz_convert(self.tz).strftime('%H:%M'):<7s}  Charge: {window[1]['charge_in_kwh']:7.2f}kWh"
             )
 
         if len(df) == 0:
-            self.log("  No Smart Charging Schedule found.")
+            self.log("    No Smart Charging Schedule found.")
 
         return df
 
-    def _load_io_tariffs(self, entity_id1):
-
-        x = {}
-        y = {}
-
-        # Load tariffs from bottlecapdave .event sensors
-        self.ulog("Downloading IOG pricing information from Octopus Energy Integration")
-
-        x = pd.DataFrame(self.get_state_retry(entity_id1, attribute=("rates")))
-        # self.log("")
-        # self.log("Read of Bottlecap current day rate entity simplfied is.....")
-        # self.log(x.to_string())
-
-        if not x.empty:
-            x = x.set_index("start")["value_inc_vat"]
-            x.index = pd.to_datetime(x.index)
-            x.index = x.index.tz_convert("UTC")
-            x *= 100
-            # SVB logging
-            # self.log("")
-            # self.log(f"Reading current day IOG prices from  {entity_id1}")
-            # self.log(x.to_string())
-        else:
-            self.log("No data found in current day rate")
-
-        # current_day_rates loaded, change the entity name to next_day_rates
-        entity_id1 = entity_id1.replace("_current_day_rates", "_next_day_rates")
-
-        y = pd.DataFrame(self.get_state_retry(entity_id1, attribute=("rates")))
-        # self.log("")
-        # self.log("Read of Bottlecap next day rate entity simplfied is.....")
-        # self.log(y.to_string())
-        if not y.empty:
-            y = y.set_index("start")["value_inc_vat"]
-            y.index = pd.to_datetime(y.index)
-            y.index = y.index.tz_convert("UTC")
-            y *= 100
-            # SVB logging
-            # self.log("")
-            # self.log(f"Reading next day IOG prices from  {entity_id1}")
-            # self.log(y.to_string())
-        else:
-            self.log("No data found in next day rate")
-
-        # Concatenate todays and tomorrows tariffs into one DataSeries
-        if not x.empty:
-            z = x.combine_first(y)
-            self.log("")
-            self.log("IOG prices are")
-            self.log(z.to_string())
-        else:
-            z = y
-
-        return z
 
     def _check_car_plugin(self):
+
+        # If Zappi entities previously found and EV charger is Zappi, schedule a tariff reload on the next optimizer run when its 
+        # detected the car has been plugged in. 
 
         if (len(self.zappi_plug_entities) > 0) and (self.get_config("ev_charger") == "Zappi"):
             for entity_id in self.zappi_plug_entities:
                 plug_status = self.get_state(entity_id)
                 # self.log(plug_status)
-                if (plug_status == "EV Connected") and (self.tariff_reloaded == 0):
+                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.tariff_reloaded == 0):
                     self.car_plugin_detected = 1
                     self.log("EV plug-in event detected, IOG tariff reload scheduled for next optimiser run")
-                elif (plug_status == "EV Connected") and (self.tariff_reloaded == 1):
-                    self.log("EV is connected but IOG tariff reload already caried out. IOG tariff not reloaded")
+                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.tariff_reloaded == 1):
+                    self.log("EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded")
+                    self.car_plugin_detected = 0
+                elif (plug_status == "Charging") and (self.tariff_reloaded == 0):
+                    self.log("EV plug-in event detected and car has commenced charging. IOG tariff reload scheduled for next optimiser run")
+                    self.car_plugin_detected = 1
+                elif (plug_status == "Charging") and (self.tariff_reloaded == 1):
+                    self.log("EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded")
                     self.car_plugin_detected = 0
                 else:
-                    self.log("EV not plugged in, or already charging. IOG tariff not reloaded")
+                    self.log("EV not plugged in. IOG tariff reload not necessary")
                     self.car_plugin_detected = 0
 
                 # If EV plugged in, check charge to add hasnt changed
-                self.io_charge_to_add = self.get_state(self.io_entity1)
+                self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)
                 if (self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected"):
                     self.car_plugin_detected = 1
                     self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
 
     def _check_for_zappi(self):
+        # Check for Zappi sensors for power consumption and car connected/charging status. 
+        # Note: this requires the myEnergi integration https://github.com/cjne/ha-myenergi
         self.ulog("Checking for Zappi Sensors")
         sensor_entities = self.get_state("sensor")
         self.zappi_entities = [k for k in sensor_entities if "zappi" in k for x in ["charge_added_session"] if x in k]
@@ -950,55 +940,18 @@ class PVOpt(hass.Hass):
         old_contract = self.contract
         self.contract = None
 
-        # Set self.io flag if IO detected. Note, this is based on Zappi flag so IOG currently only works if the Zappi charger is integrated.
-        ### SVB next bit doesnt work, as we haevn't auto detected the Octopus Account details this needs.
-        self._check_for_io()
-
-        # Load both current_day_rate and next_day_rate from the Octopus Energy Integration.
-
-        ### SVB - we are doing this before doing any contract detects as the values need to be passed into the Tariff class within pypy.
-        ### However it should be done within the Tariffs class as that is where the prices from the website are loaded
-        ### The function "get_state_retry" would be needed to load from the Octopus Energy integration, but  is in the PvOpt class.
-        #   Perhaps make a copy in the Tariff class and then shift all of the below code into it?
-
-        if self.io:
-            if self.get_config("octopus_auto"):
-                try:
-                    self.rlog(f"Trying to find Octopus Intelligent Entities from Octopus Energy Integration:")
-                    octopus_import_entity = [
-                        name
-                        for name in self.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
-                        if (
-                            "octopus_energy_electricity" in name
-                            and BOTTLECAP_DAVE["rates"] in name
-                            and not "export" in name
-                        )
-                    ]
-                    # self.log("Octopus Import Entity is = ")
-                    # self.log(octopus_import_entity)
-
-                    self.io_prices = self._load_io_tariffs(octopus_import_entity[0])
-                    # self.io_prices = self._load_io_tariffs(octopus_import_entity)        # Error forcing: failure to load prices
-
-                except Exception as e:
-                    self.rlog(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
-                    self.rlog(
-                        "Failed to find Octopus Intellgient tariffs from Octopus Energy Integration, extra IO slots will not be loaded",
-                        level="WARNING",
-                    )
-
         while self.contract is None and i < n:
             if self.get_config("octopus_auto"):
                 try:
-                    self.rlog(f"Trying to auto detect Octopus tariffs:")
+                    self.rlog(f"    Trying to auto detect Octopus tariffs:")
 
                     octopus_entities = [
                         name
                         for name in self.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
                         if ("octopus_energy_electricity" in name and BOTTLECAP_DAVE["rates"] in name)
                     ]
-                    self.log("Octopus Entities = ")
-                    self.log(octopus_entities)
+                    #self.log("Octopus Entities = ")
+                    #self.log(octopus_entities)
 
                     entities = {}
                     entities["import"] = [x for x in octopus_entities if not "export" in x]
@@ -1010,12 +963,12 @@ class PVOpt(hass.Hass):
                                 BOTTLECAP_DAVE["tariff_code"], None
                             )
 
-                            self.rlog(f"  Found {imp_exp} entity {entity}: Tariff code: {tariff_code}")
+                            self.rlog(f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code}")
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
                         if self.debug:
-                            self.log(f">>>{imp_exp}: {entities[imp_exp]}")
+                            self.log(f"    >>>{imp_exp}: {entities[imp_exp]}")
 
                         if len(entities[imp_exp]) > 0:
                             for entity in entities[imp_exp]:
@@ -1023,14 +976,13 @@ class PVOpt(hass.Hass):
                                     BOTTLECAP_DAVE["tariff_code"], None
                                 )
 
-                                # if self.debug:
-                                #    self.log(f">>>_load_contract {tariff_code}")
-                                self.log(f">>>_load_contract {tariff_code}")
+                                if self.debug:
+                                    self.log(f">>>_load_contract {tariff_code}")
+                                
 
                                 if tariff_code is not None:
                                     tariffs[imp_exp] = pv.Tariff(
                                         tariff_code,
-                                        self.io_prices,
                                         export=(imp_exp == "export"),
                                         host=self,
                                     )
@@ -1040,7 +992,11 @@ class PVOpt(hass.Hass):
                                         self.agile = True  # Tariff is Octopus Agile
                                     if "INTELLI" in tariff_code:
                                         self.intelligent = True  # Tariff is Octopus Intelligent
-
+                    # SVB logging
+                    #self.log("")
+                    #self.log("Printing bottlecap entity list")
+                    #self.log(self.bottlecap_entities)
+                     
                     self.contract = pv.Contract(
                         "current",
                         imp=tariffs["import"],
@@ -1048,7 +1004,13 @@ class PVOpt(hass.Hass):
                         host=self,
                     )
 
-                    self.rlog("Contract tariffs loaded OK")
+                    if self.intelligent:
+                        self._get_io_sensors()                  #Find the Octopus Zappi sensors
+                        io_slots = self._get_io_car_slots()     #Load the car slots
+                        self.io_slots = io_slots
+
+                    self.log("")
+                    self.log("Contract tariffs loaded OK")
 
                 except Exception as e:
                     self.rlog(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
@@ -1147,13 +1109,14 @@ class PVOpt(hass.Hass):
 
             if self.contract.tariffs["export"] is None:
                 self.contract.tariffs["export"] = pv.Tariff(
-                    "None", self.io_prices, export=True, unit=0, octopus=False, host=self
+                    "None", export=True, unit=0, octopus=False, host=self
                 )
 
             self.rlog("")
             self._load_saving_events()
 
-        self.rlog("Finished loading contract")
+        self.log("")
+        self.log("Finished loading contract")
 
     def _check_tariffs(self):
         if self.bottlecap_entities["import"] is not None:
@@ -1759,10 +1722,6 @@ class PVOpt(hass.Hass):
         self.log("")
         self._load_saving_events()
 
-        if self.io:
-            io_slots = self._get_io()
-            self.io_slots = io_slots
-
         if self.get_config("forced_discharge") and (self.get_config("supports_forced_discharge", True)):
             discharge_enable = "enabled"
         else:
@@ -1816,13 +1775,6 @@ class PVOpt(hass.Hass):
         else:
             self.log("  Tariffs OK")
             self.log("")
-
-        # if self.io:
-        #    self._get_io     #get IO slots as a dataframe
-        # SVB logging
-        # self.log("")
-        # self.log("IO slots are:")
-        # self.log(io_slots.to_string())
 
         self.t0 = pd.Timestamp.now()
         self.static = pd.DataFrame(
@@ -1987,6 +1939,11 @@ class PVOpt(hass.Hass):
 
         self.opt = self.flows[self.selected_case]
 
+        # SVB debug logging
+        #self.log("")
+        #self.log("Returned from .flows. self.opt is........")
+        #self.log(self.opt.to_string())
+
         # create a df with an index value the same as self.opt (just copy it from self.opt)
         # Copy two columns to force y to be a dataframe
 
@@ -1997,18 +1954,36 @@ class PVOpt(hass.Hass):
         # Note: self.opt will now include attribute "ioslot" regardless of actual tariff, but be set to 0 unless on IOG and dispatches are planned
         io_on = pd.Series(index=y.index, data=0, name="ioslot")
 
+        self.log("self.io_slots is")
+        self.log(self.io_slots.to_string())
+
+        self.log("y is")
+        self.log(y.to_string())
+
+
         # For each time range in the Octopus Charging Schedule, set 1/2 hour IOG slot flag to "1"
-        if not io_slots.empty:
-            for h in range(len(io_slots)):
+        if not self.io_slots.empty:
+            for h in range(len(self.io_slots)):
                 for i in range(len(y)):
-                    if (y.iat[i, 2] >= io_slots.iat[h, 5]) and (
-                        y.iat[i, 2] < io_slots.iat[h, 6]
-                    ):  ### SVB Need to lose the IATs for label based operations
+                    #if (y.iat[i, 2] >= self.io_slots.iat[h, 5]) and (    #2 is label "start", #5 is label "start_dt"
+                    #    y.iat[i, 2] < self.io_slots.iat[h, 6]            #2 is label "start", #6 is label "end_dt"
+                    #):  
+                    if (y["start"].iloc[i] >= self.io_slots["start_dt"].iloc[h]) and (  
+                        y["start"].iloc[i] < self.io_slots["end_dt"].iloc[h]     
+                    ):  
                         io_on.iat[i] = 1
 
         self.opt = pd.concat([self.opt, io_on], axis=1)  # Add ioslot flags to self.opt
 
-        if self.io:
+        # Clear off any expired io slots so dashboard displays correctly
+        if not self.io_slots.empty:
+            self.io_slots = self.io_slots.drop(self.io_slots[self.io_slots["end_dt"] < pd.Timestamp.now(self.tz)].index)
+            #SVB logging
+            self.log("IO slot clearance check")
+            self.log(self.io_slots["end_dt"])
+            self.log(pd.Timestamp.now(self.tz))
+
+        if self.intelligent:
             self.log("")
             self.ulog("Checking EV Status")
             self._check_car_plugin()
@@ -2358,9 +2333,10 @@ class PVOpt(hass.Hass):
         # Get the time of the first slot
         self.opt["start"] = self.opt.index.tz_convert(self.tz)
 
-        self.charge_start_datetime = self.opt.iat[
-            0, 15
-        ]  # "Start" is the 16th column. (###SVB Ideally change this for code that does a label lookup)
+   
+        self.charge_start_datetime = self.opt["start"].iloc[0]
+
+               
 
         # self.log("")
         # self.log("TimeNow is")
@@ -2982,11 +2958,12 @@ class PVOpt(hass.Hass):
                     self.log(
                         f">>> Total consumption from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
                     )
-                    self.log(f"   EV consumption is {(ev_power.sum()/2000):0.1f} kWh")
+                    self.log(f"   EV consumption is    : {(ev_power.sum()/2000):0.1f} kWh")
                     self.log(f"   Total consumption is : {(df.sum()/2000):0.1f} kWh")
                 else:
                     self.log("")
                     self.log("  No power returned from Zappi")
+
 
             if (start < time_now) and (end < time_now):
                 consumption["consumption"] = df.loc[start:end]
@@ -2996,7 +2973,7 @@ class PVOpt(hass.Hass):
                     df_EV_Total = None  # To store EV consumption and Total consumption
                     dfx = None
 
-                    if self.get_config("ev_part_of_house_load", False):
+                    if self.get_config("ev_part_of_house_load"):
                         self.log(
                             "      EV charger is seen as house load, so subtracting EV charging from Total consumption"
                         )
@@ -3058,10 +3035,10 @@ class PVOpt(hass.Hass):
                     consumption["consumption"] = consumption_mean
 
             if len(entity_ids) > 0:
-                self.log(f"  - Estimated consumption from {entity_ids} loaded OK ")
+                self.log(f"  Estimated consumption from {entity_ids} loaded OK ")
 
             else:
-                self.log(f"  - Estimated consumption from {entity_id} loaded OK ")
+                self.log(f"  Estimated consumption from {entity_id} loaded OK ")
 
         else:
             daily_kwh = self.get_config("daily_consumption_kwh")
@@ -3092,7 +3069,7 @@ class PVOpt(hass.Hass):
         self.log(
             f"    Total consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
         )
-        self.log(f"  - Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
+        self.log(f"   Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
 
         if self.debug:
             self.log("Printing final result of routine load_consumption.....")
@@ -3170,7 +3147,7 @@ class PVOpt(hass.Hass):
             name = tariff_set["name"]
             for imp_exp in IMPEXP:
                 code[imp_exp] = tariff_set[f"octopus_{imp_exp}_tariff_code"]
-                tariffs[imp_exp] = pv.Tariff(code[imp_exp], self.io_prices, export=(imp_exp == "export"), host=self)
+                tariffs[imp_exp] = pv.Tariff(code[imp_exp], export=(imp_exp == "export"), host=self)
 
             contracts.append(
                 pv.Contract(
