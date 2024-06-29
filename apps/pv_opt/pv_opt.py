@@ -707,14 +707,20 @@ class PVOpt(hass.Hass):
             for entity_id in self.zappi_plug_entities:
                 plug_status = self.get_state(entity_id)
                 # self.log(plug_status)
-                if (plug_status == "EV Connected") and (self.tariff_reloaded == 0):
+                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.tariff_reloaded == 0):
                     self.car_plugin_detected = 1
                     self.log("EV plug-in event detected, IOG tariff reload scheduled for next optimiser run")
-                elif (plug_status == "EV Connected") and (self.tariff_reloaded == 1):
-                    self.log("EV is connected but IOG tariff reload already caried out. IOG tariff not reloaded")
+                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.tariff_reloaded == 1):
+                    self.log("EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded")
+                    self.car_plugin_detected = 0
+                elif (plug_status == "Charging") and (self.tariff_reloaded == 0):
+                    self.log("EV plug-in event detected and car has commenced charging. IOG tariff reload scheduled for next optimiser run")
+                    self.car_plugin_detected = 1
+                elif (plug_status == "Charging") and (self.tariff_reloaded == 1):
+                    self.log("EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded")
                     self.car_plugin_detected = 0
                 else:
-                    self.log("EV not plugged in, or already charging. IOG tariff not reloaded")
+                    self.log("EV not plugged in. IOG tariff reload not necessary")
                     self.car_plugin_detected = 0
 
                 # If EV plugged in, check charge to add hasnt changed
