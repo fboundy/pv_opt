@@ -390,12 +390,12 @@ class BatteryModel:
         pass
     
     @property
-    def max_charge_power(self):
+    def max_charge_power(self) -> int:
         """ returns the maximum watts at which the battery can charge. """
         return self.current_limit_amps * self.__voltage # probably shouldn't use magic numbers here.
     
     @property
-    def max_discharge_power(self):
+    def max_discharge_power(self) -> int:
         """ returns the maximum watts at which the battery can discharge. """
         return self.max_charge_power
 
