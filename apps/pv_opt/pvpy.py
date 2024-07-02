@@ -371,12 +371,33 @@ class InverterModel:
 
 
 class BatteryModel:
-    def __init__(self, capacity: int, max_dod: float = 0.15) -> None:
+    """Describes the battery system attached to the inverter
+
+    Attributes:
+        __voltage: An int describing the voltage of the battery system.
+        capacity: An integer describing the Wh capacity of the battery.
+        max_dod: A float describing the maximum depth of discharge of the battery.
+        current_limit_amps: An int describing the maximum amps at which the battery can charge/discharge.
+    """
+
+    def __init__(self, capacity: int, max_dod: float = 0.15, current_limit_amps: int = 100) -> None:
         self.capacity = capacity
         self.max_dod = max_dod
+        self.current_limit_amps = current_limit_amps
+        self.__voltage : int = 48
 
     def __str__(self):
         pass
+    
+    @property
+    def max_charge_power(self):
+        """ returns the maximum watts at which the battery can charge. """
+        return self.current_limit_amps * self.__voltage # probably shouldn't use magic numbers here.
+    
+    @property
+    def max_discharge_power(self):
+        """ returns the maximum watts at which the battery can discharge. """
+        return self.max_charge_power
 
 
 class OctopusAccount:
@@ -904,7 +925,7 @@ class PVsystemModel:
                     str_log += f"SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
 
                     forced_charge = min(
-                        self.inverter.charger_power
+                        self.battery.max_charge_power
                         - x["forced"].loc[start_window]
                         - x[cols["solar"]].loc[start_window],
                         ((100 - x["soc_end"].loc[start_window]) / 100 * self.battery.capacity) * 2 * factor,
@@ -1016,7 +1037,7 @@ class PVsystemModel:
                         slot = (
                             start_window,
                             -min(
-                                self.inverter.inverter_power - x[kwargs.get("solar", "solar")].loc[start_window],
+                                self.battery.max_discharge_power - x[kwargs.get("solar", "solar")].loc[start_window],
                                 ((x["soc_end"].loc[start_window] - self.battery.max_dod) / 100 * self.battery.capacity)
                                 * 2
                                 * factor,
