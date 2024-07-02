@@ -3,8 +3,8 @@ pvpy:
   module: pvpy
   global: true
 
-solis_cloud:
-  module: solis_cloud
+solis:
+  module: solis
   global: true
 
 inverters:
@@ -16,7 +16,7 @@ pv_opt:
   class: PVOpt
   dependencies:
     - pvpy
-    - solis_cloud
+    - solis
 
   log: pv_opt_log
   prefix: pvopt
@@ -131,10 +131,10 @@ pv_opt:
   # update_cycle_seconds: 15
   # maximum_dod_percent: number.{device_name}_battery_minimum_soc 
   
-  # id_consumption_today: sensor.{device_name}_consumption_today
-  # id_consumption:
-  #   - sensor.{device_name}_house_load
-  #   - sensor.{device_name}_bypass_load
+  id_consumption_today: sensor.{device_name}_consumption_today
+  id_consumption:
+    - sensor.{device_name}_house_load
+    - sensor.{device_name}_bypass_load
 
   # id_grid_import_today: sensor.{device_name}_grid_import_today
   # id_grid_export_today: sensor.{device_name}_grid_export_today
@@ -225,26 +225,6 @@ pv_opt:
   # id_timed_discharge_current: sensor.{device_name}_timed_discharge_current
 
   # id_inverter_mode: sensor.{device_name}_storage_control_mode
-
-  # ===============================================================================================================
-  # Brand / Integration Specific Config: SOLIS_SOLIS_CLOUD: https://github.com/hultenvp/solis-sensor & https://github.com/stevegal/solis_control
-  # ===============================================================================================================
-  #
-  # These are the default entities used with the Solis Solis Cloud integration. You can change them here and over-ride the defaults
-
-  # inverter_type: SOLIS_SOLIS_CLOUD
-  # device_name: solis
-  
-  # battery_voltage: sensor.{device_name}_battery_voltage
-  # update_cycle_seconds: 300
-  # maximum_dod_percent: number.{device_name}_battery_minimum_soc 
-  
-  id_consumption_today: sensor.{device_name}_energy_today
-
-  id_grid_import_today: sensor.{device_name}_daily_grid_energy_purchased
-  id_grid_export_today: sensor.{device_name}_daily_on_grid_energy
-
-  id_battery_soc: sensor.{device_name}_remaining_battery_capacity
 
   # ===============================================================================================================
   # Brand / Integration Specific Config: SUNSYNK_SOLARSYNK2: 
