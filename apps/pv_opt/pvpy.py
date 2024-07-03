@@ -8,6 +8,8 @@ from numpy import isnan
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
+AGILE_PREDICT_URL = r"https://agilepredict.com/api/"
+
 TIME_FORMAT = "%d/%m %H:%M %Z"
 MAX_ITERS = 3
 
@@ -76,6 +78,7 @@ class Tariff:
         self.eco7 = eco7
         self.area = kwargs.get("area", None)
         self.day_ahead = None
+        self.agile_predict = None
         self.eco7_start = pd.Timestamp(eco7_start, tz="UTC")
 
         if octopus:
@@ -200,12 +203,12 @@ class Tariff:
             if "AGILE" in self.name and use_day_ahead:
                 if self.day_ahead is not None and df.index[-1].day == end.day:
                     # reset the day ahead forecasts if we've got a forecast going into tomorrow
+                    self.agile_predict = None
                     self.day_ahead = None
                     self.log("")
                     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
                 if pd.Timestamp.now(tz=self.tz).hour > 11 and df.index[-1].day != end.day:
-
                     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
                     if self.day_ahead is None:
                         self.day_ahead = self.get_day_ahead(df.index[0])
@@ -222,7 +225,9 @@ class Tariff:
                         else:
                             factors = AGILE_FACTORS["import"][self.area]
 
-                        mask = (self.day_ahead.index.hour >= 16) & (self.day_ahead.index.hour < 19)
+                        mask = (self.day_ahead.index.tz_convert("GB").hour >= 16) & (
+                            self.day_ahead.index.tz_convert("GB").hour < 19
+                        )
 
                         agile = (
                             pd.concat(
@@ -237,7 +242,13 @@ class Tariff:
                         )
 
                         df = pd.concat([df, agile])
-                        # self.log(df)
+                else:
+                    # Otherwise download the latest forecast from AgilePredict
+                    if self.agile_predict is None:
+                        self.agile_predict = self._get_agile_predict()
+
+                    if self.agile_predict is not None:
+                        df = pd.concat([df, self.agile_predict.loc[df.index[-1] + pd.Timedelta("30min") : end]])
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (len(df) > 1 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30) or len(df) == 1:
@@ -284,6 +295,19 @@ class Tariff:
                     df["unit"].loc[event_start:event_end] += event_value
 
         return df
+
+    def _get_agile_predict(self):
+        url = f"{AGILE_PREDICT_URL}{self.area}?days=2&high_low=false"
+        try:
+            r = requests.get(url)
+            r.raise_for_status()  # Raise an exception for unsuccessful HTTP status codes
+
+        except requests.exceptions.RequestException as e:
+            return
+
+        df = pd.DataFrame(r.json()[0]["prices"]).set_index("date_time")
+        df.index = pd.to_datetime(df.index).tz_convert("UTC")
+        return df["agile_pred"]
 
     def get_day_ahead(self, start):
         url = "https://www.nordpoolgroup.com/api/marketdata/page/325?currency=GBP"
