@@ -388,15 +388,15 @@ class BatteryModel:
 
     def __str__(self):
         pass
-    
+
     @property
     def max_charge_power(self) -> int:
-        """ returns the maximum watts at which the battery can charge. """
+        """returns the maximum watts at which the battery can charge."""
         return self.current_limit_amps * self.voltage
-    
+
     @property
     def max_discharge_power(self) -> int:
-        """ returns the maximum watts at which the battery can discharge. """
+        """returns the maximum watts at which the battery can discharge."""
         return self.max_charge_power
 
 
@@ -925,7 +925,7 @@ class PVsystemModel:
                     str_log += f"SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
 
                     forced_charge = min(
-                        self.battery.max_charge_power
+                        min(self.battery.max_charge_power, self.inverter.charger_power)
                         - x["forced"].loc[start_window]
                         - x[cols["solar"]].loc[start_window],
                         ((100 - x["soc_end"].loc[start_window]) / 100 * self.battery.capacity) * 2 * factor,
@@ -1037,7 +1037,8 @@ class PVsystemModel:
                         slot = (
                             start_window,
                             -min(
-                                self.battery.max_discharge_power - x[kwargs.get("solar", "solar")].loc[start_window],
+                                min(self.battery.max_discharge_power, self.inverter.inverter_power),
+                                -x[kwargs.get("solar", "solar")].loc[start_window],
                                 ((x["soc_end"].loc[start_window] - self.battery.max_dod) / 100 * self.battery.capacity)
                                 * 2
                                 * factor,
