@@ -374,17 +374,17 @@ class BatteryModel:
     """Describes the battery system attached to the inverter
 
     Attributes:
-        __voltage: An int describing the voltage of the battery system.
         capacity: An integer describing the Wh capacity of the battery.
         max_dod: A float describing the maximum depth of discharge of the battery.
         current_limit_amps: An int describing the maximum amps at which the battery can charge/discharge.
+        voltage: An int describing the voltage of the battery system.
     """
 
-    def __init__(self, capacity: int, max_dod: float = 0.15, current_limit_amps: int = 100) -> None:
+    def __init__(self, capacity: int, max_dod: float = 0.15, current_limit_amps: int = 100, voltage: int = 50) -> None:
         self.capacity = capacity
         self.max_dod = max_dod
         self.current_limit_amps = current_limit_amps
-        self.__voltage : int = 48
+        self.voltage = voltage
 
     def __str__(self):
         pass
@@ -392,7 +392,7 @@ class BatteryModel:
     @property
     def max_charge_power(self) -> int:
         """ returns the maximum watts at which the battery can charge. """
-        return self.current_limit_amps * self.__voltage # probably shouldn't use magic numbers here.
+        return self.current_limit_amps * self.voltage
     
     @property
     def max_discharge_power(self) -> int:
