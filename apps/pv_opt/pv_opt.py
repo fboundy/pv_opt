@@ -17,9 +17,11 @@ import re
 VERSION = "3.16.0-Beta-5"
 # Change history
 # -------
-# Beta-4:
-# Add additional comment text
-# Clear IOG car charging plan once end time is reached
+#Beta-4:
+    #Add additional comment text
+    #Clear IOG car charging plan once end time is reached
+#Beta-5
+    #Added targeted logging for any negative kWh values in consumption calculations.
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -3008,9 +3010,14 @@ class PVOpt(hass.Hass):
                         df_EV = df_EV_Total["EV"].squeeze()  # Extract EV consumption to Series
                         df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
                         df = df_Total - df_EV  # Substract EV consumption from Total Consumption
+
                         if self.debug:
                             self.log("Result of subtraction is")
                             self.log(df.to_string())
+
+                        if (df < 0).any().any():     #Are there any negative values in the subtraction?
+                            self.log("Unexpected Negative values after substraction found, setting to zero")
+                            df[df < 0] = 0
 
                 # Add consumption margin
                 df = df * (1 + self.get_config("consumption_margin") / 100)
