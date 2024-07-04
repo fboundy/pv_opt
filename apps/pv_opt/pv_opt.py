@@ -21,7 +21,7 @@ VERSION = "3.16.0-Beta-5"
     #Add additional comment text
     #Clear IOG car charging plan once end time is reached
 #Beta-5
-    #Added targeted logging for any negative kWh values in consumption calculations.
+    #Supress any negative values after substracting EV consumption from Total Consumption.
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
