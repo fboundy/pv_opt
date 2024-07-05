@@ -21,7 +21,7 @@ views:
                 name: Solar
                 max: 5000
                 icon: mdi:solar-power-variant
-              - entity: sensor.solis_total_load
+              - entity: sensor.solis_house_load
                 name: Load
                 max: 5000
               - entity: sensor.solis_battery_soc
@@ -120,6 +120,28 @@ views:
               {{a['soc_end'] | float | round(1)}}% | {{a['hold_soc']}}
               |{%endfor%}
             title: PV Opt Results
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: select.pvopt_ev_charger
+                state: Zappi
+            card:
+              type: markdown
+              content: >
+
+                <h3><u>Octopus Smart Charging Schedule</u></h3>
+
+
+                | Start | | | End |||       Energy  |
+
+                |:--------|--|--|:-----------|--|--|:------------------:|{% for
+                a in state_attr('sensor.pvopt_iog_slots', 'windows') %}
+
+                {% set tf = '%H:%M'%} | 
+                {{as_local(as_datetime(a['start_local'])).strftime(tf)}}    |||
+                {{as_local(as_datetime(a['end_local'])).strftime(tf)}} |||
+                {{a['charge_in_kwh'] | float | round(2)}}kWh |{%endfor%}
+              title: Car Charging
       - type: custom:stack-in-card
         title: Optimised Charging
         cards:
@@ -220,6 +242,8 @@ views:
             card:
               type: entities
               entities:
+                - entity: switch.pvopt_ev_part_of_house_load
+                  name: EV part of House Load
                 - entity: number.pvopt_ev_charger_power_watts
                   name: EV Charger Power
                 - entity: number.pvopt_ev_battery_capacity_kwh
@@ -239,9 +263,9 @@ views:
               - entity: number.pvopt_charger_efficiency_percent
                 name: Charger Efficiency
               - entity: number.pvopt_battery_current_limit_amps
-                name: Battery Current Limit                
+                name: Battery Current Limit
           - type: markdown
-            content: Tuning Parameters
+            content: <h3>Tuning Parameters
           - type: entities
             entities:
               - entity: number.pvopt_pass_threshold_p
@@ -300,7 +324,7 @@ views:
             span:
               start: day
             series:
-              - entity: sensor.solis_total_load
+              - entity: sensor.solis_house_load
                 float_precision: 0
                 extend_to: now
                 group_by:
@@ -539,28 +563,10 @@ views:
                      return [new Date(entry.period_start), entry.forced];
                    });
               - entity: >-
-                  event.octopus_energy_electricity_19m1337498_1610032016836_current_day_rates
+                  event.octopus_energy_electricity_22j0102472_1800020136985_current_day_rates
                 yaxis_id: price
                 name: Historic Import Price
                 color: yellow
-                opacity: 1
-                stroke_width: 3
-                extend_to: now
-                unit: p/kWh
-                data_generator: |
-                  return entity.attributes.rates.map((entry) => {
-                     return [new Date(entry.start), entry.value_inc_vat*100];
-                   });     
-                offset: '-15min'
-                show:
-                  in_header: false
-                  legend_value: false
-                  offset_in_name: false
-              - entity: >-
-                  event.octopus_energy_electricity_19m1337498_1650000216929_export_current_day_rates
-                yaxis_id: price
-                name: Historic Export Price
-                color: cyan
                 opacity: 1
                 stroke_width: 3
                 extend_to: now
@@ -614,9 +620,9 @@ views:
                 yaxis_id: price
       - type: custom:octopus-energy-rates-card
         currentEntity: >-
-          event.octopus_energy_electricity_19m1337498_1610032016836_current_day_rates
+          event.octopus_energy_electricity_22j0102472_1800020136985_current_day_rates
         futureEntity: >-
-          event.octopus_energy_electricity_19m1337498_1610032016836_next_day_rates
+          event.octopus_energy_electricity_22j0102472_1800020136985_next_day_rates
         cols: 2
         hour12: false
         showday: true
