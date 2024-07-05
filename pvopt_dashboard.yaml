@@ -21,7 +21,7 @@ views:
                 name: Solar
                 max: 5000
                 icon: mdi:solar-power-variant
-              - entity: sensor.solis_house_load
+              - entity: sensor.solis_total_load
                 name: Load
                 max: 5000
               - entity: sensor.solis_battery_soc
@@ -324,7 +324,7 @@ views:
             span:
               start: day
             series:
-              - entity: sensor.solis_house_load
+              - entity: sensor.solis_total_load
                 float_precision: 0
                 extend_to: now
                 group_by:
