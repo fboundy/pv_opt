@@ -21,7 +21,7 @@ VERSION = "3.16.0-Beta-5"
     #Add additional comment text
     #Clear IOG car charging plan once end time is reached
 #Beta-5
-    #Supress any negative values after substracting EV consumption from Total Consumption.
+    #Added targeted logging for any negative kWh values in consumption calculations.
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -1981,10 +1981,11 @@ class PVOpt(hass.Hass):
             self.io_slots = self.io_slots.drop(
                 self.io_slots[self.io_slots["end_dt"] < pd.Timestamp.now(self.tz)].index
             )
-            # SVB logging
-            self.log("IO slot clearance check")
-            self.log(self.io_slots["end_dt"])
-            self.log(pd.Timestamp.now(self.tz))
+
+            if self.debug:
+                self.log("IO slot clearance check")
+                self.log(self.io_slots["end_dt"])
+                self.log(pd.Timestamp.now(self.tz))
 
         if self.intelligent:
             self.log("")
