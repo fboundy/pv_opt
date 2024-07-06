@@ -14,14 +14,16 @@ from datetime import datetime
 import re
 
 
-VERSION = "3.16.0-Beta-5"
+VERSION = "3.16.0-Beta-6"
 # Change history
 # -------
 #Beta-4:
     #Add additional comment text
     #Clear IOG car charging plan once end time is reached
-#Beta-5
-    #Added targeted logging for any negative kWh values in consumption calculations.
+#Beta-5:
+    #Supress any negative values after substracting EV consumption from Total Consumption
+#Beta-6:
+    #Tidy up debug logging behind debug switch
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
