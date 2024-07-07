@@ -37,7 +37,7 @@ This app is not stand-alone it requires the following:
 |Solcast PV Solar Integration | Required | Retrieves solar forecast from Solcast into Home Assistant |
 |Octopus Energy | Optional | Used to retrieve tariff information and Octopus Saving Session details. For users on Octopus Intelligent, this is required for any addtional slots outside of the 6 hour period to be taken into account in the charge/discharge plan. |
 |Solax Modbus | Optional | Used to control Solis inverter directly. Support for two other integrations is now available (see below). Support inverter brands is possible using the API described below.
-|MyEnergi | Optional | For Octopus Intelligent Go users using a Zappi charger, used to detect EV plugin and supply EV consumption history. 
+|MyEnergi | Optional | For Intelligent Octopus Go users using a Zappi charger, used by Pv_opt to detect EV plugin and supply EV consumption history. 
 
 <h2>Step by Step Installation Guide</h2>
 
@@ -361,8 +361,8 @@ These parameters will define how PV Opt estimates daily consumption:
 
 | Parameter | Units | Entity | Default | Description |
 |:--|:--:| :-- | :--:|:--|
-| EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type for users on Octopus Intelligent Go. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
-| EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to On prevents this, as well as ensuring that any EV consumption is removed from Consumption History. |
+| EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type for users on Intelligent Octopus Go. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
+| EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to On prevents this, as well as ensuring that any EV consumption is removed from Consumption History. If your Zappi is wired on its own Henley block outside of what the inverter CT clamp will measure, then set this to Off. |
 | EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. Value is for a future release. At the current release this value has no effect. |
 | EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 30 | Set EV Battery Capacity. Value is for a future release. At the current release this value has no effect. |
 
