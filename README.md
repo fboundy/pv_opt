@@ -60,7 +60,7 @@ This app is not stand-alone it requires the following:
 
 
 
-This excellent integration will pull Octopus Price data in to Home Assistant. Solar Opt pulls data from Octopus independently of this integration but will extract current tariff codes from it if they are avaiable. If not it will either use account details supplied in `secrets.yaml` or explicitly defined Octopus tariff codes set in `config.yaml`.
+This excellent integration will pull Octopus Price data in to Home Assistant. Solar Opt pulls data from Octopus independently of this integration but will extract current tariff codes from it if they are avaiable. If not it will either use account details supplied in `secrets.yaml` or explicitly defined Octopus tariff codes set in `config.yaml`. If on Intelligent Octopus Go, this integration is required for Pv opt to utilise any slots allocated outside of 23:30 to 05:30 in its charging plan. 
 
 
 <h3>5. Install the Integration to Control Your Inverter</h3>
@@ -355,6 +355,13 @@ These parameters will define how PV Opt estimates daily consumption:
 | <b>Daily Consumption Parameters
 | Daily Consumption | kWh | `number.pvopt_daily_consumption_kwh` | 17 | Estimated daily consumption to use when predicting future load |
 | Shape Consumption Profile | `on`/`off` | `switch.pvopt_shape_consumption_profile` | On | Defines whether to shapoe the consumption to a typical daily profile (`on`) or to assume constant usage (`off`) |
+
+<h3>EV parameters</h3>
+
+| Parameter | Units | Entity | Default | Description |
+|:--|:--:| :-- | :--:|:--|
+| EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type. 'Zappi' requires MyEnergi integration to be installed. Type 'Other' is unused and is for a future release|
+| EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to on will prevent this |
 
 
 <h3>Tuning Parameters</h3>
