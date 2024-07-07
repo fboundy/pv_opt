@@ -360,9 +360,10 @@ These parameters will define how PV Opt estimates daily consumption:
 
 | Parameter | Units | Entity | Default | Description |
 |:--|:--:| :-- | :--:|:--|
-| EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type for users on Octopus Intelligent Go. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: selecting Zappi requires the MyEnergi integration to be installed. |
+| EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type for users on Octopus Intelligent Go. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
 | EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to On prevents this, as well as ensuring that any EV consumption is removed from Consumption History. |
-
+| EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. Value is for a future release. At the current release this value has no effect. |
+| EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 30 | Set EV Battery Capacity. Value is for a future release. At the current release this value has no effect. |
 
 <h3>Tuning Parameters</h3>
 These parameters will tweak how PV Opt runs:
