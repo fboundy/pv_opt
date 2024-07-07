@@ -35,8 +35,9 @@ This app is not stand-alone it requires the following:
 | Studio Code Server| Alternative|Alternative to using `File Editor` to edit config files. Not convered in this guide.
 | <u><b>Integrations</b></u> | | |
 |Solcast PV Solar Integration | Required | Retrieves solar forecast from Solcast into Home Assistant |
-|Octopus Energy | Optional | Used to retrieve tariff information and Octopus Saving Session details|
+|Octopus Energy | Optional | Used to retrieve tariff information and Octopus Saving Session details. For users on Octopus Intelligent, this is required for any addtional slots outside of the 6 hour period to be taken into account in the charge/discharge plan. |
 |Solax Modbus | Optional | Used to control Solis inverter directly. Support for two other integrations is now available (see below). Support inverter brands is possible using the API described below.
+|MyEnergi | Optional | For Octopus Intelligent Go users using a Zappi charger, used to detect EV plugin and supply EV consumption history. 
 
 <h2>Step by Step Installation Guide</h2>
 
