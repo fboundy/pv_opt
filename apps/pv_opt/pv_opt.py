@@ -14,7 +14,7 @@ from datetime import datetime
 import re
 
 
-VERSION = "3.16.0-Beta-6"
+VERSION = "3.16.0-Beta-7"
 # Change history
 # -------
 #Beta-4:
@@ -24,6 +24,9 @@ VERSION = "3.16.0-Beta-6"
     #Supress any negative values after substracting EV consumption from Total Consumption
 #Beta-6:
     #Tidy up debug logging behind debug switch
+#Beta-7: 
+    #Correct typo in _get_io_car_slots
+
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -529,6 +532,7 @@ class PVOpt(hass.Hass):
         self.car_plugin_detected = 0
         self.tariff_reloaded = 0
         self.io_slots = pd.DataFrame()
+        self.contract_last_loaded = pd.Timestamp(2024,1,1)
 
         self.bottlecap_entities = {"import": None, "export": None}
 
@@ -653,7 +657,7 @@ class PVOpt(hass.Hass):
         self.log(f"  Current Dispatch Status (On/off) = : {self.io_dispatch_active}")
 
         if self.debug:
-            self.io_dispatch_attrib = self.get_state(self.self.io_dispatching_sensor, attribute="all")
+            self.io_dispatch_attrib = self.get_state(self.io_dispatching_sensor, attribute="all")
             for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
                 self.rlog(f" {k:20s} {self.io_dispatch_attrib[k]}")
 
@@ -665,11 +669,8 @@ class PVOpt(hass.Hass):
                         f"  {z['start'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['end'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['charge_in_kwh']:12.3f}  {z['source']:12s}"
                     )
 
-        # Get Planned dispatches from Intelligent Dispatcing sensor
+        # Get Planned dispatches from Intelligent Dispathing sensor
         df = pd.DataFrame(self.get_state_retry(self.io_dispatching_sensor, attribute=("planned_dispatches")))
-        # self.log("df after first dataload is")
-        # self.log(df)
-        # self.log(df.info)
 
         # If Charging plan exists, convert dispatch start and end times to datetime format and append to df.
         if not df.empty:
@@ -678,7 +679,7 @@ class PVOpt(hass.Hass):
             df["start_local"] = df["start_dt"].dt.tz_convert(self.tz)
             df["end_local"] = df["end_dt"].dt.tz_convert(self.tz)
 
-        # SVB updates
+        
         self.log("")
         self.log("    Octopus Intelligent Go Smart Charging Schedule is.... ")
 
@@ -1107,7 +1108,7 @@ class PVOpt(hass.Hass):
 
         else:
             self.contract_last_loaded = pd.Timestamp.now(tz="UTC")
-            ### SVB logging
+            # SVB logging
             # self.log("Printing self.contract.tariffs at end of 'load_contract'")
             # self.log(self.contract.tariffs)
             # self.log("")
@@ -2112,11 +2113,10 @@ class PVOpt(hass.Hass):
                     # If the current slot is a Hold SOC slot and we aren't holding then we need to
                     # enable Hold SOC. Uses backup mode instead of charge current = 0 to allow excess solar to charge batteries.
 
-                    ### SVB if already in IOG hold slot, first 'if' should now not run. Delete this comment once verified.
 
                     if (
                         self.hold and self.hold[0]["active"]
-                    ):  ### Should not activate for IOG slots (as self.hold shouldnt be active)
+                    ):  # Should not activate for IOG slots (as self.hold shouldnt be active)
 
                         self.log("In a hold slot")
                         self.log("Printing Status")
@@ -2148,7 +2148,7 @@ class PVOpt(hass.Hass):
                         else:
                             self.log(f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%")
 
-                    else:  ### if already in IOG slot, this bit should run
+                    else:  # if already in IOG slot, this bit should run
                         self.log(f"Current charge/discharge window ends in {time_to_slot_end:0.1f} minutes.")
 
                         if self.charge_power > 0:  # Intentionally 0 (not 1) to ensure IOG slots are also encompassed.
@@ -2190,28 +2190,6 @@ class PVOpt(hass.Hass):
                                 power=self.charge_power,
                                 target_soc=self.charge_target_soc,
                             )
-
-                        ### SVB new code added, this erases the start time and thus means the inverter should not be written to for contiguous IOG slots
-
-                        # elif self.charge_power == 1:
-                        #    if not status["hold_soc"]["active"]:  # probably don't need this gate anymore, just set Start = None regardless ####
-                        #        start = pd.Timestamp.now(tz=self.tz)
-                        #    else:
-                        #        start = None
-                        #
-                        #    if status["discharge"]["active"]:
-                        #        self.inverter.control_discharge(
-                        #            enable=False,
-                        #        )
-
-                        #    self.inverter.control_charge(
-                        #        enable=True,
-                        #        start=start,
-                        #        end=self.charge_end_datetime,
-                        #        power=self.charge_power,
-                        #        target_soc=self.charge_target_soc,
-                        #    )
-                        ### end of new code.
 
                 else:
                     if self.charge_power > 0:  # for charge slots and IOG hold slots
@@ -2534,7 +2512,7 @@ class PVOpt(hass.Hass):
                 self.log("")
                 self.log(
                     "Setting IO slots to hold"
-                )  # If forced = 1 then the window is an IO slot. It will already have a "<=" set as we made start SOC = end SOC, but we
+                )  # If forced = 1 then the window is an IOG slot. It will already have a "<=" set as we made start SOC = end SOC, but we
                 # possibly want to differentiate the two for later processing.
                 self.windows.loc[
                     (self.windows["forced"] == 1),
@@ -2557,28 +2535,6 @@ class PVOpt(hass.Hass):
 
             self.charge_start_datetime = self.windows["start"].iloc[0].tz_convert(self.tz)
             self.charge_end_datetime = self.windows["end"].iloc[0].tz_convert(self.tz)
-
-            # self.log("")
-            # self.log("TimeNow is")
-            # self.log(pd.Timestamp.now(self.tz))
-            # self.log("")
-            # self.log("Charge_start_datetime is")
-            # self.log(self.charge_start_datetime)
-
-            # slot_left_factor = 0
-            # if pd.Timestamp.now(self.tz) > self.charge_start_datetime:
-            #    slot_left_factor = 1800 / ((self.charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds())
-
-            # self.log("")
-            # self.log("Print slot_left_factor")
-            # self.log(slot_left_factor)
-
-            # If we are in a slot, then "forced" has already been factored by the slot time remaining to ensure the power flow calclations are correct
-            # We need to remove that factor so the inverter charge power remains unchanged in the slot
-            # if slot_left_factor == 0:
-            #    self.charge_power = self.windows["forced"].iloc[0]
-            # else:
-            #    self.charge_power = self.windows["forced"].iloc[0] * slot_left_factor
 
             self.charge_power = self.windows["forced"].iloc[0]
             voltage = self.get_config("battery_voltage", default=50)
@@ -2930,7 +2886,7 @@ class PVOpt(hass.Hass):
 
             for entity_id in entity_ids:
                 power = self.hass2df(entity_id=entity_id, days=days)
-
+                self.log(f"Getting consumption in W from: {entity_id} ")
                 power = self.riemann_avg(power)
                 if df is None:
                     df = power
@@ -2938,7 +2894,7 @@ class PVOpt(hass.Hass):
                     df += power
 
             if df is None:
-                self.log("Getting consumpion")
+                self.log(f"Getting consumption in kWh from: {entity_id} ")
                 df = self._get_hass_power_from_daily_kwh(
                     entity_id,
                     days=days,
@@ -3284,7 +3240,7 @@ class PVOpt(hass.Hass):
                 str_log = "No export tariff."
 
             else:
-                ### SVB debugging
+                # SVB debugging
                 # self.log("")
                 # self.log("Entity name to be read is .....")
                 # self.log(self.bottlecap_entities[direction])
@@ -3317,7 +3273,7 @@ class PVOpt(hass.Hass):
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
 
-                ### SVB logging
+                # SVB logging
                 # self.log("Printing contract comparison df")
                 # self.log(df.to_string())
 
