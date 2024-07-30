@@ -13,8 +13,9 @@ from numpy import nan
 from datetime import datetime
 import re
 
+VERSION = "3.16.0-Beta-8"
 
-VERSION = "3.16.0-Beta-7"
+
 # Change history
 # -------
 #Beta-4:
@@ -26,6 +27,8 @@ VERSION = "3.16.0-Beta-7"
     #Tidy up debug logging behind debug switch
 #Beta-7: 
     #Correct typo in _get_io_car_slots
+#Beta-8:
+    #Add fixes for tariff overrides when Octopus Auto = False (to allow development of EV charge control on Agile)
 
 
 
@@ -335,6 +338,7 @@ DEFAULT_CONFIG = {
     },
     "ev_charger": {
         "default": "None",
+        "domain": "select",
         "attributes": {
             "options": [
                 "None",
@@ -648,6 +652,9 @@ class PVOpt(hass.Hass):
                     "Failed to find Octopus Intelligent Dispatching Sensor and/or % Charge to Add from Octopus Energy Integration. Car charging cannot be determined",
                     level="WARNING",
                 )
+        else:  # No access to Octopus for loading charge to add
+            self.io_charge_to_add = 0   # Set default value of 0
+            self.old_io_charge_to_add = 0 
 
     def _get_io_car_slots(self):
         # Get Planned dispatches from Intelligent Dispatcing sensor
@@ -729,10 +736,13 @@ class PVOpt(hass.Hass):
                     self.car_plugin_detected = 0
 
                 # If EV plugged in, check charge to add hasnt changed
-                self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)
-                if (self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected"):
-                    self.car_plugin_detected = 1
-                    self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
+                if self.get_config("octopus_auto"):
+                    self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)
+                    if (self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected"):
+                        self.car_plugin_detected = 1
+                        self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
+                else:
+                    self.log("Octopus Energy Integration not detected, Charge to add is not available, IOG tariff not reloaded")
 
     def _check_for_zappi(self):
         # Check for Zappi sensors for power consumption and car connected/charging status.
@@ -984,7 +994,7 @@ class PVOpt(hass.Hass):
                                 )
 
                                 if self.debug:
-                                    self.log(f">>>_load_contract {tariff_code}")
+                                    self.log(f">>>X _load_contract {tariff_code}")
 
                                 if tariff_code is not None:
                                     tariffs[imp_exp] = pv.Tariff(
@@ -1073,11 +1083,11 @@ class PVOpt(hass.Hass):
                         self.rlog(str)
 
                         tariffs = {x: None for x in IMPEXP}
+
                         for imp_exp in IMPEXP:
                             if f"octopus_{imp_exp}_tariff_code" in self.config:
                                 tariffs[imp_exp] = pv.Tariff(
                                     self.config[f"octopus_{imp_exp}_tariff_code"],
-                                    self.io_prices,
                                     export=(imp_exp == "export"),
                                     host=self,
                                 )
@@ -1109,13 +1119,14 @@ class PVOpt(hass.Hass):
         else:
             self.contract_last_loaded = pd.Timestamp.now(tz="UTC")
             # SVB logging
-            # self.log("Printing self.contract.tariffs at end of 'load_contract'")
-            # self.log(self.contract.tariffs)
-            # self.log("")
+            #self.log("Printing self.contract.tariffs at end of 'load_contract'")
+            #self.log(self.contract.tariffs)
+            #self.log("")
 
+            ##### SVB debugging - Override Export Tariff
             if self.contract.tariffs["export"] is None:
                 self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
-
+                #self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)
             self.rlog("")
             self._load_saving_events()
 
@@ -2367,11 +2378,11 @@ class PVOpt(hass.Hass):
             | ((self.opt["ioslot"].diff() > 0) & (self.opt["forced"] == 0))
         ).cumsum()
 
-        # SVB logging
-        if self.debug:
-            self.log("")
-            self.log("After assignment of 'period', self.opt is........")
-            self.log(self.opt.to_string())
+        ### SVB logging
+        #if self.debug:
+        self.log("")
+        self.log("After assignment of 'period', self.opt is........")
+        self.log(self.opt.to_string())
 
         # If there is either a charge/discharge plan or an IOG car charging plan, create windows.
         if ((self.opt["forced"] != 0).sum() > 0) or ((self.opt["ioslot"] != 0).sum() > 0):
