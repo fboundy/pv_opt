@@ -840,10 +840,10 @@ class PVsystemModel:
 
         prices = prices.set_axis([t for t in contract.tariffs.keys() if contract.tariffs[t] is not None], axis=1)
         
-        #if not use_export:
-        #    self.log(f"Ignoring export pricing because Use Export is turned off")
-        #    discharge = False
-        #    prices["export"] = 0
+        if not use_export:
+            self.log(f"Ignoring export pricing because Use Export is turned off")
+            discharge = False
+            prices["export"] = 0
 
         df = pd.concat(
             [prices, consumption, self.flows(initial_soc, static_flows, **kwargs)],
@@ -1018,8 +1018,8 @@ class PVsystemModel:
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
                                     )
-                                    #if log and self.host.debug:
-                                    if log:
+                                    if log and self.host.debug:
+                                    #if log:
                                         str_log_x = (
                                             f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
                                             + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
@@ -1127,7 +1127,7 @@ class PVsystemModel:
             available = (
                 (df["import"] < max_export_price) & (df["forced"] < self.inverter.charger_power) & (df["forced"] >= 0)
             )
-            self.log(df["import"]<max_export_price)
+            # self.log(df["import"]<max_export_price)
             a0 = available.sum()
             if log:
                 self.log(f"{available.sum()} slots have an import price less than the max export price")
@@ -1169,7 +1169,7 @@ class PVsystemModel:
                             - pd.Timestamp.utcnow().tz_localize(None)
                         ).total_seconds() / 1800
                     else:
-                        str_log += "- "
+                        str_log += "  "
                         factor = 1
 
                     #str_log += f"SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
@@ -1181,7 +1181,7 @@ class PVsystemModel:
                         - x[cols["solar"]].loc[start_window],
                         ((100 - x["soc_end"].loc[start_window]) / 100 * self.battery.capacity) * 2 * factor,
                     )
-                    self.log(f"Forced Charge = {forced_charge}")
+                    #self.log(f"Forced Charge = {forced_charge}")
                     slot = (
                         start_window,
                         forced_charge,
@@ -1189,9 +1189,9 @@ class PVsystemModel:
 
                     slots.append(slot)
 
-                    slots_df = pd.DataFrame({'col':slots})  # Convert list to df for easier logging
-                    self.log("Slots after append = ")
-                    self.log(slots_df)
+                    #slots_df = pd.DataFrame({'col':slots})  # Convert list to df for easier logging
+                    #self.log("Slots after append = ")
+                    #self.log(slots_df)
 
                     df = pd.concat(
                         [
@@ -1201,8 +1201,8 @@ class PVsystemModel:
                         axis=1,
                     )
 
-                    self.log("Df after flows called = ")
-                    self.log(df.to_string())
+                    #self.log("Df after flows called = ")
+                    #self.log(df.to_string())
 
                     net_cost = contract.net_cost(df).sum()
 
@@ -1244,9 +1244,9 @@ class PVsystemModel:
             else:
                 str_log += f": > Pass Threshold {self.host.get_config('pass_threshold_p'):0.1f}p => Slots Included"
 
-            #if log:
-            self.log("")
-            self.log(str_log)
+            if log:
+                self.log("")
+                self.log(str_log)
 
             # -----------
             # Discharging
@@ -1339,8 +1339,8 @@ class PVsystemModel:
                                 ],
                                 axis=1,
                             )
-                            #if log:
-                            self.log(str_log)
+                            if log:
+                                self.log(str_log)
                     else:
                         done = True
 
