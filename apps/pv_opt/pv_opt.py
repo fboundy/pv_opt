@@ -13,7 +13,7 @@ from numpy import nan
 from datetime import datetime
 import re
 
-VERSION = "3.16.0-Beta-8"
+VERSION = "3.16.0-Beta-9"
 
 
 # Change history
