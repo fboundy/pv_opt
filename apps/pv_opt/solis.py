@@ -453,7 +453,7 @@ class InverterController:
 
         for switch in switches:
             if switch in kwargs:
-                if self.host.debug:
+                if (self.host.debug and "I" in self.host.debug_cat):
                     self.log(f">>> {switch}: {kwargs[switch]}")
                 switches[switch] = kwargs[switch]
 
@@ -467,7 +467,7 @@ class InverterController:
             modes = {INVERTER_DEFS[self.type]["codes"].get(mode): mode for mode in entity_modes}
             # mode = INVERTER_DEFS[self.type]["modes"].get(code)
             mode = modes.get(code)
-            if self.host.debug:
+            if (self.host.debug and "I" in self.host.debug_cat):
                 self.log(f">>> Inverter Code: {code}")
                 self.log(f">>> Entity modes: {entity_modes}")
                 self.log(f">>> Modes: {modes}")
@@ -487,7 +487,7 @@ class InverterController:
         else:
             modes = INVERTER_DEFS[self.type]["modes"]
             code = {modes[m]: m for m in modes}[inverter_mode]
-        if self.host.debug:
+        if (self.host.debug and "I" in self.host.debug_cat):
             self.log(f">>> Inverter Mode: {inverter_mode}")
             self.log(f">>> Inverter Code: {code}")
 
