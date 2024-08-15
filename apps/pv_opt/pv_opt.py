@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.15.4"
+VERSION = "3.15.5"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -2172,7 +2172,11 @@ class PVOpt(hass.Hass):
             "consumption",
         ]
 
-        cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1).fillna(0)
+        cost = (
+            pd.DataFrame(pd.concat([df for df in [cost_today, cost] if len(df) > 0]))
+            .set_axis(["cost"], axis=1)
+            .fillna(0)
+        )
         cost["cumulative_cost"] = cost["cost"].cumsum()
 
         for d in [df, cost]:

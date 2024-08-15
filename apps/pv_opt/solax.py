@@ -5,6 +5,7 @@ TIMEFORMAT = "%H:%M"
 LIMITS = ["start", "end"]
 DIRECTIONS = ["charge"]
 WRITE_POLL_SLEEP_DURATION = 0.5
+BATTERY_VOLTAGE_DEFAULT = 100.0
 
 INVERTER_DEFS = {
     "SOLAX_X1": {
@@ -109,7 +110,11 @@ class InverterController:
                 power = kwargs.get("power")
                 if power is not None:
                     entity_id = self.host.config[f"id_max_charge_current"]
-                    current = abs(round(power / self.host.get_config("battery_voltage"), 1))
+                    voltage = self.host.get_config("battery_voltage")
+                    if voltage == 0:
+                        voltage = BATTERY_VOLTAGE_DEFAULT
+                        self.log(f"Read a battery voltage of zero. Assuming default of {BATTERY_VOLTAGE_DEFAULT}")
+                    current = abs(round(power / voltage, 1))
                     current = min(current, self.host.get_config("battery_current_limit_amps"))
 
                     self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
