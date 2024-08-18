@@ -3,8 +3,6 @@ import pandas as pd
 import requests
 from copy import copy
 from numpy import isnan
-
-# from scipy.stats import linregress
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -516,13 +514,23 @@ class Tariff:
 
 
 class InverterModel:
+    """Describes the inverter
+
+    Attributes:
+        inverter_efficiency: A float describing the DC-AC efficiency of the inverter.
+        charger_efficiency: A float describing the AC-DC efficiency of the inverter.
+        inverter_loss: An int describing the internal power consumption of the inverter at zero load.
+        inverter_power: An int describing the DC-AC power of the inverter.
+        charger_power: An int describing the AC-CC power of the inverter.
+    """
+
     def __init__(
         self,
-        inverter_efficiency=0.97,
-        charger_efficiency=0.91,
-        inverter_loss=100,
-        inverter_power=3000,
-        charger_power=3500,
+        inverter_efficiency: float = 0.97,
+        charger_efficiency: float = 0.91,
+        inverter_loss: int = 100,
+        inverter_power: int = 3000,
+        charger_power: int = 3500,
     ) -> None:
         self.inverter_efficiency = inverter_efficiency
         self.charger_efficiency = charger_efficiency
@@ -530,8 +538,8 @@ class InverterModel:
         self.charger_power = charger_power
         self.inverter_loss = inverter_loss
 
-    # def __str__(self):
-    #     pass
+    def __str__(self):
+        pass
 
     # def calibrate(self, data, **kwargs):
     #     cols = {k: kwargs.get(k, k) for k in ["solar", "consumption", "grid", "battery", "soc"]}
