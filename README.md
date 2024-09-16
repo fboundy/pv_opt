@@ -8,6 +8,8 @@ The application will integrate fully with Solis inverters which are controlled u
 - [Home Assistant Solax Modbus Integration](https://github.com/wills106/homeassistant-solax-modbus) 
 - [Home Assistant Core Modbus Integration](https://github.com/fboundy/ha_solis_modbus) 
 - [Home Assistant Solarman Integration](https://github.com/StephanJoubert/home_assistant_solarman) 
+- [Home Assistant Solis Sensor Integration](https://github.com/hultenvp/solis-sensor) (read-only mode)
+  - [Home Assistant Solis Control Integration](https://github.com/stevegal/solis_control) (allows inverter control via solis_cloud and HA automations)
 
 Once installed it should require miminal configuration. Other inverters/integrations can be added if required or can be controlled indirectly using automations.
 
@@ -48,7 +50,7 @@ This app is not stand-alone it requires the following:
 <h3>2. Install HACS</h3>
 
 1. Install HACS: https://hacs.xyz/docs/setup/download
-2. Enable AppDaemon in HACS: https://hacs.xyz/docs/categories/appdaemon_apps/
+2. Enable AppDaemon in HACS: https://hacs.xyz/docs/use/repositories/type/appdaemon/#making-appdaemon-apps-visible-in-hacs
 
 <h3>3. Install the Solcast PV Solar Integration (v4.0.x)</h3>
 
@@ -66,7 +68,9 @@ This excellent integration will pull Octopus Price data in to Home Assistant. So
 
 <h3>5. Install the Integration to Control Your Inverter</h3>
 
-At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus) or the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus. Support for the Solarman integration (https://github.com/StephanJoubert/home_assistant_solarman) is in test. At the moment writing to the inverter is disabled pending further testing by Solarman users.
+At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus), the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus, or combining the [Solis-Senor](https://github.com/hultenvp/solis-sensor) and [Solis-Control](https://github.com/hultenvp/solis_control) integrations. 
+
+Support for the Solarman integration (https://github.com/StephanJoubert/home_assistant_solarman) is in test. At the moment writing to the inverter is disabled pending further testing by Solarman users.
 
 <h4>Solax Modbus:</h4>
 
@@ -87,6 +91,15 @@ At present this app only works directly with Solis hybrid inverters using either
 
 Follow the Github instructions here: https://github.com/fboundy/ha_solis_modbus
 
+<h4>Using Solis Cloud</h4>
+<h5>Solis-Sensor</h5>
+
+Follow the Github instruction here: https://github.com/hultenvp/solis-sensor
+
+<h5>Solis-Control</h5>
+
+Follow the Github instruction here: https://github.com/hultenvp/solis_control
+
 <h4>Solarman</h4>
 
 Follow the Github instructions here: https://github.com/StephanJoubert/home_assistant_solarman 
@@ -100,9 +113,7 @@ Follow the Github instructions here: https://github.com/StephanJoubert/home_assi
 
 <h3>7. Install Mosquitto MQTT Broker</h3>
 
-1. Click the Home Assistant My button below to open the add-on on your Home Assistant instance:
-
-   [![](https://camo.githubusercontent.com/c16bd5d7acfc6d5163636b546783e9217e27a401c1ac5bfd93a2ef5fa23e15fe/68747470733a2f2f6d792e686f6d652d617373697374616e742e696f2f6261646765732f73757065727669736f725f6164646f6e2e737667)](https://my.home-assistant.io/redirect/supervisor_addon/?addon=a0d7b954_appdaemon&repository_url=https%3A%2F%2Fgithub.com%2Fhassio-addons%2Frepository)
+1. Navigate to Settings -> Addons and click "Mosquito Broker"
 
 2. Click on Install
 
@@ -111,6 +122,10 @@ Follow the Github instructions here: https://github.com/StephanJoubert/home_assi
 4. Either save the MQTT username and password in your `secrets.yaml` file or make a note of them for later.
 
 <h3>8. Install File Editor</h3>
+
+Follow instructions here: https://github.com/home-assistant/addons/blob/master/configurator/README.md
+
+Navigate to Settings -> Addons -> File editor -> Configuration and set "Enforce Basepath" to "off".
 
 <h3>9. Install Samba Share and/or Studio Code Server Add-ons If Required</h3>
 
@@ -124,7 +139,7 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
 
 1. Click the Home Assistant My button below to open the add-on on your Home Assistant instance:
 
-   [![](https://camo.githubusercontent.com/c16bd5d7acfc6d5163636b546783e9217e27a401c1ac5bfd93a2ef5fa23e15fe/68747470733a2f2f6d792e686f6d652d617373697374616e742e696f2f6261646765732f73757065727669736f725f6164646f6e2e737667)](http://homeassistant.local:8123/hassio/addon/core_mosquitto/info)
+   [![](https://camo.githubusercontent.com/a54868bd2c4edb2d623ab2fef3d074fe711b45c2c1cdc0fbe4dfd296faa594f8/68747470733a2f2f6d792e686f6d652d617373697374616e742e696f2f6261646765732f73757065727669736f725f6164646f6e2e737667)](https://my.home-assistant.io/redirect/supervisor_addon/?addon=a0d7b954_appdaemon&repository_url=https%3A%2F%2Fgithub.com%2Fhassio-addons%2Frepository)
 
 2. Click on <b>Install</b>
 
@@ -165,6 +180,11 @@ AppDaemon is a loosely coupled, multi-threaded, sandboxed python execution envir
         api:
         hadashboard:
 
+And add the `client_user` and `client_password` keys to `secrets.yaml` like this:
+
+    mqtt-user: some_user
+    mqtt-password: some_password
+    
 3. It is also recommended that you add the following entries to `appdaemon.yaml` to improve AppDaemon logging. These settings assume that you have a `/share/logs` folder setup using `Samba Share`.
 
         logs:
