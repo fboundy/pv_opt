@@ -162,3 +162,7 @@ cython_debug/
 nordpool.py
 brm.py
 .test.py
+
+# VSCode
+.vscode/
+*.code-workspace
