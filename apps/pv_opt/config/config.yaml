@@ -29,7 +29,7 @@ pv_opt:
 
 
   # If true the current config in HA will be over-written with that in the config.yaml. 
-  overwrite_ha_on_restart: true
+  overwrite_ha_on_restart: false
   list_entities: true
 
   # If true the personal data will be redacted from the log files. 
@@ -38,10 +38,9 @@ pv_opt:
   # ========================================
   # Basic parameters
   # ========================================
-  read_only: true # If true the inverter will not be controlled
+  read_only: false # If true the inverter will not be controlled
   forced_discharge: true # Enable forced discharging
-  allow_cyclic: true # Enable alternate charge/discharge windows
-  optimise_frequency_minutes: 5
+  allow_cyclic: false # Enable alternate charge/discharge windows
 
   # ========================================
   # Plant parameters
@@ -50,19 +49,19 @@ pv_opt:
   # All parameters can be a number or point to an entity UNLESS they start with 'id_'. All of
   # these are required but will be defaulted if not specified
 
-  battery_capacity_wh: 3650
-  inverter_efficiency_percent: 97 # Default: 97
-  charger_efficiency_percent: 95 # Default: 91
-  maximum_dod_percent: 8
-  charger_power_watts: 1800
-  inverter_power_watts: 3600
+  # battery_capacity_wh: 10000
+  # inverter_efficiency_percent: 97 # Default: 97
+  # charger_efficiency_percent: 91 # Default: 91
+  # maximum_dod_percent: 15
+  # charger_power_watts: 3500
+  # inverter_power_watts: 3600
   # inverter_loss_watts: 100
-  battery_current_limit_amps: 37
+  # battery_current_limit_amps: 50
   
   # ========================================
   # Solcast configuration
   # ========================================
-  use_solar: true
+   # use_solar: true
   #
   # id_solcast_today: sensor.solcast_pv_forecast_forecast_today
   # id_solcast_tomorrow: sensor.solcast_pv_forecast_forecast_tomorrow
@@ -72,9 +71,9 @@ pv_opt:
   # Consumption forecast parameters
   # ========================================
   #
-  use_consumption_history: true
-  consumption_history_days: 14
-  #
+  # use_consumption_history: false
+  # # consumption_history_days: 6
+  # #
   # daily_consumption_kwh: 17
   # shape_consumption_profile: true
   # consumption_shape:
@@ -99,15 +98,15 @@ pv_opt:
   # Octopus account parameters
   # ========================================
 
-  octopus_auto: false # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+  # octopus_auto: False # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
 
   # octopus_account: !secret octopus_account
   # octopus_api_key: !secret octopus_api_key
 
   # The following Can be omitted if either of the above options is working correctly:
 
-  octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
-  octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
+  # octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+  # octopus_export_tariff_code: E-1R-AGILE-OUTGOING-19-05-13-G
 
   # octopus_import_tariff_code: E-1R-AGILE-23-12-06-G 
   # # octopus_export_tariff_code: E-1R-OUTGOING-LITE-FIX-12M-23-09-12-G
@@ -118,6 +117,22 @@ pv_opt:
   
   # octopus_import_tariff_code: E-1R-GO-VAR-22-10-14-N
   # octopus_export_tariff_code: E-1R-OUTGOING-LITE-FIX-12M-23-09-12-N
+
+  # ========================================
+  # EV parameters
+  # ========================================
+  #
+  # If you have a Zappi Charger, uncomment next line to allow Pv_opt to detect car plugin status
+  # for use with the Octopus Intelligent Tariff and to allow EV consumption data to be read (if needed). 
+  #
+  # ev_charger: Zappi   # Default = None
+  #
+  # By default, Zappi is set to seen as part of the house load to prevent house battery discharge during car charging and allow discounting of EV consumption
+  # from house charging calculations. 
+  #
+  # If your Zappi is not seen as part of the house load, uncomment next line to set to False. 
+  #
+  # ev_part_of_house_load = False     # Default = True
   
   # ===============================================================================================================
   # Brand / Integration Specific Config: SOLIS_SOLAX_MODBUS: https://github.com/wills106/homeassistant-solax-modbus
@@ -128,19 +143,19 @@ pv_opt:
   # inverter_type: SOLIS_SOLAX_MODBUS
   # device_name: solis
   
-  battery_voltage: sensor.{device_name}_battery_voltage
-  # update_cycle_seconds: 15 
+  # battery_voltage: sensor.{device_name}_battery_voltage
+  # update_cycle_seconds: 15
   # maximum_dod_percent: number.{device_name}_battery_minimum_soc 
   
-  id_consumption_today: sensor.{device_name}_daily_grid_energy_used
-  # id_consumption:
-  #   - sensor.{device_name}_total_consumption_power
-  #   - sensor.{device_name}_bypass_load
+  id_consumption_today: sensor.{device_name}_consumption_today
+  id_consumption:
+    - sensor.{device_name}_house_load
+    - sensor.{device_name}_bypass_load
 
-  id_grid_import_today: sensor.{device_name}_daily_grid_energy_purchased
-  id_grid_export_today: sensor.{device_name}_daily_on_grid_energy
+  # id_grid_import_today: sensor.{device_name}_grid_import_today
+  # id_grid_export_today: sensor.{device_name}_grid_export_today
 
-  id_battery_soc: sensor.{device_name}_remaining_battery_capacity
+  # id_battery_soc: sensor.{device_name}_battery_soc
   # id_timed_charge_start_hours: number.{device_name}_timed_charge_start_hours
   # id_timed_charge_start_minutes: number.{device_name}_timed_charge_start_minutes
   # id_timed_charge_end_hours: number.{device_name}_timed_charge_end_hours
@@ -238,7 +253,7 @@ pv_opt:
   # device_name: solarsynk
   # inverter_sn: 000000  # enter {sunsynk_serial} from solarsynk2 addon
 
-  # maximum_dod_percent:  10
+  # maximum_dod_percent:  20
   # id_battery_soc:  sensor.{device_name}_{inverter_sn}_battery_soc
   # id_consumption_today: sensor.{device_name}_{inverter_sn}_day_load_energy
   # id_grid_import_today: sensor.{device_name}_{inverter_sn}_day_grid_import
@@ -249,20 +264,20 @@ pv_opt:
 
 # Tariff comparison
   # id_daily_solar: sensor.{device_name}_power_generation_today
-  id_solar_power: 
-  - sensor.{device_name}_dc_power_pv1
-  - sensor.{device_name}_dc_power_pv2
-  # id_solar_power: sensor.{device_name}_dc_power_combined
+  # id_solar_power: 
+  # #   - sensor.{device_name}_pv_power_1
+  # #   - sensor.{device_name}_pv_power_2
+  id_solar_power: sensor.{device_name}_pv_total_power
     
   alt_tariffs:
-  #   - name: Agile_Fix
-  #     octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
-  #     octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
+    - name: Agile_Fix
+      octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
+      octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
 
-  #   - name: Eco7_Fix
-  #     octopus_import_tariff_code: E-2R-VAR-22-11-01-G
-  #     octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
+    - name: Eco7_Fix
+      octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+      octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
       
-  #   - name: Flux
-  #     octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
-  #     octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
+    - name: Flux
+      octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+      octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
