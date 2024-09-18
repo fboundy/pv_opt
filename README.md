@@ -393,7 +393,7 @@ The app always produces a Base forecast of future battery SOC and the associated
 
 If `Optimise Charging` is enabled, an optimsised charging plan is calculated and writtemt to `sensor.pvopt_opt_cost`. This will also include a list of forced charge and discharge windows.
 
-The easiest way to control and visualise this is through the `pvopt_dashboard.yaml` Lovelace yaml file included in this repo. Note that you will need to manually paste this into a dashboard and edit the charts to use the correct Octopus Energy sensors:
+The easiest way to control and visualise this is through the `dashboards/pvopt_dashboard.yaml` Lovelace yaml file included in this repo.  If you're using the Solis Cloud integration, you can start with the `dashboards/pvopt_dashboard_solis_cloud.yaml`. Note that you will need to manually paste this into a dashboard and edit the charts to use the correct Octopus Energy sensors:
 
 ![Alt text](image-1.png)
 
