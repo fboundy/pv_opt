@@ -99,7 +99,7 @@ pv_opt:
   # Octopus account parameters
   # ========================================
 
-  # octopus_auto: true # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+  octopus_auto: false # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
 
   # octopus_account: !secret octopus_account
   # octopus_api_key: !secret octopus_api_key
