@@ -322,6 +322,126 @@ Restarts between Home Assistant and Add-Ons are not synchronised so it is helpfu
           addon: a0d7b954_appdaemon
     mode: single
 
+<h3>14. For Solis-Control: Add Automation to Control Inverter</h3>
+
+If you're using the solis-sensor and solis_control integrations through Solis Cloud, you'll need to add the following automation which will send the messages to Solis Cloud in order to control your inverter.  N.B: It's important that you've set up the solis_control integration correctly and requested API access via Solis Cloud Technical Support.
+
+```
+alias: "Solis: Use PV_Opt"
+description: "Use the output of pv_opt to control your Solis inverter via Solis Cloud."
+trigger:
+  - platform: state
+    entity_id:
+      - sensor.pvopt_status
+    to: Idle (Read Only)
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 5
+    enabled: false
+  - platform: time_pattern
+    hours: /1
+    minutes: "00"
+    seconds: "05"
+  - platform: time_pattern
+    hours: /1
+    minutes: "30"
+    seconds: "05"
+  - platform: state
+    entity_id:
+      - sensor.pvopt_charge_start
+condition: []
+action:
+  - if:
+      - condition: template
+        value_template: >-
+          {{ states('sensor.pvopt_charge_start') | as_datetime | as_local <=
+          today_at("23:59") }}
+    then:
+      - data:
+          days:
+            - chargeCurrent: >-
+                {% set direction = float(states('sensor.pvopt_charge_current'),
+                0.0) %} {% set chargeAmps = min((max(direction, 0.0) |
+                round(method='floor')), 50)%} {{ chargeAmps }}
+              dischargeCurrent: >-
+                {% set direction = float(states('sensor.pvopt_charge_current'),
+                0.0) %} {% set dischargeAmps = min((min(direction, 0.0) | abs |
+                round(method='floor')), 50) %} {{ dischargeAmps }}
+              chargeStartTime: >-
+                {% set direction = float(states('sensor.pvopt_charge_current'),
+                0.0) %} {% set startChargeTime = '00:00' %} {% if direction >=
+                0.0 -%}
+                  {% set startChargeTime = (as_local(as_datetime(states('sensor.pvopt_charge_start')))|string)[11:16] %}
+                {%- endif %} {{ startChargeTime }}
+              chargeEndTime: >-
+                {% set direction = float(states('sensor.pvopt_charge_current'),
+                0.0) %} {% set endChargeTime = '00:00' %} {% if direction >= 0.0
+                -%}
+                  {% set endChargeTime = (as_local(as_datetime(states('sensor.pvopt_charge_end')))|string)[11:16] %}
+                {%- endif %} {{ endChargeTime }}
+              dischargeStartTime: >-
+                {% set direction = float(states('sensor.pvopt_charge_current'),
+                0.0) %} {% set startDischargeTime = '00:00' %} {% if direction <
+                0.0 -%}
+                  {% set startDischargeTime = (as_local(as_datetime(states('sensor.pvopt_charge_start')))|string)[11:16] %}
+                {%- endif %} {{ startDischargeTime }}
+              dischargeEndTime: >-
+                {% set direction = float(states('sensor.pvopt_charge_current'),
+                0.0) %} {% set endDischargeTime = '00:00' %} {% if direction <
+                0.0 -%}
+                  {% set endDischargeTime = (as_local(as_datetime(states('sensor.pvopt_charge_end')))|string)[11:16] %}
+                {%- endif %} {{ endDischargeTime }}
+            - chargeCurrent: "0"
+              dischargeCurrent: "0"
+              chargeStartTime: "00:00"
+              chargeEndTime: "00:00"
+              dischargeStartTime: "00:00"
+              dischargeEndTime: "00:00"
+            - chargeCurrent: "0"
+              dischargeCurrent: "0"
+              chargeStartTime: "00:00"
+              chargeEndTime: "00:00"
+              dischargeStartTime: "00:00"
+              dischargeEndTime: "00:00"
+          config:
+            secret: <<Your secret without quotes>>
+            key_id: "<<Your key id with quotes>>"
+            username: <<Your username without quotes>>
+            password: <<Your password without quotes>>
+            plantId: "<<Your plant_id with quotes>>"
+        action: pyscript.solis_control
+    else:
+      - data:
+          days:
+            - chargeCurrent: "0"
+              dischargeCurrent: "0"
+              chargeStartTime: "00:00"
+              chargeEndTime: "00:00"
+              dischargeStartTime: "00:00"
+              dischargeEndTime: "00:00"
+            - chargeCurrent: "0"
+              dischargeCurrent: "0"
+              chargeStartTime: "00:00"
+              chargeEndTime: "00:00"
+              dischargeStartTime: "00:00"
+              dischargeEndTime: "00:00"
+            - chargeCurrent: "0"
+              dischargeCurrent: "0"
+              chargeStartTime: "00:00"
+              chargeEndTime: "00:00"
+              dischargeStartTime: "00:00"
+              dischargeEndTime: "00:00"
+          config:
+            secret: <<Your secret without quotes>>
+            key_id: "<<Your key id with quotes>>"
+            username: <<Your username without quotes>>
+            password: <<Your password without quotes>>
+            plantId: "<<Your plant_id with quotes>>"
+        action: pyscript.solis_control
+mode: single
+```
+
 
 <h2>Configuration</h2>
 
