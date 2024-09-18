@@ -530,7 +530,7 @@ views:
                      return [new Date(entry.period_start), entry.forced];
                    });
               - entity: >-
-                  event.octopus_energy_electricity_18l2077993_1900013281497_current_day_rates
+                  event.octopus_energy_electricity_19m1337498_1610032016836_current_day_rates
                 yaxis_id: price
                 name: Historic Import Price
                 color: yellow
@@ -548,7 +548,7 @@ views:
                   legend_value: false
                   offset_in_name: false
               - entity: >-
-                  event.octopus_energy_electricity_18l2077993_1900092609322_export_current_day_rates
+                  event.octopus_energy_electricity_19m1337498_1610032016836_export_current_day_rates
                 yaxis_id: price
                 name: Historic Export Price
                 color: cyan
@@ -605,9 +605,9 @@ views:
                 yaxis_id: price
       - type: custom:octopus-energy-rates-card
         currentEntity: >-
-          event.octopus_energy_electricity_18l2077993_1900013281497_current_day_rates
+          event.octopus_energy_electricity_19m1337498_1610032016836_current_day_rates
         futureEntity: >-
-          event.octopus_energy_electricity_18l2077993_1900013281497_next_day_rates
+          event.octopus_energy_electricity_19m1337498_1610032016836_next_day_rates
         cols: 2
         hour12: false
         showday: true
