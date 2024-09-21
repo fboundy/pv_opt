@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.15.5
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.16.0
 
 <h2>This documentation needs updating!</h2>
 
@@ -10,7 +10,7 @@ The application will integrate fully with Solis inverters which are controlled u
 - [Home Assistant Core Modbus Integration](https://github.com/fboundy/ha_solis_modbus) 
 - [Home Assistant Solarman Integration](https://github.com/StephanJoubert/home_assistant_solarman) 
 - [Home Assistant Solis Sensor Integration](https://github.com/hultenvp/solis-sensor) (read-only mode)
-  - [Home Assistant Solis Control Integration](https://github.com/stevegal/solis_control) (allows inverter control via solis_cloud and HA automations)
+- [Home Assistant Solis Control Integration](https://github.com/stevegal/solis_control) (allows inverter control via solis_cloud and HA automations)
 
 Once installed it should require miminal configuration. Other inverters/integrations can be added if required or can be controlled indirectly using automations.
 
