@@ -35,6 +35,28 @@ pv_opt:
   # If true the personal data will be redacted from the log files. 
   # redact_personal_data_from_log: false
 
+  #=======================================
+  #Logging Category Control
+  #=======================================
+  #Defines Logging subjects to add to logfile
+  #If commented out, everything is logged
+  #Ignored if "debug" is set to False above
+  #
+  # S = Startup/Initialisation Logging
+  # T = Tariff loading Logging
+  # P = Power consumption history Logging
+  # C = Charge algorithm Logging
+  # D = Discharge algorithm Logging
+  # W = Charge/Discharge Windows Logging
+  # F = Power Flows Logging
+  # V = Power Flows debugging (extra verbose)
+  # I = inverter control/commands Logging
+  # E = EV debugging
+
+  # Letters can be added to "debug_categories" in any order
+
+  debug_categories: W
+
   # ========================================
   # Basic parameters
   # ========================================
@@ -71,28 +93,28 @@ pv_opt:
   # Consumption forecast parameters
   # ========================================
   #
-  use_consumption_history: false
-  # consumption_history_days: 6
-  #
-  daily_consumption_kwh: 17
-  shape_consumption_profile: true
-  consumption_shape:
-    - hour: 0
-      consumption: 300
-    - hour: 0.5
-      consumption: 200
-    - hour: 6
-      consumption: 150
-    - hour: 8
-      consumption: 500
-    - hour: 15.5
-      consumption: 500
-    - hour: 17
-      consumption: 750
-    - hour: 22
-      consumption: 750
-    - hour: 24
-      consumption: 300
+  # use_consumption_history: false
+  # # consumption_history_days: 6
+  # #
+  # daily_consumption_kwh: 17
+  # shape_consumption_profile: true
+  # consumption_shape:
+  #   - hour: 0
+  #     consumption: 300
+  #   - hour: 0.5
+  #     consumption: 200
+  #   - hour: 6
+  #     consumption: 150
+  #   - hour: 8
+  #     consumption: 500
+  #   - hour: 15.5
+  #     consumption: 500
+  #   - hour: 17
+  #     consumption: 750
+  #   - hour: 22
+  #     consumption: 750
+  #   - hour: 24
+  #     consumption: 300
   
   # ========================================
   # Octopus account parameters
@@ -117,6 +139,22 @@ pv_opt:
   
   # octopus_import_tariff_code: E-1R-GO-VAR-22-10-14-N
   # octopus_export_tariff_code: E-1R-OUTGOING-LITE-FIX-12M-23-09-12-N
+
+  # ========================================
+  # EV parameters
+  # ========================================
+  #
+  # If you have a Zappi Charger, uncomment next line to allow Pv_opt to detect car plugin status
+  # for use with the Octopus Intelligent Tariff and to allow EV consumption data to be read (if needed). 
+  #
+  # ev_charger: Zappi   # Default = None
+  #
+  # By default, Zappi is set to seen as part of the house load to prevent house battery discharge during car charging and allow discounting of EV consumption
+  # from house charging calculations. 
+  #
+  # If your Zappi is not seen as part of the house load, uncomment next line to set to False. 
+  #
+  # ev_part_of_house_load = False     # Default = True
   
   # ===============================================================================================================
   # Brand / Integration Specific Config: SOLIS_SOLAX_MODBUS: https://github.com/wills106/homeassistant-solax-modbus
@@ -253,15 +291,15 @@ pv_opt:
   # #   - sensor.{device_name}_pv_power_2
   id_solar_power: sensor.{device_name}_pv_total_power
     
-  alt_tariffs:
-    - name: Agile_Fix
-      octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
-      octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
+  # alt_tariffs:
+  #   - name: Agile_Fix
+  #     octopus_import_tariff_code: E-1R-AGILE-23-12-06-G
+  #     octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
 
-    - name: Eco7_Fix
-      octopus_import_tariff_code: E-2R-VAR-22-11-01-G
-      octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
+  #   - name: Eco7_Fix
+  #     octopus_import_tariff_code: E-2R-VAR-22-11-01-G
+  #     octopus_export_tariff_code: E-1R-OUTGOING-FIX-12M-19-05-13-G
       
-    - name: Flux
-      octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
-      octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
+  #   - name: Flux
+  #     octopus_import_tariff_code: E-1R-FLUX-IMPORT-23-02-14-G
+  #     octopus_export_tariff_code: E-1R-FLUX-EXPORT-23-02-14-G
