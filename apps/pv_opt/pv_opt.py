@@ -18,20 +18,20 @@ VERSION = "3.16.0-Beta-9"
 
 # Change history
 # -------
-#Beta-4:
-    #Add additional comment text
-    #Clear IOG car charging plan once end time is reached
-#Beta-5:
-    #Supress any negative values after substracting EV consumption from Total Consumption
-#Beta-6:
-    #Tidy up debug logging behind debug switch
-#Beta-7: 
-    #Correct typo in _get_io_car_slots
-#Beta-8:
-    #Add fixes for tariff overrides when Octopus Auto = False (to allow development of EV charge control on Agile)
-#Beta-9:
-    #Introduce category based logging (i.e a filter on debug = true)
-    #Correct error in Forced Discharging introduced in 3.15.4 
+# Beta-4:
+# Add additional comment text
+# Clear IOG car charging plan once end time is reached
+# Beta-5:
+# Supress any negative values after substracting EV consumption from Total Consumption
+# Beta-6:
+# Tidy up debug logging behind debug switch
+# Beta-7:
+# Correct typo in _get_io_car_slots
+# Beta-8:
+# Add fixes for tariff overrides when Octopus Auto = False (to allow development of EV charge control on Agile)
+# Beta-9:
+# Introduce category based logging (i.e a filter on debug = true)
+# Correct error in Forced Discharging introduced in 3.15.4
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -42,16 +42,16 @@ DEBUG = False
 # Filter Logging when debug = true.
 # Valid values for "Debug_categories" are:
 
-  # S = Startup/Initialisation Logging
-  # T = Tariff loading Logging
-  # P = Power consumption history Logging
-  # C = Charge algorithm Logging
-  # D = Discharge algorithm Logging
-  # W = Charge/Discharge Windows Logging
-  # F = Power Flows Logging
-  # V = Power Flows debugging (extra verbose)
-  # I = inverter control/commands Logging
-  # E = EV debugging
+# S = Startup/Initialisation Logging
+# T = Tariff loading Logging
+# P = Power consumption history Logging
+# C = Charge algorithm Logging
+# D = Discharge algorithm Logging
+# W = Charge/Discharge Windows Logging
+# F = Power Flows Logging
+# V = Power Flows debugging (extra verbose)
+# I = inverter control/commands Logging
+# E = EV debugging
 
 # Default is all, include desired string in Config.yaml to enable filtering
 
@@ -489,6 +489,7 @@ def importName(modulename, name):
         return None
     return vars(module)[name]
 
+
 class PVOpt(hass.Hass):
     @ad.app_lock
     def initialize(self):
@@ -509,7 +510,7 @@ class PVOpt(hass.Hass):
 
         self.debug = self.args.get("debug", self.debug)
         self.debug_cat = self.args.get("debug_categories", self.debug_cat)
-     
+
         self.log(f"Debug Categories selected = {self.debug_cat}")
 
         if not self.debug:
@@ -566,7 +567,7 @@ class PVOpt(hass.Hass):
         self.car_plugin_detected = 0
         self.tariff_reloaded = 0
         self.io_slots = pd.DataFrame()
-        self.contract_last_loaded = pd.Timestamp(2024,1,1)
+        self.contract_last_loaded = pd.Timestamp(2024, 1, 1)
 
         self.bottlecap_entities = {"import": None, "export": None}
 
@@ -605,7 +606,7 @@ class PVOpt(hass.Hass):
         self.optimise()
         self._setup_schedule()
 
-        if (self.debug and "S" in self.debug_cat):
+        if self.debug and "S" in self.debug_cat:
             self.log(f"PV Opt Initialisation complete. Listen_state Handles:")
             for id in self.handles:
                 self.log(f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}")
@@ -683,8 +684,8 @@ class PVOpt(hass.Hass):
                     level="WARNING",
                 )
         else:  # No access to Octopus for loading charge to add
-            self.io_charge_to_add = 0   # Set default value of 0
-            self.old_io_charge_to_add = 0 
+            self.io_charge_to_add = 0  # Set default value of 0
+            self.old_io_charge_to_add = 0
 
     def _get_io_car_slots(self):
         # Get Planned dispatches from Intelligent Dispatcing sensor
@@ -693,7 +694,7 @@ class PVOpt(hass.Hass):
 
         self.log(f"  Current Dispatch Status (On/off) = : {self.io_dispatch_active}")
 
-        if (self.debug and "E" in self.debug_cat):
+        if self.debug and "E" in self.debug_cat:
             self.io_dispatch_attrib = self.get_state(self.io_dispatching_sensor, attribute="all")
             for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
                 self.rlog(f" {k:20s} {self.io_dispatch_attrib[k]}")
@@ -716,7 +717,6 @@ class PVOpt(hass.Hass):
             df["start_local"] = df["start_dt"].dt.tz_convert(self.tz)
             df["end_local"] = df["end_dt"].dt.tz_convert(self.tz)
 
-        
         self.log("")
         self.log("    Octopus Intelligent Go Smart Charging Schedule is.... ")
 
@@ -772,7 +772,9 @@ class PVOpt(hass.Hass):
                         self.car_plugin_detected = 1
                         self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
                 else:
-                    self.log("Octopus Energy Integration not detected (or disabled): Charge to add is not available, IOG tariff not reloaded")
+                    self.log(
+                        "Octopus Energy Integration not detected (or disabled): Charge to add is not available, IOG tariff not reloaded"
+                    )
 
     def _check_for_zappi(self):
         # Check for Zappi sensors for power consumption and car connected/charging status.
@@ -908,7 +910,7 @@ class PVOpt(hass.Hass):
         start = kwargs.get("start", pd.Timestamp.now(tz="UTC").normalize())
         end = kwargs.get("end", pd.Timestamp.now(tz="UTC"))
 
-        if (self.debug and "F" in self.debug_cat):
+        if self.debug and "F" in self.debug_cat:
             self.log(
                 f">>> Start: {start.strftime(DATE_TIME_FORMAT_SHORT)} End: {end.strftime(DATE_TIME_FORMAT_SHORT)}"
             )
@@ -1014,7 +1016,7 @@ class PVOpt(hass.Hass):
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
-                        if (self.debug and "T" in self.debug_cat):
+                        if self.debug and "T" in self.debug_cat:
                             self.log(f"    >>>{imp_exp}: {entities[imp_exp]}")
 
                         if len(entities[imp_exp]) > 0:
@@ -1023,7 +1025,7 @@ class PVOpt(hass.Hass):
                                     BOTTLECAP_DAVE["tariff_code"], None
                                 )
 
-                                if (self.debug and "T" in self.debug_cat):
+                                if self.debug and "T" in self.debug_cat:
                                     self.log(f">>>X _load_contract {tariff_code}")
 
                                 if tariff_code is not None:
@@ -1149,14 +1151,14 @@ class PVOpt(hass.Hass):
         else:
             self.contract_last_loaded = pd.Timestamp.now(tz="UTC")
             # SVB logging
-            #self.log("Printing self.contract.tariffs at end of 'load_contract'")
-            #self.log(self.contract.tariffs)
-            #self.log("")
+            # self.log("Printing self.contract.tariffs at end of 'load_contract'")
+            # self.log(self.contract.tariffs)
+            # self.log("")
 
             ##### SVB debugging - Override Export Tariff
             if self.contract.tariffs["export"] is None:
                 self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
-                #self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)
+                # self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)
             self.rlog("")
             self._load_saving_events()
 
@@ -1305,7 +1307,7 @@ class PVOpt(hass.Hass):
             return True
 
     def _load_args(self, items=None):
-        if (self.debug and "S" in self.debug_cat):
+        if self.debug and "S" in self.debug_cat:
             self.rlog(self.args)
 
         self.prefix = self.args.get("prefix", "solis")
@@ -1398,7 +1400,7 @@ class PVOpt(hass.Hass):
 
             else:
                 # The value should be read explicitly
-                if (self.debug and "S" in self.debug_cat):
+                if self.debug and "S" in self.debug_cat:
                     self.rlog(f"{item}:")
                     for value in self.args[item]:
                         self.rlog(f"\t{value}")
@@ -1417,7 +1419,7 @@ class PVOpt(hass.Hass):
                     self.yaml_config[item] = self.config[item]
 
                 elif min(arg_types[str]):
-                    if (self.debug and "S" in self.debug_cat):
+                    if self.debug and "S" in self.debug_cat:
                         self.rlog("\tFound a valid list of strings")
 
                     if isinstance(self.get_default_config(item), str) and len(values) == 1:
@@ -1490,7 +1492,7 @@ class PVOpt(hass.Hass):
                                 )
 
                 elif len(values) == 1 and (arg_types[bool][0] or arg_types[int][0] or arg_types[float][0]):
-                    if (self.debug and "S" in self.debug_cat):
+                    if self.debug and "S" in self.debug_cat:
                         self.rlog("\tFound a single default value")
 
                     self.config[item] = values[0]
@@ -1504,7 +1506,7 @@ class PVOpt(hass.Hass):
                     and (min(arg_types[str][:-1]))
                     and (arg_types[bool][-1] or arg_types[int][-1] or arg_types[float][-1])
                 ):
-                    if (self.debug and "S" in self.debug_cat):
+                    if self.debug and "S" in self.debug_cat:
                         self.rlog("\tFound a valid list of strings followed by a single default value")
                     ha_values = [self.get_ha_value(entity_id=v) for v in values[:-1]]
                     val_types = {t: np.array([isinstance(v, t) for v in ha_values]) for t in [str, float, int, bool]}
@@ -1856,7 +1858,7 @@ class PVOpt(hass.Hass):
 
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
-        if (self.debug and "I" in self.debug_cat):
+        if self.debug and "I" in self.debug_cat:
             self.log(f">>> soc_now: {self.soc_now}")
             self.log(f">>> x: {x}")
             self.log(f">>> Original: {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
@@ -1874,7 +1876,7 @@ class PVOpt(hass.Hass):
         x = pd.to_numeric(x, errors="coerce").interpolate()
 
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
-        if (self.debug and "I" in self.debug_cat):
+        if self.debug and "I" in self.debug_cat:
             self.log(f">>> Fixed   : {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
 
         x = pd.concat(
@@ -1999,7 +2001,7 @@ class PVOpt(hass.Hass):
         # Note: self.opt will now include attribute "ioslot" regardless of actual tariff, but be set to 0 unless on IOG and dispatches are planned
         io_on = pd.Series(index=y.index, data=0, name="ioslot")
 
-        if (self.debug and "E" in self.debug_cat):
+        if self.debug and "E" in self.debug_cat:
             self.log("self.io_slots is")
             self.log(self.io_slots.to_string())
 
@@ -2026,7 +2028,7 @@ class PVOpt(hass.Hass):
                 self.io_slots[self.io_slots["end_dt"] < pd.Timestamp.now(self.tz)].index
             )
 
-            if (self.debug and "E" in self.debug_cat):
+            if self.debug and "E" in self.debug_cat:
                 self.log("IO slot clearance check")
                 self.log(self.io_slots["end_dt"])
                 self.log(pd.Timestamp.now(self.tz))
@@ -2153,7 +2155,6 @@ class PVOpt(hass.Hass):
 
                     # If the current slot is a Hold SOC slot and we aren't holding then we need to
                     # enable Hold SOC. Uses backup mode instead of charge current = 0 to allow excess solar to charge batteries.
-
 
                     if (
                         self.hold and self.hold[0]["active"]
@@ -2375,10 +2376,9 @@ class PVOpt(hass.Hass):
                 (self.charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()
             )
 
-        if (self.debug and "W" in self.debug_cat):
+        if self.debug and "W" in self.debug_cat:
             self.log("")
             self.log(f"Slot_left_factor = {slot_left_factor}")
-            
 
         # If we are in a slot, then "forced" has already been factored by the slot time remaining to ensure the power flow calclations are correct
         # We need to remove that factor so the inverter charge power remains unchanged in the slot.
@@ -2409,13 +2409,13 @@ class PVOpt(hass.Hass):
             | ((self.opt["ioslot"].diff() > 0) & (self.opt["forced"] == 0))
         ).cumsum()
 
-        if (self.debug and "W" in self.debug_cat):
+        if self.debug and "W" in self.debug_cat:
             self.log("")
             self.log("After assignment of 'period', self.opt is........")
 
             self.log(f"\n{self.opt.to_string()}")
 
-            #self.log(self.opt.to_string())
+            # self.log(self.opt.to_string())
 
         # If there is either a charge/discharge plan or an IOG car charging plan, create windows.
         if ((self.opt["forced"] != 0).sum() > 0) or ((self.opt["ioslot"] != 0).sum() > 0):
@@ -2425,12 +2425,11 @@ class PVOpt(hass.Hass):
             x["soc"] = x["soc"].round(0).astype(int)
             x["soc_end"] = x["soc_end"].round(0).astype(int)
 
-            if (self.debug and "C" in self.debug_cat):
+            if self.debug and "C" in self.debug_cat:
                 self.log("")
                 self.log("Printing X for charge slots.....")
                 # self.log(x.to_string())
                 self.log(f"\n{x.to_string()}")
-
 
             # Create the charge window by taking the first and the last entry for each period.
             windows_c = pd.concat(
@@ -2442,22 +2441,22 @@ class PVOpt(hass.Hass):
             )
 
             # SVB logging
-            if (self.debug and "C" in self.debug_cat):
+            if self.debug and "C" in self.debug_cat:
                 self.log("")
                 self.log("Printing Window_C for charge")
                 self.log(f"\n{windows_c.to_string()}")
-                #self.log(windows_c.to_string())
+                # self.log(windows_c.to_string())
 
             x = self.opt[self.opt["forced"] < 0].copy()
             x["start"] = x.index.tz_convert(self.tz)
             x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
 
             # SVB logging
-            if (self.debug and "D" in self.debug_cat):
+            if self.debug and "D" in self.debug_cat:
                 self.log("")
                 self.log("Printing X for discharge slots.....")
                 self.log(f"\n{x.to_string()}")
-                #self.log(x.to_string())
+                # self.log(x.to_string())
 
             windows_d = pd.concat(
                 [
@@ -2468,12 +2467,12 @@ class PVOpt(hass.Hass):
             )
 
             # SVB logging
-            if (self.debug and "D" in self.debug_cat):
+            if self.debug and "D" in self.debug_cat:
                 self.log("")
                 self.log("Printing Window_D for discharge")
                 self.log(f"\n{windows_d.to_string()}")
 
-                #self.log(windows_d.to_string())
+                # self.log(windows_d.to_string())
 
             # Combine charge and discharge windows
             self.windows = pd.concat([windows_c, windows_d]).sort_values("start")
@@ -2490,12 +2489,12 @@ class PVOpt(hass.Hass):
             x["forced"] = 1
 
             # SVB logging
-            if (self.debug and "W" in self.debug_cat):
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing X for Hold (IOG) slots (if not already charging)")
                 self.log("")
                 self.log(f"\n{x.to_string()}")
-                #self.log(x.to_string())
+                # self.log(x.to_string())
 
             # Create the window by taking the first and the last entry for each period.
 
@@ -2508,23 +2507,23 @@ class PVOpt(hass.Hass):
             )
 
             # SVB logging
-            if (self.debug and "W" in self.debug_cat):
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing Window_io for IOG slots")
                 self.log(f"\n{windows_io.to_string()}")
 
-                #self.log(windows_io.to_string())
+                # self.log(windows_io.to_string())
 
             # for IOG slots, set 'soc_end' to equal 'soc', as the slot is now a hold slot.
             windows_io["soc_end"] = windows_io["soc"]
 
             # SVB logging
-            if (self.debug and "W" in self.debug_cat):
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing Combined Window for Charge and Discharge Slots")
 
                 self.log(f"\n{self.windows.to_string()}")
-                #self.log(self.windows.to_string())
+                # self.log(self.windows.to_string())
 
             self.windows["hold_soc"] = ""
 
@@ -2533,7 +2532,7 @@ class PVOpt(hass.Hass):
                 self.windows["forced"] = ((self.windows["forced"] / tolerance).round(0) * tolerance).astype(int)
 
             # SVB logging
-            if (self.debug and "W" in self.debug_cat):
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing Combined Window after power rounding")
                 self.log(f"\n{self.windows.to_string()}")
@@ -2558,7 +2557,7 @@ class PVOpt(hass.Hass):
                 ] = "<="
 
                 # SVB logging
-                if (self.debug and "W" in self.debug_cat):
+                if self.debug and "W" in self.debug_cat:
                     self.log("")
                     self.log("Printing Combined Window after Hold SOC check.....")
                     self.log(f"\n{self.windows.to_string()}")
@@ -2575,7 +2574,7 @@ class PVOpt(hass.Hass):
                 ] = "<=IOG"
 
             # SVB logging
-            if (self.debug and "W" in self.debug_cat):
+            if self.debug and "W" in self.debug_cat:
 
                 self.log("")
                 self.log("Printing Combined Window after <=IOG added for any IO slots.....")
@@ -2678,7 +2677,11 @@ class PVOpt(hass.Hass):
             "consumption",
         ]
 
-        cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1).fillna(0)
+        cost = (
+            pd.DataFrame(pd.concat([df for df in [cost_today, cost] if len(df) > 0]))
+            .set_axis(["cost"], axis=1)
+            .fillna(0)
+        )
         cost["cumulative_cost"] = cost["cost"].cumsum()
 
         for d in [df, cost]:
@@ -2832,7 +2835,7 @@ class PVOpt(hass.Hass):
             )
             return df
 
-        if (self.debug and "X" in self.debug_cat):
+        if self.debug and "X" in self.debug_cat:
             self.log("Getting Solcast data")
         try:
             solar = self.get_state_retry(self.config["id_solcast_today"], attribute="all")["attributes"][
@@ -2955,7 +2958,7 @@ class PVOpt(hass.Hass):
                     days=days,
                     log=self.debug,
                 )
-                if (self.debug and "P" in self.debug_cat):
+                if self.debug and "P" in self.debug_cat:
                     self.log("Df after first load is:......")
                     self.log(df.to_string())
 
@@ -2992,8 +2995,8 @@ class PVOpt(hass.Hass):
                     self.log(
                         f"    Total consumption from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)} is {(df.sum()/2000):0.1f} kWh"
                     )
-                    #self.log(f"   EV consumption is    : {(ev_power.sum()/2000):0.1f} kWh")
-                    #self.log(f"   Total consumption is : {(df.sum()/2000):0.1f} kWh")
+                    # self.log(f"   EV consumption is    : {(ev_power.sum()/2000):0.1f} kWh")
+                    # self.log(f"   Total consumption is : {(df.sum()/2000):0.1f} kWh")
                 else:
                     self.log("")
                     self.log("  No power returned from Zappi")
@@ -3026,17 +3029,17 @@ class PVOpt(hass.Hass):
                         df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
                         df = df_Total - df_EV  # Substract EV consumption from Total Consumption
 
-                        if (self.debug and "P" in self.debug_cat):
+                        if self.debug and "P" in self.debug_cat:
                             self.log("Result of subtraction is")
                             self.log(df.to_string())
 
-                        if (df < 0).any().any():     #Are there any negative values in the subtraction?
+                        if (df < 0).any().any():  # Are there any negative values in the subtraction?
                             self.log("Unexpected Negative values after substraction found, setting to zero")
                             df[df < 0] = 0
 
                 # Add consumption margin
                 df = df * (1 + self.get_config("consumption_margin") / 100)
-                if (self.debug and "P" in self.debug_cat):
+                if self.debug and "P" in self.debug_cat:
                     self.log("Df after adding consumption margin is.......")
                     self.log(df.to_string())
 
@@ -3046,7 +3049,7 @@ class PVOpt(hass.Hass):
                 df = df.groupby(df.index.time).aggregate(self.get_config("consumption_grouping"))
                 df.name = "consumption"
 
-                if (self.debug and "P" in self.debug_cat):
+                if self.debug and "P" in self.debug_cat:
                     self.log(">>> All consumption:")
                     self.log(f">>> {dfx.to_string()}")
                     self.log(">>> Consumption grouped by time:")
@@ -3109,7 +3112,7 @@ class PVOpt(hass.Hass):
         )
         self.log(f"   Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
 
-        if (self.debug and "P" in self.debug_cat):
+        if self.debug and "P" in self.debug_cat:
             self.log("Printing final result of routine load_consumption.....")
             self.log(consumption.to_string())
         return consumption
@@ -3176,7 +3179,7 @@ class PVOpt(hass.Hass):
         self.log(f"Consumption: {static['consumption'].sum()/2000:15.1f} kWh")
         self.log(f"Solar:       {static['solar'].sum()/2000:15.1f} kWh")
 
-        if (self.debug and "T" in self.debug_cat):
+        if self.debug and "T" in self.debug_cat:
             self.log(f">>> Yesterday's data:\n{static.to_string()}")
 
         for tariff_set in self.config["alt_tariffs"]:
