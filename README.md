@@ -1,6 +1,6 @@
 # PV Opt: Home Assistant Solar/Battery Optimiser v3.16.0
 
-Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
+Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also beneficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7. Specific support for Intelligent Octopus Go using the Zappi charger is provided. 
 
 The application will integrate fully with Solis inverters which are controlled using any of:
 
@@ -34,9 +34,10 @@ This app is not stand-alone it requires the following:
 | Samba Share| Alternative| Alternative to using File Editor to edit config files. Not convered in this guide.
 | Studio Code Server| Alternative|Alternative to using `File Editor` to edit config files. Not convered in this guide.
 | <u><b>Integrations</b></u> | | |
-|Solcast PV Solar Integration | Required | Retrieves solar forecast from Solcast into Home Assistant |
-|Octopus Energy | Optional | Used to retrieve tariff information and Octopus Saving Session details|
+|Solcast PV Solar Integration | Required | Retrieves solar forecast from Solcast into Home Assistant. |
+|Octopus Energy | Optional | Used to retrieve tariff information and Octopus Saving Session details. For users on Intelligent Octopus Go, this is required for any addtional slots outside of the 6 hour period to be taken into account in the charge/discharge plan. |
 |Solax Modbus | Optional | Used to control Solis inverter directly. Support for two other integrations is now available (see below). Support inverter brands is possible using the API described below.
+|MyEnergi | Optional | For Intelligent Octopus Go users using a Zappi charger, used by Pv_opt to detect EV plugin and supply EV consumption history. 
 
 <h2>Step by Step Installation Guide</h2>
 
@@ -49,9 +50,9 @@ This app is not stand-alone it requires the following:
 1. Install HACS: https://hacs.xyz/docs/setup/download
 2. Enable AppDaemon in HACS: https://hacs.xyz/docs/categories/appdaemon_apps/
 
-<h3>3. Install the Solcast PV Solar Integration (v4.0.x)</h3>
+<h3>3. Install the Solcast PV Solar Integration (v4.1.x)</h3>
 
-1. Install the integation via HACS: https://github.com/oziee/ha-solcast-solar
+1. Install the integation: https://github.com/BJReplay/ha-solcast-solar
 2. Add the Integration via Settings: http://homeassistant.local:8123/config/integrations/dashboard
 3. Once installed configure using your Solcast API Key from (1) . 
 4. Set up an automation to update according to your desired schedule. Once every 3 hours will work.
@@ -60,7 +61,7 @@ This app is not stand-alone it requires the following:
 
 
 
-This excellent integration will pull Octopus Price data in to Home Assistant. Solar Opt pulls data from Octopus independently of this integration but will extract current tariff codes from it if they are avaiable. If not it will either use account details supplied in `secrets.yaml` or explicitly defined Octopus tariff codes set in `config.yaml`.
+This excellent integration will pull Octopus Price data in to Home Assistant. Solar Opt pulls data from Octopus independently of this integration but will extract current tariff codes from it if they are avaiable. If not it will either use account details supplied in `secrets.yaml` or explicitly defined Octopus tariff codes set in `config.yaml`. If on Intelligent Octopus Go, this integration is required for Pv opt to utilise any slots allocated outside of 23:30 to 05:30 in its charging plan. 
 
 
 <h3>5. Install the Integration to Control Your Inverter</h3>
@@ -356,6 +357,14 @@ These parameters will define how PV Opt estimates daily consumption:
 | Daily Consumption | kWh | `number.pvopt_daily_consumption_kwh` | 17 | Estimated daily consumption to use when predicting future load |
 | Shape Consumption Profile | `on`/`off` | `switch.pvopt_shape_consumption_profile` | On | Defines whether to shapoe the consumption to a typical daily profile (`on`) or to assume constant usage (`off`) |
 
+<h3>EV parameters</h3>
+
+| Parameter | Units | Entity | Default | Description |
+|:--|:--:| :-- | :--:|:--|
+| EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type for users on Intelligent Octopus Go. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
+| EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to On prevents this, as well as ensuring that any EV consumption is removed from Consumption History. If your Zappi is wired on its own Henley block and thus outside of what the inverter CT clamp will measure (or you want the EV to utilise the house battery when charging), then set this to Off. |
+| EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. Value is for a future release. At the current release this value has no effect. |
+| EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 30 | Set EV Battery Capacity. Value is for a future release. At the current release this value has no effect. |
 
 <h3>Tuning Parameters</h3>
 These parameters will tweak how PV Opt runs:

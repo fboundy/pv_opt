@@ -35,6 +35,28 @@ pv_opt:
   # If true the personal data will be redacted from the log files. 
   # redact_personal_data_from_log: false
 
+  #=======================================
+  #Logging Category Control
+  #=======================================
+  #Defines Logging subjects to add to logfile
+  #If commented out, everything is logged
+  #Ignored if "debug" is set to False above
+  #
+  # S = Startup/Initialisation Logging
+  # T = Tariff loading Logging
+  # P = Power consumption history Logging
+  # C = Charge algorithm Logging
+  # D = Discharge algorithm Logging
+  # W = Charge/Discharge Windows Logging
+  # F = Power Flows Logging
+  # V = Power Flows debugging (extra verbose)
+  # I = inverter control/commands Logging
+  # E = EV debugging
+
+  # Letters can be added to "debug_categories" in any order
+
+  debug_categories: W
+
   # ========================================
   # Basic parameters
   # ========================================
