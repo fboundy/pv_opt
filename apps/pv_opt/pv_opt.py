@@ -922,15 +922,15 @@ class PVOpt(hass.Hass):
             self.log(f"EV Charge Target = {self.ev_charge_target}")
             self.log(f"EV Ready by time = {self.ev_ready_by_time}")
 
-        #Calculate charge to add in kwh (EV capacity * (SOC target - SOC current) * 1/efficiency)
+        # Calculate charge to add in kwh (EV capacity * (SOC target - SOC current) * 1/efficiency)
         charge_kwh = self.ev_capacity * (self.ev_charge_target) * (1 / self.ev_charger_efficiency)
 
-        #self.log("")
-        #self.log(f"Charge to add (kwh) = {charge_kwh}")
+        # self.log("")
+        # self.log(f"Charge to add (kwh) = {charge_kwh}")
 
         # Work out time needed to charge
         ev_charge_time = charge_kwh / (self.ev_charger_power / 1000)
-        #self.log(f"Charge time (hours) = {ev_charge_time}")
+        # self.log(f"Charge time (hours) = {ev_charge_time}")
 
         ### Code will quantise to full slots only - i.e no partial charging in a half hour slot (which is what IOG does)
         ### LAter versions of code will add this
@@ -940,12 +940,12 @@ class PVOpt(hass.Hass):
 
         self.log(f"EV Charging Candidate plan requires {ev_slots_required} 1/2 hour slots")
 
-        #now = datetime.now()
-        #ready_by_time = datetime.strptime(self.ev_ready_by_time, "%H:%M")
+        # now = datetime.now()
+        # ready_by_time = datetime.strptime(self.ev_ready_by_time, "%H:%M")
         
         # Get timenow, this is in local time)
         now = pd.Timestamp.now()
-        #self.log(f"Time Now = {now}")
+        # self.log(f"Time Now = {now}")
 
         # Get ready by time, this will also be in local time. 
         ready_by_time = pd.to_datetime(self.ev_ready_by_time, errors="coerce", format="%H:%M")
@@ -956,11 +956,11 @@ class PVOpt(hass.Hass):
 
         ready_by_datetime = ready_by_time.replace(year=Y, month=M, day = D)
 
-        #Is ready time in the past? If so make it the same time tomorrow. 
+        # Is ready time in the past? If so make it the same time tomorrow. 
         if ready_by_datetime < now:
             ready_by_datetime += pd.Timedelta(hours=24)
 
-        #Localise, then convert to UTC
+        # Localise, then convert to UTC
         ready_by_datetime = ready_by_datetime.tz_localize(self.tz)
         ready_by_datetime = ready_by_datetime.tz_convert("UTC")
 
@@ -974,16 +974,16 @@ class PVOpt(hass.Hass):
             self.log("Df = ")
             self.log(f"\n{df.to_string()}")
           
-        #Trim self.car_charge_slots to remove all slots after "ready_by_datetime"
+        # Trim self.car_charge_slots to remove all slots after "ready_by_datetime"
         df = df[df["start"]  < ready_by_datetime]
 
         if self.debug and "E" in self.debug_cat:
             self.log(f"\n{df.to_string()}")
 
-        #Reorder dataframe slots to cheapest import slot first
+        # Reorder dataframe slots to cheapest import slot first
         df = df.sort_values("import")
       
-        #Keep the number of rows required to charge the car, delete the rest
+        # Keep the number of rows required to charge the car, delete the rest
         df = df.iloc[:ev_slots_required]
 
         if self.debug and "E" in self.debug_cat:
@@ -995,18 +995,18 @@ class PVOpt(hass.Hass):
         df["start_local"] = df["start_dt"].dt.tz_convert(self.tz)
         df["end_local"] = df["end_dt"].dt.tz_convert(self.tz)
 
-        #If max slot price is set to zero then its disabled. 
-        #If non-zero, delete all slots that cost above the max price set
+        # If max slot price is set to zero then its disabled. 
+        # If non-zero, delete all slots that cost above the max price set
 
         if self.ev_max_slot_price != 0:
             car_charge_slots = df[df["import"] <= self.ev_max_slot_price]
         else:
             car_charge_slots = df
 
-        #Add "charge_in_kwh" col, fixed at charger power * efficiency
+        # Add "charge_in_kwh" col, fixed at charger power * efficiency
         car_charge_slots['charge_in_kwh'] = (self.ev_charger_power / 1000) * (self.ev_charger_efficiency/100 * 0.5)
 
-        #Reorder dataframe back to date order
+        # Reorder dataframe back to date order
         car_charge_slots = car_charge_slots.sort_index()
 
         if self.debug and "E" in self.debug_cat:
@@ -1126,8 +1126,8 @@ class PVOpt(hass.Hass):
 
 
         ### SVB: once code is up and running for Agile EV charging, should probably put these parameters in something like pv.EvModel (as they don't change)
-        #Needs a gate for systems with no EV? 
-        #If EV_charger = Zappi then:
+        # Needs a gate for systems with no EV? Something like:
+        # If EV_charger = Zappi then:
         self.ev_capacity = self.get_config("ev_battery_capacity_kwh")
         self.ev_charger_power = self.get_config("ev_charger_power_watts")
         self.ev_charger_efficiency = self.get_config("ev_charger_efficiency_percent")
@@ -1407,9 +1407,9 @@ class PVOpt(hass.Hass):
             self.contract_last_loaded = pd.Timestamp.now(tz="UTC")
 
             
-            #self.log("Printing self.contract.tariffs at end of 'load_contract'")
-            #self.log(self.contract.tariffs)
-            #self.log("")
+            # self.log("Printing self.contract.tariffs at end of 'load_contract'")
+            # self.log(self.contract.tariffs)
+            # self.log("")
 
             ##### SVB debugging - Override Export Tariff
             if self.contract.tariffs["export"] is None:
@@ -2264,8 +2264,8 @@ class PVOpt(hass.Hass):
         car_on = pd.Series(index=y.index, data=0, name="carslot")
 
 
-        #If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load.
-        #If on Agile tariff, (re)calculate them now. 
+        # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load.
+        # If on Agile tariff, (re)calculate them now. 
 
         if self.agile and self.ev:
             self.log("")
@@ -2316,7 +2316,7 @@ class PVOpt(hass.Hass):
             self.ulog("Checking EV Status (Agile Tariff)")
             self._check_car_plugin_agile()
             
-            #Copy candidate car slots to active plan upon 
+            # Copy candidate car slots to active plan upon 
             # 1) plugin detected
             # 2) new agile prices are available (and EV is plugged in)
             # 3) Transfer button is pressed
@@ -2669,7 +2669,7 @@ class PVOpt(hass.Hass):
                     entity_id=entity_id,
                 )
 
-            #Inverter updates complete. Now command EV charger on/off. 
+            # Inverter updates complete. Now command EV charger on/off. 
             self._control_EV_charger()
 
     def _create_windows(self):
@@ -2946,10 +2946,10 @@ class PVOpt(hass.Hass):
 
     def _create_ev_windows(self):
         
-        #At the moment the only purpose of this routine is for dashboard display (in the future)
-        #Actual charging is done by reading self.opt
+        # At the moment the only purpose of this routine is for dashboard display (in the future)
+        # Actual charging is done by reading self.opt
 
-        #Clear "period" to 0 (as period was previously set i.a.w. house battery charging)
+        # Clear "period" to 0 (as period was previously set i.a.w. house battery charging)
         self.opt["period"] = 0
 
         # Increment "period" if non-contiguous car slot detected.
@@ -3123,7 +3123,7 @@ class PVOpt(hass.Hass):
         ev_total_cost = 0
         ev_percent_to_add = 0
 
-        # For Agile Tariff, calculate total charge to be added (in kWh and in %) and total cost of charge, for display on Dashboard
+        # For Agile Tariff, calculate total charge to be added (both in kWh and in % of car battery) and total cost of charge, for display on Dashboard
         if not self.candidate_car_slots.empty:
             ev_total_charge = self.candidate_car_slots["charge_in_kwh"].sum()
             ev_total_cost = self.candidate_car_slots["import"].sum()
@@ -3157,7 +3157,7 @@ class PVOpt(hass.Hass):
             attributes=attributes,
         )
 
-        #Zero EV data previously set in candidate plan for re-use in active plan
+        # Zero EV data previously set in candidate plan for re-use in active plan
         ev_total_charge = 0
         ev_total_cost = 0
         ev_percent_to_add = 0
