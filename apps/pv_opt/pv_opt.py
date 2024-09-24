@@ -3424,9 +3424,6 @@ class PVOpt(hass.Hass):
             if (start < time_now) and (end < time_now):
                 consumption["consumption"] = df.loc[start:end]
             else:
-
-            ### Alot of the code below has the wrong ident - i.e consumption margin should not be gated by self.ev
-
                 if self.ev:
                     df_EV = None  # To store EV consumption
                     df_EV_Total = None  # To store EV consumption and Total consumption
