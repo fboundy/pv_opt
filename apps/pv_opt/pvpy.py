@@ -3,6 +3,8 @@ import pandas as pd
 import requests
 from copy import copy
 from numpy import isnan
+
+# from scipy.stats import linregress
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -514,23 +516,13 @@ class Tariff:
 
 
 class InverterModel:
-    """Describes the inverter
-
-    Attributes:
-        inverter_efficiency: A float describing the DC-AC efficiency of the inverter.
-        charger_efficiency: A float describing the AC-DC efficiency of the inverter.
-        inverter_loss: An int describing the internal power consumption of the inverter at zero load.
-        inverter_power: An int describing the DC-AC power of the inverter.
-        charger_power: An int describing the AC-CC power of the inverter.
-    """
-
     def __init__(
         self,
-        inverter_efficiency: float = 0.97,
-        charger_efficiency: float = 0.91,
-        inverter_loss: int = 100,
-        inverter_power: int = 3000,
-        charger_power: int = 3500,
+        inverter_efficiency=0.97,
+        charger_efficiency=0.91,
+        inverter_loss=100,
+        inverter_power=3000,
+        charger_power=3500,
     ) -> None:
         self.inverter_efficiency = inverter_efficiency
         self.charger_efficiency = charger_efficiency
@@ -538,8 +530,8 @@ class InverterModel:
         self.charger_power = charger_power
         self.inverter_loss = inverter_loss
 
-    def __str__(self):
-        pass
+    # def __str__(self):
+    #     pass
 
     # def calibrate(self, data, **kwargs):
     #     cols = {k: kwargs.get(k, k) for k in ["solar", "consumption", "grid", "battery", "soc"]}
@@ -900,6 +892,11 @@ class PVsystemModel:
             self.log("")
 
 
+            if log and (self.host.debug and "C" in self.host.debug_cat):
+                self.log ("SPR = Slot Power Required, SCPA = Slot Charger Power Available, SAC = Slot Available Capacity")
+                self.log ("")
+
+
         # self.log(slots)
         net_cost = []
         net_cost_opt = base_cost
@@ -1011,9 +1008,6 @@ class PVsystemModel:
                             # We should factor this reduced power back up again just prior to inverter programming.
 
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
-                                if log:
-                                    self.log ("")
-                                    self.log ("   >>> SPR = Slot Power Required, SCPA = Slot Charger Power Available, SAC = Slot Available Capacity")
 
                                 for slot, factor in zip(window, factors):
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
@@ -1057,8 +1051,8 @@ class PVsystemModel:
                                 net_cost_opt = net_cost[-1]
                                 str_log += f"Net: {net_cost_opt:6.1f}"
                                 if log:
-                                    self.log("")
                                     self.log(str_log)
+                                    self.log("")
                                     if (self.host.debug and "F" in self.host.debug_cat):
                                         xx = pd.concat(
                                             [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]],
@@ -1107,7 +1101,7 @@ class PVsystemModel:
 
         slots_added = 999
         # Only do the rest if there is an export tariff:
-        self.log(f"Sum of Export Prices = {prices['export'].sum()}")
+        #self.log(f"Sum of Export Prices = {prices['export'].sum()}")
         
         if prices["export"].sum() > 0:
             j = 0
