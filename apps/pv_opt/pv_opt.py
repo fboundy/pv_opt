@@ -2825,9 +2825,11 @@ class PVOpt(hass.Hass):
                 self.log("Printing Window_car for Car slots")
                 self.log(f"\n{windows_car.to_string()}")
 
-                # self.log(windows_io.to_string())
-
             # for Car slots, set 'soc_end' to equal 'soc', as the slot is now a hold slot.
+            ### Problem : If Zappi is not seen as house load, doing this will generate a needless hold slot
+            # We probably need to do this later on to avoid this.
+            # We did this originally for display purposes only
+            # we could do it later based on "<= Car"?
             windows_car["soc_end"] = windows_car["soc"]
 
             if self.debug and "W" in self.debug_cat:
@@ -2850,6 +2852,11 @@ class PVOpt(hass.Hass):
 
             # Add the Car slots. This is done after power value rounding to ensure the Forced = 1 setting remains
             self.windows = pd.concat([windows_car, self.windows]).sort_values("start")
+
+            if self.debug and "W" in self.debug_cat:
+                self.log("")
+                self.log("Printing Combined Window after concatenation.....")
+                self.log(f"\n{self.windows.to_string()}")
 
             # Round SOC to integers
             self.windows["soc"] = self.windows["soc"].round(0).astype(int)
