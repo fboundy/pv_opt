@@ -143,6 +143,7 @@ INVERTER_DEFS = {
         },
     },
     "SOLIS_SOLARMAN": {
+        "online": "sensor.{device_name}_battery_soc",
         "modes": {
             0x21: "Self Use",
             0x22: "Optimized Revenue",
