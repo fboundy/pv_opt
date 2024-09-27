@@ -2828,7 +2828,7 @@ class PVOpt(hass.Hass):
                 self.log(f"\n{windows_car.to_string()}")
 
             # for Car slots, set 'soc_end' to equal 'soc', as the slot is now a hold slot.
-            ### Problem : If Zappi is not seen as house load, doing this will generate a needless hold slot
+            # Problem : If Zappi is not seen as house load, doing this will generate a needless hold slot
             # We probably need to do this later on to avoid this.
             # We did this originally for display purposes only
             # Do it later based on Forced = 1
