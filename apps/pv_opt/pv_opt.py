@@ -2265,6 +2265,8 @@ class PVOpt(hass.Hass):
         # to 0 unless on 1) IOG and dispatches are planned or 2) Car charging on agile is required
         car_on = pd.Series(index=y.index, data=0, name="carslot")
 
+        # Reload Ev selector status
+        self.ev = self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]  # Is set true only for Zappi at this point
 
         # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load.
         # If on Agile tariff, (re)calculate them now. 
