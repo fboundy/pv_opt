@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.17.1-Beta-2"
+VERSION = "3.17.1-Beta-3"
 
 # Change history
 # -------
@@ -42,6 +42,8 @@ VERSION = "3.17.1-Beta-2"
 # Beta-2: 
 # Fixed timezones/UTC conversions in Car charging plan
 # Added additional attributes to car_slots and candidate_car_slots for Dashboard display
+# Beta-3:
+# Corrected logic for car slots when Zappi not seen as part of house load (no inverter holding is necessary)
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -2829,8 +2831,8 @@ class PVOpt(hass.Hass):
             ### Problem : If Zappi is not seen as house load, doing this will generate a needless hold slot
             # We probably need to do this later on to avoid this.
             # We did this originally for display purposes only
-            # we could do it later based on "<= Car"?
-            windows_car["soc_end"] = windows_car["soc"]
+            # Do it later based on Forced = 1
+            # windows_car["soc_end"] = windows_car["soc"]
 
             if self.debug and "W" in self.debug_cat:
                 self.log("")
@@ -2885,13 +2887,18 @@ class PVOpt(hass.Hass):
             if self.intelligent or (self.agile and self.ev) :
                 self.log("")
                 self.log(
-                    "Setting Car slots to hold"
-                )  # If forced = 1 then the window is an Car Slot. It will already have a "<=" set as we made start SOC = end SOC, but we
+                    "Setting Car slots (Forced = 1) to hold"
+                )  
+                # If forced = 1 then the window is an Car Slot. It will already have a "<=" set as we made start SOC = end SOC, but we
                 # possibly want to differentiate the two for later processing.
                 self.windows.loc[
                     (self.windows["forced"] == 1),
                     "hold_soc",
                 ] = "<=Car"
+
+                # Set soc end to equal start soc for any car slots (purely for dashboard display purposes)
+                self.windows.loc[(self.windows["forced"] == 1), "soc_end"] = self.windows["soc]"]
+               
 
             if self.debug and "W" in self.debug_cat:
 
