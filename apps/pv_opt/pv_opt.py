@@ -2042,6 +2042,10 @@ class PVOpt(hass.Hass):
 
         self.log(f"  Contract last loaded at {self.contract_last_loaded.strftime(DATE_TIME_FORMAT_SHORT)}")
 
+        # Reload Ev selector status
+        self.ev = self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]  # Is set true only for Zappi at this point
+
+
         if self.agile:
             if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
                 pd.Timestamp.now(tz=self.tz).hour >= 16
@@ -2264,9 +2268,6 @@ class PVOpt(hass.Hass):
         # Note: self.opt will now include attribute "carslot" regardless of actual tariff, but be set 
         # to 0 unless on 1) IOG and dispatches are planned or 2) Car charging on agile is required
         car_on = pd.Series(index=y.index, data=0, name="carslot")
-
-        # Reload Ev selector status
-        self.ev = self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]  # Is set true only for Zappi at this point
 
         # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load.
         # If on Agile tariff, (re)calculate them now. 
