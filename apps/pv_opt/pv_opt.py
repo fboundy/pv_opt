@@ -2311,7 +2311,7 @@ class PVOpt(hass.Hass):
 
         # If no Charger selected, clear self.car_slots (catchall / helps with testing)
         if not self.ev:
-            self.car_slots = {}
+            self.car_slots = pd.DataFrame()
 
             
         if self.intelligent:
