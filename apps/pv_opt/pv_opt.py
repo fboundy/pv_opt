@@ -2905,6 +2905,8 @@ class PVOpt(hass.Hass):
                 # Set soc end to equal start soc for any car slots (purely for dashboard display purposes)
                 ### line is currently not working
                 #self.windows.loc[(self.windows["forced"] == 1), "soc_end"] = self.windows["soc"]
+                ###try this one instead (might create a new column tho)
+                #self.windows["soc_end"]=self.windows["soc"][self.windows["forced"]==1]
                
 
             if self.debug and "W" in self.debug_cat:
