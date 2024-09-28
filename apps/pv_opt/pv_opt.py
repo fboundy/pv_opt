@@ -2288,7 +2288,7 @@ class PVOpt(hass.Hass):
             self.log(y.to_string())
 
         # For each time range in the IOG Charging Schedule/Agile Car Charge Plan, set 1/2 hour Car slot flag to "1"
-        if not self.car_slots.empty:
+        if not self.car_slots.empty and self.ev:
             for h in range(len(self.car_slots)):
                 for i in range(len(y)):
                     if (y["start"].iloc[i] >= self.car_slots["start_dt"].iloc[h]) and (
