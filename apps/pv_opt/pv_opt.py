@@ -2903,7 +2903,8 @@ class PVOpt(hass.Hass):
                 ] = "<=Car"
 
                 # Set soc end to equal start soc for any car slots (purely for dashboard display purposes)
-                self.windows.loc[(self.windows["forced"] == 1), "soc_end"] = self.windows["soc"]
+                ### line is currently not working
+                #self.windows.loc[(self.windows["forced"] == 1), "soc_end"] = self.windows["soc"]
                
 
             if self.debug and "W" in self.debug_cat:
