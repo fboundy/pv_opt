@@ -180,10 +180,10 @@ DEFAULT_CONFIG = {
         "domain": "number",
     },
     "pass_threshold_p": {
-        "default": 4.0,
+        "default": 1.0,
         "attributes": {
             "min": 0.0,
-            "max": 1.0,
+            "max": 4.0,
             "step": 0.5,
             "mode": "slider",
         },
