@@ -2309,6 +2309,9 @@ class PVOpt(hass.Hass):
                 self.log(self.car_slots["end_dt"])
                 self.log(pd.Timestamp.now(self.tz))
 
+        # If no Charger selected, clear self.car_slots (catchall / helps with testing)
+        if not self.ev:
+            self.car_slots = {}
 
             
         if self.intelligent:
