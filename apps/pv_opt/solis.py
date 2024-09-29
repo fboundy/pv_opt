@@ -48,6 +48,9 @@ INVERTER_DEFS = {
         # required config. These config items can be over-written by config specified in the config.yaml
         # file. They are required for the main PV_Opt module and if they cannot be found an ERROR will be
         # raised
+        ### house_load_x and _bypass_load_x are not the defaults for Solax. Not changed, as they are potentially
+        # causing issues for some users
+        
         "default_config": {
             "maximum_dod_percent": "number.{device_name}_battery_minimum_soc",
             "id_battery_soc": "sensor.{device_name}_battery_soc",
