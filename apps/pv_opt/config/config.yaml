@@ -208,6 +208,7 @@ pv_opt:
   # id_consumption_today: sensor.{device_name}_daily_house_backup_consumption
 
   # id_grid_power: sensor.{device_name}_meter_active_power
+  # id_grid_import_today: sensor.{device_name}_daily_energy_imported
   # id_inverter_ac_power": sensor.{device_name}_inverter_ac_power
   # id_battery_soc: sensor.{device_name}_battery_soc
   # id_backup_mode_soc: 

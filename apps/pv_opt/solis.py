@@ -184,6 +184,7 @@ INVERTER_DEFS = {
             #     "sensor.{device_name}_backup_load_power",
             # ],
             "id_grid_power": "sensor.{device_name}_meter_active_power",
+            "id_grid_import_today": "sensor.{device_name}_daily_energy_imported",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
             "supports_forced_discharge": True,
