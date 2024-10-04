@@ -553,7 +553,7 @@ class PVOpt(hass.Hass):
     def initialize(self):
         self.config = {}
         self.log("")
-        self.log(f"******************* PV Opt v{VERSION} *******************")
+        self.log(f"*************** PV Opt Version: v{VERSION} ***************")
         self.log("")
 
         self.debug = DEBUG
