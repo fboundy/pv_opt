@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.17.1-Beta-3"
+VERSION = "3.17.1-Beta-4"
 
 # Change history
 # -------
@@ -44,6 +44,8 @@ VERSION = "3.17.1-Beta-3"
 # Added additional attributes to car_slots and candidate_car_slots for Dashboard display
 # Beta-3:
 # Corrected logic for car slots when Zappi not seen as part of house load (no inverter holding is necessary)
+# Beta-4
+# Trial : commented out supression of MQTT generation of "active" in _expose_configs, to correct 3 switches not being written to
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -1842,7 +1844,7 @@ class PVOpt(hass.Hass):
             and ("json_" not in item)
             and ("alt_" not in item)
             and ("auto" not in item)
-            and ("active" not in item)
+            # and ("active" not in item)   SVB commented out as a trial, otherwise switches don't get written
             and "domain" in DEFAULT_CONFIG[item]
         ]
 
