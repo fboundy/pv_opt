@@ -143,7 +143,7 @@ INVERTER_DEFS = {
         },
     },
     "SOLIS_SOLARMAN": {
-        "online": "sensor.{device_name}_battery_soc",
+        "online": "sensor.{device_name}_overdischarge_soc",
         "modes": {
             0x21: "Self Use",
             0x22: "Optimized Revenue",
@@ -176,7 +176,8 @@ INVERTER_DEFS = {
             "backup_mode_soc": 43024,
         },
         "default_config": {
-            "maximum_dod_percent": 15,
+            #"maximum_dod_percent": 15,
+            "maximum_dod_percent": "sensor.{device_name}_overdischarge_soc",
             "id_battery_soc": "sensor.{device_name}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_daily_house_backup_consumption",
             # "id_consumption": [
