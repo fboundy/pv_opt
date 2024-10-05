@@ -425,6 +425,7 @@ DEFAULT_CONFIG = {
         "domain": "select",
         "attributes": {"options": OPTIONS_TIME},
     },
+    "control_car_charging": {"default": False, "domain": "switch"},
     "solar_forecast": {
         "default": "Solcast",
         "attributes": {"options": ["Solcast", "Solcast_p10", "Solcast_p90", "Weighted"]},
@@ -646,6 +647,7 @@ class PVOpt(hass.Hass):
         self._load_pv_system_model()
         self._load_contract()
         self.ev = self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]  # Is set true only for Zappi at this point
+        self.car_charging = self.get_config("control_car_charging")
         self._check_for_zappi()
 
         if self.get_config("alt_tariffs") is not None:
@@ -2274,7 +2276,7 @@ class PVOpt(hass.Hass):
         # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load.
         # If on Agile tariff, (re)calculate them now. 
 
-        if self.agile and self.ev:
+        if self.agile and self.ev and self.car_charging:
             self.log("")
             self.ulog("Calculating candidate Car Charging Plan")
             self.candidate_car_slots = self.calculate_agile_car_slots()
@@ -2312,7 +2314,7 @@ class PVOpt(hass.Hass):
                 self.log(pd.Timestamp.now(self.tz))
 
         # If no Charger selected, clear self.car_slots (catchall / helps with testing)
-        if not self.ev:
+        if not self.ev or not self.car_charging:
             self.car_slots = pd.DataFrame()
 
             
@@ -2321,7 +2323,7 @@ class PVOpt(hass.Hass):
             self.ulog("Checking EV Status (IOG tariff)")
             self._check_car_plugin_iog()
 
-        if self.agile and self.ev:
+        if self.agile and self.ev and self.car_charging:
             self.log("")
             self.ulog("Checking EV Status (Agile Tariff)")
             self._check_car_plugin_agile()
