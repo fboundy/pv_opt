@@ -1846,7 +1846,6 @@ class PVOpt(hass.Hass):
             and ("json_" not in item)
             and ("alt_" not in item)
             and ("auto" not in item)
-            # and ("active" not in item)  ### SVB trial
             and "domain" in DEFAULT_CONFIG[item]
         ]
 
@@ -1945,7 +1944,7 @@ class PVOpt(hass.Hass):
 
             self.ha_entities = {}
             for entity_id in self.change_items:
-                if not ("sensor" or "_active") in entity_id:   ### SVB trial
+                if not ("sensor" or "_active") in entity_id:
                     item = self.change_items[entity_id]
                     self.log(f"  {item:40s}  {entity_id:42s}  {self.config_state[item]}")
                     self.handles[entity_id] = self.listen_state(
