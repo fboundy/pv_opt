@@ -2049,6 +2049,8 @@ class PVOpt(hass.Hass):
         # Reload Ev selector status
         self.ev = self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]  # Is set true only for Zappi at this point
 
+        # Reload EV Charge plan control
+        self.car_charging = self.get_config("control_car_charging")
 
         if self.agile:
             if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
