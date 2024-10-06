@@ -317,18 +317,20 @@ If you are running a different integration or inverter brand you will need to ed
 You may also need to change the `device_name`. This is the name given to your inverter by your integration. The default is `solis` but this can also be changed in `config.yaml`.
 
 E.g:
+
 For the Core Modbus Integration:
+
     inverter_type: SOLIS_CORE_MODBUS
     device_name: solis
 
 For the Solarman integration (legacy installs using https://github.com/StephanJoubert/home_assistant_solarman)
 
-    inverter_type: SOLARMAN
+    inverter_type: SOLIS_SOLARMAN
     device_name: solis
 
 For the Solarman integration (new installs using https://github.com/davidrapan/ha-solarman)
 
-    inverter_type: SOLARMAN_V2
+    inverter_type: SOLIS_SOLARMAN_V2
     device_name: solis
     
 
