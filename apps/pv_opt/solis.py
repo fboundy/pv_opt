@@ -593,5 +593,10 @@ class InverterController:
     def _solis_write_time_register(self, direction, limit, unit, value):
         address = INVERTER_DEFS[self.type]["registers"][f"timed_{direction}_{limit}_{unit}"]
         entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
+        self.log(" >>> _solis_write_time_register called")
+        self.log(f" >>> Type = {self.type}")
+        self.log(f" >>> Entity = {entity_id}")
+        self.log(f" >>> Address = {address}")
+
 
         return self._solis_write_holding_register(address=address, value=value, entity_id=entity_id)
