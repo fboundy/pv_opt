@@ -11,7 +11,7 @@ The application will integrate fully with Solis inverters which are controlled u
 - [Home Assistant Solarman Integration](https://github.com/davidrapan/ha-solarman) (1)
 
 (1) https://github.com/StephanJoubert/home_assistant_solarman appears to be no longer maintained so has been replaced with
-https://github.com/davidrapan/ha-solarman. The link above should be used for new installs for PvOpt v3.15.6 onwards. 
+https://github.com/davidrapan/ha-solarman. This should be used for new installs for PvOpt v3.15.6 onwards. 
 
 Once installed it should require miminal configuration. Other inverters/integrations can be added if required or can be controlled indirectly using automations.
 
