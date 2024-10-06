@@ -304,7 +304,7 @@ class InverterController:
             return True
 
     def enable_timed_mode(self):
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
             self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True, Backup=False)
         else:
             self._unknown_inverter()
@@ -320,7 +320,7 @@ class InverterController:
         self._control_charge_discharge("discharge", enable, **kwargs)
 
     def hold_soc(self, enable, soc=None, **kwargs):
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
             start = kwargs.get("start", pd.Timestamp.now(tz=self.tz).floor("1min"))
             end = kwargs.get("end", pd.Timestamp.now(tz=self.tz).ceil("30min"))
             self._solis_control_charge_discharge(
@@ -340,7 +340,7 @@ class InverterController:
         raise Exception(e)
 
     def hold_soc_old(self, enable, soc=None):
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
 
             if enable:
                 self._solis_set_mode_switch(SelfUse=True, Timed=False, GridCharge=True, Backup=True)
@@ -358,7 +358,7 @@ class InverterController:
             self.log(f"Setting Backup SOC to {soc}%")
             if self.type == "SOLIS_SOLAX_MODBUS":
                 changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=soc)
-            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
                 changed, written = self.solis_write_holding_register(
                     address=INVERTER_DEFS(self.type)["registers"]["backup_mode_soc"],
                     value=soc,
@@ -371,7 +371,7 @@ class InverterController:
     @property
     def status(self):
         status = None
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
             status = self._solis_state()
 
         return status
@@ -380,7 +380,7 @@ class InverterController:
         pass
 
     def _control_charge_discharge(self, direction, enable, **kwargs):
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
             self._solis_control_charge_discharge(direction, enable, **kwargs)
 
     def _solis_control_charge_discharge(self, direction, enable, **kwargs):
@@ -435,7 +435,7 @@ class InverterController:
                         changed, written = self.host.write_and_poll_value(
                             entity_id=entity_id, value=value, verbose=True
                         )
-                    elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+                    elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
                         changed, written = self._solis_write_time_register(direction, limit, unit, value)
 
                     else:
@@ -484,7 +484,7 @@ class InverterController:
             self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
             if self.type == "SOLIS_SOLAX_MODBUS":
                 changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
-            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
                 changed, written = self._solis_write_current_register(direction, current, tolerance=1)
             else:
                 e = "Unknown inverter type"
@@ -500,7 +500,7 @@ class InverterController:
                 self.log("Inverter already at correct current")
 
     def _solis_set_mode_switch(self, **kwargs):
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN":
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
             status = self._solis_solax_solarman_mode_switch()
 
         elif self.type == "SOLIS_CORE_MODBUS":
@@ -535,7 +535,7 @@ class InverterController:
 
             self.host.set_select("inverter_mode", mode)
 
-        elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+        elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
             self._solis_write_holding_register(address=address, value=code, entity_id=entity_id)
 
@@ -562,7 +562,7 @@ class InverterController:
 
     def _solis_state(self):
         limits = ["start", "end"]
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN":
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
             status = self._solis_solax_solarman_mode_switch()
         else:
             status = self._solis_core_mode_switch()
@@ -628,7 +628,7 @@ class InverterController:
                 self.host.call_service("modbus/write_register", **data)
                 written = True
 
-        elif self.type == "SOLIS_SOLARMAN":
+        elif self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
             if entity_id is not None and self.host.entity_exists(entity_id):
                 old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
