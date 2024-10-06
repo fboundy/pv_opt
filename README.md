@@ -70,7 +70,8 @@ This excellent integration will pull Octopus Price data in to Home Assistant. So
 
 <h3>5. Install the Integration to Control Your Inverter</h3>
 
-At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus) or the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus. 
+At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus) or the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus.
+
 Support for the Solarman integrations (https://github.com/StephanJoubert/home_assistant_solarman and https://github.com/davidrapan/ha-solarman) are in test. 
 
 <h4>Solax Modbus:</h4>
