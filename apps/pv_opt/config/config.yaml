@@ -143,11 +143,6 @@ pv_opt:
 
   # id_daily_solar: sensor.{device_name}_power_generation_today
   
-  # id_solar_power: sensor.{device_name}_pv_total_power
-  # id_solar_power: 
-  # #   - sensor.{device_name}_pv_power_1
-  # #   - sensor.{device_name}_pv_power_2
-
   # id_battery_soc: sensor.{device_name}_battery_soc
   # id_timed_charge_start_hours: number.{device_name}_timed_charge_start_hours
   # id_timed_charge_start_minutes: number.{device_name}_timed_charge_start_minutes
@@ -163,6 +158,18 @@ pv_opt:
 
   # id_timed_charge_discharge_button: button.{device_name}_update_charge_discharge_times
   # id_inverter_mode: select.{device_name}_energy_storage_control_switch
+
+
+  # The following do not have defaults stored within Pv_opt so require uncommenting if used:
+
+  # Required for Tariff Comparison, see end of file. 
+
+  # id_solar_power: sensor.{device_name}_pv_total_power
+  # OR 
+  # id_solar_power: 
+  #   - sensor.{device_name}_pv_power_1
+  #   - sensor.{device_name}_pv_power_2
+
 
   # ==============================================================================================================
   # Brand / Integration Specific Config: SOLIS_CORE_MODBUS: https://github.com/fboundy/ha_solis_modbus
@@ -191,10 +198,6 @@ pv_opt:
   # id_battery_soc: sensor.{device_name}_battery_soc
 
   # id_daily_solar: sensor.{device_name}_power_generation_today
-  # id_solar_power: sensor.{device_name}_pv_total_power
-  # id_solar_power: 
-  # #   - sensor.{device_name}_pv_power_1
-  # #   - sensor.{device_name}_pv_power_2
 
   # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour 
   # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
@@ -209,6 +212,17 @@ pv_opt:
   # id_timed_discharge_current: sensor.{device_name}_timed_discharge_current_limit
 
   # id_inverter_mode: sensor.{device_name}_energy_storage_control_switch
+
+
+  # The following do not have defaults stored within Pv_opt so require uncommenting if used:
+
+  # Required for Tariff Comparison, see end of file. 
+
+  # id_solar_power: sensor.{device_name}_pv_total_power
+  #  OR
+  # id_solar_power: 
+  #   - sensor.{device_name}_pv_power_1
+  #   - sensor.{device_name}_pv_power_2
 
   # ==============================================================================================================
   # Brand / Integration Specific Config: SOLIS_SOLARMAN: https://github.com/StephanJoubert/home_assistant_solarman
@@ -248,6 +262,7 @@ pv_opt:
 
   # id_inverter_mode: sensor.{device_name}_storage_control_mode
 
+
   # ==============================================================================================================
   # Brand / Integration Specific Config: SOLIS_SOLARMAN_V2:  https://github.com/davidrapan/ha-solarman
   # ==============================================================================================================
@@ -274,10 +289,6 @@ pv_opt:
   # id_inverter_ac_power: sensor.{device_name}_inverter_ac_power
   # id_backup_mode_soc: sensor.{device_name}_backup_mode_soc
 
-
-  id_solar_power:
-    - sensor.{device_name}_power_pv1
-    - sensor.{device_name}_power_pv2
   # id_daily_solar: sensor.{device_name}_today_production
 
   # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
@@ -293,6 +304,14 @@ pv_opt:
   # id_timed_discharge_current: sensor.{device_name}_timed_discharge_current
 
   # id_inverter_mode: sensor.{device_name}_storage_control_mode
+
+
+  # The following do not have defaults stored within Pv_opt so require uncommenting if used:
+
+  # Required for Tariff Comparison, see end of file. Can be commented out if not using. 
+  id_solar_power:
+    - sensor.{device_name}_power_pv1
+    - sensor.{device_name}_power_pv2
 
 
   # ===============================================================================================================
@@ -316,7 +335,8 @@ pv_opt:
   # update_cycle_seconds: 300
 
 
-# Tariff comparison
+  # Tariff comparison
+  # If required, also uncomment "id_solar_power" in the relevent integration above
       
   # alt_tariffs:
   #   - name: Agile_Fix
