@@ -1713,7 +1713,7 @@ class PVOpt(hass.Hass):
                         # try getting values from all the entities
                         elif valid_strings:
                             self.config[item] = valid_strings[0][0]
-                            if not "sensor" in valid_strings[0][1]:
+                            if not ("sensor" or "_active") in valid_strings[0][1]:   #SVB trial
                                 self.change_items[valid_strings[0][1]] = item
                             self.rlog(
                                 f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
@@ -1780,7 +1780,7 @@ class PVOpt(hass.Hass):
                         )
                         # If these change then we need to trigger automatically
                         for v in values[:-1]:
-                            if not "sensor" in v:
+                            if not ("sensor" or "_active") in v:   #SVB trial
                                 self.change_items[v] = item
 
                     else:
