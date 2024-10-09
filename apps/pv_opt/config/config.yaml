@@ -291,16 +291,12 @@ pv_opt:
 
   # id_daily_solar: sensor.{device_name}_today_production
 
-  # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
-  # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute
-  # id_timed_charge_end_hours: sensor.{device_name}_timed_charge_end_hour
-  # id_timed_charge_end_minutes: sensor.{device_name}_timed_charge_end_minute
+  # id_timed_charge_start: sensor.{device_name}_timed_charge_start
+  # id_timed_charge_end: sensor.{device_name}_timed_charge_end
   # id_timed_charge_current: sensor.{device_name}_timed_charge_current
 
-  # id_timed_discharge_start_hours: sensor.{device_name}_timed_discharge_start_hour
-  # id_timed_discharge_start_minutes: sensor.{device_name}_timed_discharge_start_minute
-  # id_timed_discharge_end_hours: sensor.{device_name}_timed_discharge_end_hour
-  # id_timed_discharge_end_minutes: sensor.{device_name}_timed_discharge_end_minute
+  # id_timed_discharge_start: sensor.{device_name}_timed_discharge_start
+  # id_timed_discharge_end: sensor.{device_name}_timed_discharge_end
   # id_timed_discharge_current: sensor.{device_name}_timed_discharge_current
 
   # id_inverter_mode: sensor.{device_name}_storage_control_mode

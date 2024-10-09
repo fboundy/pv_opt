@@ -257,15 +257,11 @@ INVERTER_DEFS = {
         },
         "brand_config": {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
-            "id_timed_charge_start_hours": "sensor.{device_name}_timed_charge_start_hour",
-            "id_timed_charge_start_minutes": "sensor.{device_name}_timed_charge_start_minute",
-            "id_timed_charge_end_hours": "sensor.{device_name}_timed_charge_end_hour",
-            "id_timed_charge_end_minutes": "sensor.{device_name}_timed_charge_end_minute",
+            "id_timed_charge_start": "sensor.{device_name}_timed_charge_start",
+            "id_timed_charge_end": "sensor.{device_name}_timed_charge_end",
             "id_timed_charge_current": "sensor.{device_name}_timed_charge_current_limit",
-            "id_timed_discharge_start_hours": "sensor.{device_name}_timed_discharge_start_hour",
-            "id_timed_discharge_start_minutes": "sensor.{device_name}_timed_discharge_start_minute",
-            "id_timed_discharge_end_hours": "sensor.{device_name}_timed_discharge_end_hour",
-            "id_timed_discharge_end_minutes": "sensor.{device_name}_timed_discharge_end_minute",
+            "id_timed_discharge_start": "sensor.{device_name}_timed_discharge_start",
+            "id_timed_discharge_end": "sensor.{device_name}_timed_discharge_end",
             "id_timed_discharge_current": "sensor.{device_name}_timed_discharge_current_limit",
             "id_inverter_mode": "sensor.{device_name}_storage_control_mode",
             "id_backup_mode_soc": "sensor.{device_name}_backup_mode_soc",
@@ -425,13 +421,14 @@ class InverterController:
         for limit in times:
             if times[limit] is not None:
                 for unit in ["hours", "minutes"]:
-                    entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
+                    # entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] 
                     if unit == "hours":
                         value = times[limit].hour
                     else:
                         value = times[limit].minute
 
                     if self.type == "SOLIS_SOLAX_MODBUS":
+                        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]   # moved - now only runs for Solax integration, the others don't need it. 
                         changed, written = self.host.write_and_poll_value(
                             entity_id=entity_id, value=value, verbose=True
                         )
@@ -560,6 +557,7 @@ class InverterController:
         switches = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
         return {"code": code, "switches": switches}
 
+
     def _solis_state(self):
         limits = ["start", "end"]
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
@@ -567,20 +565,33 @@ class InverterController:
         else:
             status = self._solis_core_mode_switch()
 
+
+
         for direction in ["charge", "discharge"]:
             status[direction] = {}
             for limit in limits:
                 states = {}
-                for unit in ["hours", "minutes"]:
-                    entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
-                    states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
-                status[direction][limit] = pd.Timestamp(
-                    f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
-                )
+ 
+                if self.type != "SOLIS_SOLARMAN_V2":                
+                    
+                    for unit in ["hours", "minutes"]:
+                        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] #timetag - DONE
+                        states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
+                    
+                    status[direction][limit] = pd.Timestamp(
+                        f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
+                    )
+                else:   # for SOLARMAN_V2
+                    entity_id = self.host.config[f"id_timed_{direction}_{limit}"]
+                    time = (self.host.get_state_retry(entity_id=entity_id))
+                    status[direction][limit] = pd.Timestamp(time)
+
             time_now = pd.Timestamp.now(tz=self.tz)
             status[direction]["current"] = float(
                 self.host.get_state_retry(self.host.config[f"id_timed_{direction}_current"])
             )
+
+
 
             status[direction]["active"] = (
                 time_now >= status[direction]["start"]
@@ -628,7 +639,24 @@ class InverterController:
                 self.host.call_service("modbus/write_register", **data)
                 written = True
 
-        elif self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
+        elif self.type == "SOLIS_SOLARMAN":
+            if entity_id is not None and self.host.entity_exists(entity_id):
+                old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
+                if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
+                    self.log(f"Inverter value already set to {value}.")
+                    changed = False
+
+            if changed:
+                data = {"register": address, "value": value}
+                # self.host.call_service("solarman/write_holding_register", **data)
+                self.log(">>> Writing {value} to inverter register {address} using Solarman")
+                written = True
+
+        ### For solarman_v2, the entity_id passed to do the writes (hours and minutes seperately) 
+        #   won't exist as something to read (time value includes hours and minutes)
+        #   this means the inverter value will always be written to. Needs fixing.
+        
+        elif self.type == "SOLIS_SOLARMAN_V2":
             if entity_id is not None and self.host.entity_exists(entity_id):
                 old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
@@ -656,11 +684,12 @@ class InverterController:
 
     def _solis_write_time_register(self, direction, limit, unit, value):
         address = INVERTER_DEFS[self.type]["registers"][f"timed_{direction}_{limit}_{unit}"]
-        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
+        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] #timetag
         self.log(" >>> _solis_write_time_register called")
         self.log(f" >>> Type = {self.type}")
         self.log(f" >>> Entity = {entity_id}")
         self.log(f" >>> Address = {address}")
+        self.log(f" >>> Value = {value}")
 
 
         return self._solis_write_holding_register(address=address, value=value, entity_id=entity_id)
