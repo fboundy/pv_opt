@@ -571,9 +571,7 @@ class InverterController:
             status[direction] = {}
             for limit in limits:
                 states = {}
- 
-                if self.type != "SOLIS_SOLARMAN_V2":                
-                    
+                if not self.type == "SOLIS_SOLARMAN_V2":                
                     for unit in ["hours", "minutes"]:
                         entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] #timetag - DONE
                         states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
