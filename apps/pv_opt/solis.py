@@ -680,7 +680,7 @@ class InverterController:
             self.log("solis_write_holding_register....Entity ID is.....")
             self.log(entity_id)
             if entity_id is not None and self.host.entity_exists(entity_id):
-                old_value = int(float(self.host.get_state_retry(entity_id=entity_id))) ### This is reading a string, not a float. Needs correcting. (just remove float?)
+                old_value = int(float(self.host.get_state_retry(entity_id=entity_id))) 
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                     self.log(f"Inverter value already set to {value}.")
                     changed = False
