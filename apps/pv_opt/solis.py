@@ -543,7 +543,7 @@ class InverterController:
         else:
             modes = INVERTER_DEFS[self.type]["modes"]
             code = {modes[m]: m for m in modes}[inverter_mode]
-        if self.host.debug:
+        if self.host.debug:  ### timetag SVB logging should probably make this log by default
             self.log(f">>> Inverter Mode: {inverter_mode}")
             self.log(f">>> Inverter Code: {code}")
 
@@ -623,7 +623,7 @@ class InverterController:
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS":
             status["hold_soc"]["soc"] = self.host.get_config("id_backup_mode_soc")
         else:
-            status["hold_soc"]["soc"] = None
+            status["hold_soc"]["soc"] = None  ### SOLARMAN_V2 has the ability to read id_backup_mode_SOC so should probably add to the switch above
 
         return status
 
@@ -673,12 +673,14 @@ class InverterController:
         ### For solarman_v2, the entity_id passed to do the writes (hours and minutes seperately) 
         #   won't exist as something to read (time value includes hours and minutes)
         #   this means the inverter value will always be written to. Needs fixing.
+        # 10-10-24 update, looks like old_value = int/float is errorinng which means it is being run,
+        # therefore the entity must exist. added logging to see what the entity name is. 
         
         elif self.type == "SOLIS_SOLARMAN_V2":
             self.log("solis_write_holding_register....Entity ID is.....")
             self.log(entity_id)
             if entity_id is not None and self.host.entity_exists(entity_id):
-                old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
+                old_value = int(float(self.host.get_state_retry(entity_id=entity_id))) ### This is reading a string, not a float. Needs correcting. (just remove float?)
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
                     self.log(f"Inverter value already set to {value}.")
                     changed = False
