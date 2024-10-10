@@ -577,13 +577,32 @@ class InverterController:
                     for unit in ["hours", "minutes"]:
                         entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] #timetag - DONE
                         states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
+
                     status[direction][limit] = pd.Timestamp(
                         f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                     )
+                    ### SVB debugging
+
+                    self.log("Status of status is....")
+                    self.log(status[direction][limit])
+                    
+
                 else:   # for SOLARMAN_V2
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}"]
-                    time = (self.host.get_state_retry(entity_id=entity_id))
-                    status[direction][limit] = pd.Timestamp(time)
+                    time_stamp = (self.host.get_state_retry(entity_id=entity_id))
+                    status[direction][limit] = pd.Timestamp(time_stamp, tz=self.host.tz)
+                   
+                    ### SVB debug logging
+                    self.log("Direction is....")
+                    self.log(direction)
+
+                    self.log("Limit is ....")
+                    self.log(limit)
+
+                    self.log("Status of status is....")
+                    self.log(status[direction][limit])
+                    ### end of SVB debug logging
+
 
             time_now = pd.Timestamp.now(tz=self.tz)
             status[direction]["current"] = float(
@@ -656,6 +675,8 @@ class InverterController:
         #   this means the inverter value will always be written to. Needs fixing.
         
         elif self.type == "SOLIS_SOLARMAN_V2":
+            self.log("solis_write_holding_register....Entity ID is.....")
+            self.log(entity_id)
             if entity_id is not None and self.host.entity_exists(entity_id):
                 old_value = int(float(self.host.get_state_retry(entity_id=entity_id)))
                 if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
