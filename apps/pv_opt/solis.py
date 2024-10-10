@@ -565,17 +565,18 @@ class InverterController:
         else:
             status = self._solis_core_mode_switch()
 
-
-
+        self.log("self.type is")
+        self.log(self.type)
+        
         for direction in ["charge", "discharge"]:
             status[direction] = {}
             for limit in limits:
+
                 states = {}
-                if not self.type == "SOLIS_SOLARMAN_V2":                
+                if self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS":                
                     for unit in ["hours", "minutes"]:
                         entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] #timetag - DONE
                         states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
-                    
                     status[direction][limit] = pd.Timestamp(
                         f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                     )
