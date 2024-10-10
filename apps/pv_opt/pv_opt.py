@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.17.1-Beta-4"
+VERSION = "3.17.1-Beta-5"
 
 # Change history
 # -------
@@ -46,7 +46,9 @@ VERSION = "3.17.1-Beta-4"
 # Corrected logic for car slots when Zappi not seen as part of house load (no inverter holding is necessary)
 # Beta-4
 # Trial : commented out supression of MQTT generation of "active" in _expose_configs, to correct 3 switches not being written to
-
+# Beta-5 
+# Final fixes for trial above to ensure updates to _active don't retrigger optimiser
+# Add Debug category "X" for verbose logging of charge/discharge windows
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -63,6 +65,7 @@ DEBUG = False
 # C = Charge algorithm Logging
 # D = Discharge algorithm Logging
 # W = Charge/Discharge Windows Logging
+# X = Charge/Discharge Windows Logging (verbose)
 # F = Power Flows Logging
 # V = Power Flows debugging (verbose)
 # I = inverter control/commands Logging
@@ -70,7 +73,7 @@ DEBUG = False
 
 # Default is all, include desired string in Config.yaml to enable filtering
 
-DEBUG_CATEGORIES = "STPQCDWFVIE"
+DEBUG_CATEGORIES = "STPQCDWXFVIE"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M %Z"
@@ -2858,7 +2861,7 @@ class PVOpt(hass.Hass):
             if tolerance > 0:
                 self.windows["forced"] = ((self.windows["forced"] / tolerance).round(0) * tolerance).astype(int)
 
-            if self.debug and "W" in self.debug_cat:
+            if self.debug and "X" in self.debug_cat:
                 self.log("")
                 self.log("Printing Combined Window after power rounding")
                 self.log(f"\n{self.windows.to_string()}")
@@ -2949,7 +2952,7 @@ class PVOpt(hass.Hass):
                 for i in range(0, min(len(self.windows), 1))
             ]
 
-            if self.debug and "W" in self.debug_cat:
+            if self.debug and "X" in self.debug_cat:
                 self.log("Printing final result of _create_windows....")
                 self.log("Charge_start_datetime = ")
                 self.log(self.charge_start_datetime)
