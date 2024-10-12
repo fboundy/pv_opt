@@ -12,6 +12,11 @@ The application will integrate fully with Solis inverters which are controlled u
 - [Home Assistant Solis Sensor Integration](https://github.com/hultenvp/solis-sensor) (read-only mode)
 - [Home Assistant Solis Control Integration](https://github.com/stevegal/solis_control) (allows inverter control via solis_cloud and HA automations)
 
+PV Opt supports EV charging:
+ - If on Octopus Intelligent Go, PV-opt will incorporate any extra cheap slots in the house battery charge/discharge plan.
+ - If on the Agile tariff, PV Opt calculates a car charging plan which can be used to control a variety of EV chargers.
+ - If necessary Pv_opt automatically prevents house battery discharge during EV Charging.
+
 Once installed it should require miminal configuration. Other inverters/integrations can be added if required or can be controlled indirectly using automations.
 
 It has been tested primarily with Octopus tariffs but other tariffs can be manually implemented.
@@ -505,7 +510,7 @@ These parameters will define how PV Opt estimates daily consumption:
 |:--|:--:| :-- | :--:|:--|
 | EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
 | EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to On prevents this, as well as ensuring that any EV consumption is removed from Consumption History. If your Zappi is wired on its own Henley block and thus outside of what the inverter CT clamp will measure (or you want the EV to utilise the house battery when charging), then set this to Off. |
-| Car Charge Plan | kWh | `switch.control_car_charging` | Off | Toggle Car Plan generation On/Off. For users on Agile, setitng to On generates a candidate car charging plan on each optimiser run based on the settings below. The candidate plan is made active upon car plugin, or via Dashbaord command (see "Transfer Car Charge Plan" below). Intelligent Octopus Go users should set this to Off and the rest of the parameters below will have no effect. |
+| Car Charge Plan | kWh | `switch.control_car_charging` | Off | Toggle Car Plan generation On/Off. For users on Agile, setitng to On generates a candidate car charging plan on each optimiser run based on the settings below. The candidate plan is made active upon car plugin, or via Dashbaord command (see "Transfer Car Charge Plan" below). The active car charging plan is output on binary_sensor.pvopt_car_charging_slot for use in HA automations. An example HA automation to control the Zappi charger is included at XXXXXXX. Intelligent Octopus Go users should set this to Off and the rest of the parameters below will have no effect. |
 | Transfer Car Charge Plan | On/Off | `switch.transfer_car_charge_plan` | 30 | Make Candidate Car Charging Plan the active plan. Useful if adjusting any of the below paramaters after the car has been plugged in. This will automatically be set back to Off after the plan is transferred. This ensures any external HA automations used to auto-calculate "Car Charge to Add" based on car SOC don't corrupt the car charging plan once the car starts charging. |
 | EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. |
 | EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 60 | Set EV Battery Capacity.   |
