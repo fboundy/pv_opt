@@ -12,14 +12,14 @@ The application will integrate fully with Solis inverters which are controlled u
 - [Home Assistant Solis Sensor Integration](https://github.com/hultenvp/solis-sensor) (read-only mode)
 - [Home Assistant Solis Control Integration](https://github.com/stevegal/solis_control) (allows inverter control via solis_cloud and HA automations)
 
-PV Opt supports EV charging:
- - If on Octopus Intelligent Go, PV-opt will incorporate any extra cheap slots in the house battery charge/discharge plan.
- - If on the Agile tariff, PV Opt calculates a car charging plan which can be used to control a variety of EV chargers.
- - If necessary Pv_opt automatically prevents house battery discharge during EV Charging.
-
 Once installed it should require miminal configuration. Other inverters/integrations can be added if required or can be controlled indirectly using automations.
 
 It has been tested primarily with Octopus tariffs but other tariffs can be manually implemented.
+
+PV Opt supports EV charging:
+ - If on Octopus Intelligent Go, PV Opt will incorporate any extra cheap slots in the house battery charge/discharge plan.
+ - If on the Agile tariff, PV Opt can calculate a car charging plan which can be used to control your EV charger/car via external HA automation scripts.
+ - If necessary Pv_opt automatically prevents house battery discharge during EV Charging.
 
 <h2>Don't Buy Me a Beer or a Coffee...</h2>
 
