@@ -503,10 +503,11 @@ These parameters will define how PV Opt estimates daily consumption:
 
 | Parameter | Units | Entity | Default | Description |
 |:--|:--:| :-- | :--:|:--|
-| EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type for users on Intelligent Octopus Go. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
+| EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
 | EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to On prevents this, as well as ensuring that any EV consumption is removed from Consumption History. If your Zappi is wired on its own Henley block and thus outside of what the inverter CT clamp will measure (or you want the EV to utilise the house battery when charging), then set this to Off. |
 | EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. Value is for a future release. At the current release this value has no effect. |
 | EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 30 | Set EV Battery Capacity. Value is for a future release. At the current release this value has no effect. |
+| Car Charge Plan | kWh | `switch.car_charge_plan` | Off | Toggle Car Plan generation On/Off. For users on Agile, setitng to On generates a candidate car charging plan based on the values of XX, YY and ZZ on each optimiser run. The candidate plan is made active upon car plugin, or via Dashbaord command (see AAAAA). Intelligent Octopus Go users should set this to Off. |
 
 <h3>Tuning Parameters</h3>
 These parameters will tweak how PV Opt runs:
