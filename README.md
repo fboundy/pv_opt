@@ -505,9 +505,15 @@ These parameters will define how PV Opt estimates daily consumption:
 |:--|:--:| :-- | :--:|:--|
 | EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
 | EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to On prevents this, as well as ensuring that any EV consumption is removed from Consumption History. If your Zappi is wired on its own Henley block and thus outside of what the inverter CT clamp will measure (or you want the EV to utilise the house battery when charging), then set this to Off. |
-| EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. Value is for a future release. At the current release this value has no effect. |
-| EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 30 | Set EV Battery Capacity. Value is for a future release. At the current release this value has no effect. |
-| Car Charge Plan | kWh | `switch.car_charge_plan` | Off | Toggle Car Plan generation On/Off. For users on Agile, setitng to On generates a candidate car charging plan based on the values of XX, YY and ZZ on each optimiser run. The candidate plan is made active upon car plugin, or via Dashbaord command (see AAAAA). Intelligent Octopus Go users should set this to Off. |
+| Car Charge Plan | kWh | `switch.control_car_charging` | Off | Toggle Car Plan generation On/Off. For users on Agile, setitng to On generates a candidate car charging plan based on the settings below. The candidate plan is made active upon car plugin, or via Dashbaord command (see AAAAA). Intelligent Octopus Go users should set this to Off and the rest of the parameters below will have no effect. |
+| Transfer Car Charge Plan | On/Off | `switch.transfer_car_charge_plan` | 30 | Make Candidate Car Charging Plan the active plan.   |
+| EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. |
+| EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 30 | Set EV Battery Capacity.   |
+| Car Ready  By | Time | `car_charging_ready_by1` | 30 | Set Time for when the Car is to be ready by.   |
+| Car Charge to Add | % | `number.ev_charge_target_percent` | 30 | % of charge to add to the car. I.e if your car is at 40% and want it to be charged to 90% then set this to 50%.  |
+| Car Charge Slot max price | p | `number.max_ev_price_p` | 30 | Maximum price per kWh in pence for a slot to be added to the candidate car charging plan. Disable by setting to 0. |
+| Car Charge Efficiency | % | `number.ev_charger_efficiency_percent` | 92 | Charging Efficiency for EV Charger/Car. 92% is average for most cars/chargers but adjust if the car is consistently undercharging or overcharging against its target |
+
 
 <h3>Tuning Parameters</h3>
 These parameters will tweak how PV Opt runs:
