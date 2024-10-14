@@ -216,14 +216,6 @@ INVERTER_DEFS = {
             0x28: "Battery Wake-Up",
             0x60: "Feed-In Priority",
         },
-        "codes": {
-            "Self Use": 0x21,
-            "Optimized Revenue": 0x22,
-            "Time of Use": 0x23,
-            "Off-Grid Storage": 0x24,
-            "Battery Wake-Up": 0x28,
-            "Feed-In Priority": 0x60,
-        },
         "bits": [
             "SelfUse",
             "Timed",
@@ -555,18 +547,13 @@ class InverterController:
             self.host.set_select("inverter_mode", mode)
 
         elif self.type == "SOLIS_SOLARMAN_V2":
-            
-            ###  To do
             # 1) Work out the value to write as per Solax above
-            entity_modes = self.host.get_state_retry(entity_id, attribute="options")
-            modes = {INVERTER_DEFS[self.type]["codes"].get(mode): mode for mode in entity_modes}
-            mode = modes.get(code)
+          
+            mode = INVERTER_DEFS[self.type]["modes"].get(code)
+            
             self.log("SolarMan_V2")
             self.log(f">>> Inverter Code: {code}")
-            self.log(f">>> Entity modes: {entity_modes}")
-            self.log(f">>> Modes: {modes}")
             self.log(f">>> Inverter Mode: {mode}")
-
             
             # 2) Read the existing entity (which is a string) to see what its current mode is
             
@@ -577,14 +564,13 @@ class InverterController:
                     self.log(f"Inverter value already set to {mode}.")
                     changed = False
 
-            # 3) If it needs modifying, Call _solis_write_holding_register as below but without an entity id - this suppress the value check at register level
+            # 3) If it needs modifying, Call _solis_write_holding_register but without an entity id - this suppress the old value check at register level
             
             if changed:
                 address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
                 self.log(f">>> Solarman_V2, need to change {old_mode} to {mode}")
                 self.log(f">>> Solarman_V2, calling _solis_write_holding_register, writing {code} to inverter register {address} using Solarman")
                 self._solis_write_holding_register(address=address, value=code)
-
         
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
