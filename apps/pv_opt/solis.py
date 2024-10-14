@@ -259,10 +259,23 @@ INVERTER_DEFS = {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
             "id_timed_charge_start": "time.{device_name}_timed_charge_start",
             "id_timed_charge_end": "time.{device_name}_timed_charge_end",
+  
+            "id_timed_charge_start_hours": "number.{device_name}_timed_charge_start_hours",
+            "id_timed_charge_start_minutes": "number.{device_name}_timed_charge_start_minutes",
+            "id_timed_charge_end_hours": "number.{device_name}_timed_charge_end_hours",
+            "id_timed_charge_end_minutes": "number.{device_name}_timed_charge_end_minutes",
+            
             "id_timed_charge_current": "number.{device_name}_timed_charge_current",
+            
             "id_timed_discharge_start": "time.{device_name}_timed_discharge_start",
             "id_timed_discharge_end": "time.{device_name}_timed_discharge_end",
+            "id_timed_discharge_start_hours": "number.{device_name}_timed_discharge_start_hours",
+            "id_timed_discharge_start_minutes": "number.{device_name}_timed_discharge_start_minutes",
+            "id_timed_discharge_end_hours": "number.{device_name}_timed_discharge_end_hours",
+            "id_timed_discharge_end_minutes": "number.{device_name}_timed_discharge_end_minutes",
+            
             "id_timed_discharge_current": "number.{device_name}_timed_discharge_current",
+            
             "id_inverter_mode": "sensor.{device_name}_storage_control_mode",
             "id_backup_mode_soc": "sensor.{device_name}_backup_mode_soc",
         },
@@ -517,6 +530,7 @@ class InverterController:
         bits = INVERTER_DEFS[self.type]["bits"]
         bin_list = [2**i * switches[bit] for i, bit in enumerate(bits)]
         code = sum(bin_list)
+        
         entity_id = self.host.config["id_inverter_mode"]
 
         if self.type == "SOLIS_SOLAX_MODBUS":
@@ -532,7 +546,33 @@ class InverterController:
 
             self.host.set_select("inverter_mode", mode)
 
-        elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
+        elif self.type == "SOLIS_SOLARMAN_V2":
+            # 1) Work out the value to write as per Solax above
+          
+            mode = INVERTER_DEFS[self.type]["modes"].get(code)
+            
+            self.log("SolarMan_V2")
+            self.log(f">>> Inverter Code: {code}")
+            self.log(f">>> Inverter Mode: {mode}")
+            
+            # 2) Read the existing entity (which is a string) to see what its current mode is
+            
+            changed = True
+            if entity_id is not None and self.host.entity_exists(entity_id):
+                old_mode = (self.host.get_state_retry(entity_id=entity_id))
+                if old_mode != mode:
+                    self.log(f"Inverter value already set to {mode}.")
+                    changed = False
+
+            # 3) If it needs modifying, Call _solis_write_holding_register but without an entity id - this suppress the old value check at register level
+            
+            if changed:
+                address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
+                self.log(f">>> Solarman_V2, need to change {old_mode} to {mode}")
+                self.log(f">>> Solarman_V2, calling _solis_write_holding_register, writing {code} to inverter register {address} using Solarman")
+                self._solis_write_holding_register(address=address, value=code)
+        
+        elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
             self._solis_write_holding_register(address=address, value=code, entity_id=entity_id)
 
@@ -575,7 +615,7 @@ class InverterController:
                 states = {}
                 if self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS":                
                     for unit in ["hours", "minutes"]:
-                        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] #timetag - DONE
+                        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
                         states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
 
                     status[direction][limit] = pd.Timestamp(
@@ -588,10 +628,19 @@ class InverterController:
                     
 
                 else:   # for SOLARMAN_V2
-                    entity_id = self.host.config[f"id_timed_{direction}_{limit}"]
-                    time_stamp = (self.host.get_state_retry(entity_id=entity_id))
-                    status[direction][limit] = pd.Timestamp(time_stamp, tz=self.host.tz)
-                   
+                    #Code for combined hours/minutes entity
+                    #entity_id = self.host.config[f"id_timed_{direction}_{limit}"]
+                    #time_stamp = (self.host.get_state_retry(entity_id=entity_id))
+                    #status[direction][limit] = pd.Timestamp(time_stamp, tz=self.host.tz)
+
+                    #Code for hours and minutes entities that are seperate
+                    for unit in ["hours", "minutes"]:
+                        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
+                        states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
+
+                    status[direction][limit] = pd.Timestamp(
+                        f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
+                    
                     ### SVB debug logging
                     self.log("Direction is....")
                     self.log(direction)
@@ -620,7 +669,7 @@ class InverterController:
             )
 
         status["hold_soc"] = {"active": status["switches"]["Backup"]}
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS":
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS": ### Needs SOLARMAN_V2 adding, as backup mode register is now supported
             status["hold_soc"]["soc"] = self.host.get_config("id_backup_mode_soc")
         else:
             status["hold_soc"]["soc"] = None  ### SOLARMAN_V2 has the ability to read id_backup_mode_SOC so should probably add to the switch above
@@ -696,7 +745,7 @@ class InverterController:
     def _solis_write_current_register(self, direction, current, tolerance):
         address = INVERTER_DEFS[self.type]["registers"][f"timed_{direction}_current"]
         entity_id = self.host.config[f"id_timed_{direction}_current"]
-        return self._solis_write_holding_register(
+        return self.(
             address=address,
             value=round(current, 1),
             entity_id=entity_id,
@@ -706,12 +755,11 @@ class InverterController:
 
     def _solis_write_time_register(self, direction, limit, unit, value):
         address = INVERTER_DEFS[self.type]["registers"][f"timed_{direction}_{limit}_{unit}"]
-        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] #timetag
+        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] #
         self.log(" >>> _solis_write_time_register called")
         self.log(f" >>> Type = {self.type}")
         self.log(f" >>> Entity = {entity_id}")
         self.log(f" >>> Address = {address}")
         self.log(f" >>> Value = {value}")
-
 
         return self._solis_write_holding_register(address=address, value=value, entity_id=entity_id)
