@@ -640,6 +640,7 @@ class InverterController:
 
                     status[direction][limit] = pd.Timestamp(
                         f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
+                    )
                     
                     ### SVB debug logging
                     self.log("Direction is....")
@@ -745,7 +746,7 @@ class InverterController:
     def _solis_write_current_register(self, direction, current, tolerance):
         address = INVERTER_DEFS[self.type]["registers"][f"timed_{direction}_current"]
         entity_id = self.host.config[f"id_timed_{direction}_current"]
-        return self.(
+        return self._solis_write_holding_register(
             address=address,
             value=round(current, 1),
             entity_id=entity_id,
