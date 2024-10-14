@@ -257,8 +257,9 @@ INVERTER_DEFS = {
         },
         "brand_config": {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
-            "id_timed_charge_start": "time.{device_name}_timed_charge_start",
-            "id_timed_charge_end": "time.{device_name}_timed_charge_end",
+
+            #"id_timed_charge_start": "time.{device_name}_timed_charge_start",
+            #"id_timed_charge_end": "time.{device_name}_timed_charge_end",
   
             "id_timed_charge_start_hours": "number.{device_name}_timed_charge_start_hours",
             "id_timed_charge_start_minutes": "number.{device_name}_timed_charge_start_minutes",
@@ -267,8 +268,9 @@ INVERTER_DEFS = {
             
             "id_timed_charge_current": "number.{device_name}_timed_charge_current",
             
-            "id_timed_discharge_start": "time.{device_name}_timed_discharge_start",
-            "id_timed_discharge_end": "time.{device_name}_timed_discharge_end",
+            #"id_timed_discharge_start": "time.{device_name}_timed_discharge_start",
+            #"id_timed_discharge_end": "time.{device_name}_timed_discharge_end",
+
             "id_timed_discharge_start_hours": "number.{device_name}_timed_discharge_start_hours",
             "id_timed_discharge_start_minutes": "number.{device_name}_timed_discharge_start_minutes",
             "id_timed_discharge_end_hours": "number.{device_name}_timed_discharge_end_hours",
