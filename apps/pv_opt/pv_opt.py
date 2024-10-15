@@ -3013,7 +3013,8 @@ class PVOpt(hass.Hass):
             self.log("Optimal EV charging slots:")
             for window in self.ev_windows.iterrows():
                 self.log(
-                    f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
+                    #f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
+                    f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}"
                 )
 
     def _log_inverter_status(self, status):
@@ -3243,10 +3244,8 @@ class PVOpt(hass.Hass):
                     {
                         k: window1[1][k]
                         for k in [
-                            "start_local",
-                            "end_local",
-                            "charge_in_kwh",
-                            "import",
+                            "start",
+                            "end",
                         ]
                     }
                     for window1 in self.ev_windows.iterrows()
