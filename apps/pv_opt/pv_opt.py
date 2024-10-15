@@ -3009,6 +3009,13 @@ class PVOpt(hass.Hass):
 
             self.ev_windows = ev_windows
 
+            self.log("")
+            self.log("Optimal EV charging slots:")
+            for window in self.ev_windows.iterrows():
+                self.log(
+                    f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
+                )
+
     def _log_inverter_status(self, status):
         self.log("")
         self.log(f"Current inverter status:")
@@ -3148,11 +3155,12 @@ class PVOpt(hass.Hass):
             io_slot_datetime = self.static.index[0].tz_convert(self.tz)
 
 
+        # For Agile Tariff, calculate total charge to be added (both in kWh and in % of car battery) and total cost of charge, for display on Dashboard
+        ### This calculating code should really be elsewhere
         ev_total_charge = 0
         ev_total_cost = 0
         ev_percent_to_add = 0
 
-        # For Agile Tariff, calculate total charge to be added (both in kWh and in % of car battery) and total cost of charge, for display on Dashboard
         if not self.candidate_car_slots.empty:
             ev_total_charge = self.candidate_car_slots["charge_in_kwh"].sum()
             ev_total_cost = self.candidate_car_slots["import"].sum()
@@ -3186,11 +3194,13 @@ class PVOpt(hass.Hass):
             attributes=attributes,
         )
 
+
         # Zero EV data previously set in candidate plan for re-use in active plan
+        ### This calculating code should really be elsewhere
         ev_total_charge = 0
         ev_total_cost = 0
         ev_percent_to_add = 0
-
+        
         if not self.car_slots.empty:
             ev_total_charge = self.car_slots["charge_in_kwh"].sum()
             ev_total_cost = self.car_slots["import"].sum()
@@ -3224,6 +3234,36 @@ class PVOpt(hass.Hass):
             state=io_slot_datetime,
             attributes=attributes,
         )
+
+        attributes = (
+            {
+                "friendly_name": "Pv Opt Car Charging Windows",
+                "device_class": "timestamp",
+                "windows": [
+                    {
+                        k: window1[1][k]
+                        for k in [
+                            "start_local",
+                            "end_local",
+                            "charge_in_kwh",
+                            "import",
+                        ]
+                    }
+                    for window1 in self.ev_windows.iterrows()
+                ],
+            }
+            | {"ev_total_charge": ev_total_charge}
+            | {"ev_total_cost": ev_total_cost}
+            | {"ev_percent_to_add": ev_percent_to_add}
+            | {"ev_car_slots_last_loaded": self.car_slots_last_loaded}
+        ) 
+
+        self.write_to_hass(
+            entity=f"sensor.{self.prefix}_car_windows",
+            state=io_slot_datetime,
+            attributes=attributes,
+        )
+
 
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_charge_end",
