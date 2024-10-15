@@ -627,6 +627,7 @@ class PVOpt(hass.Hass):
         self.saving_events = {}
         self.contract = None
         self.car_plugin_detected = 0
+        self.car_plugin_detected_delayed = 0
         self.tariff_reloaded = 0
         self.agile_car_plan_activated = 0
         self.car_charging_slot = "Off"
