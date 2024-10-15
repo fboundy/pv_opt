@@ -853,28 +853,29 @@ class PVOpt(hass.Hass):
             for entity_id in self.zappi_plug_entities:
                 plug_status = self.get_state(entity_id)
                 # self.log(plug_status)
-                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
-                    self.agile_car_plan_activated == 0
-                ):
+                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected == 0):
                     self.car_plugin_detected = 1
                     self.log("EV plug-in event detected, transfer Candidate Agile Car Charging Plan to Active Plan")
-                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
-                    self.agile_car_plan_activated == 1
-                ):
+
+                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected == 1) and (self.agile_car_plan_activated == 1):
                     self.log("EV is connected but Candidate Car charging plan previously transfered.")
                     self.car_plugin_detected = 0
-                elif (plug_status == "Charging") and (self.agile_car_plan_activated == 0):  # probably don't need this one, should never happen
-                    self.log(
-                        "EV plug-in event detected, car has commenced charging but no plan exists. Transfer Candidate Plan to Active Plan"
-                    )
+
+                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.agile_car_plan_activated == 0):
                     self.car_plugin_detected = 1
+                    self.log("EV is connected but no Car charging plan exists, transfer Candidate Agile Car Charging Plan to Active Plan")
+
+                elif (plug_status == "Charging") and (self.agile_car_plan_activated == 0):  # probably don't need this one, should never happen
+                    self.log("Car has commenced charging but no plan exists. Transfer Candidate Plan to Active Plan")
+                    self.car_plugin_detected = 1
+
                 elif (plug_status == "Charging") and (self.agile_car_plan_activated == 1):
                     self.log("EV is charging, Car charging plan already transferred")
                     self.car_plugin_detected = 0
+
                 else:
                     self.log("EV not plugged in. Car charging plan not required.")
                     self.car_plugin_detected = 0
-
                 
                 if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")):
                     self.car_plugged_in = True
@@ -2364,7 +2365,8 @@ class PVOpt(hass.Hass):
                 self.log("Active Plan after transfer is:.....")
                 self.log(f"\n{self.car_slots.to_string()}")
                 
-                self.agile_car_plan_activated = 1
+                self.agile_car_plan_activated = 1    #Set car plan active flag
+                self.car_plugin_detected = 0         #Clear plugin detected flag
                 
                 # Set the manual transfer switch back to off (if routine triggered by manual car switch)
                 if car_button:
