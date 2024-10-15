@@ -853,11 +853,11 @@ class PVOpt(hass.Hass):
             for entity_id in self.zappi_plug_entities:
                 plug_status = self.get_state(entity_id)
                 # self.log(plug_status)
-                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected == 0):
+                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected_delayed == 0):
                     self.car_plugin_detected = 1
                     self.log("EV plug-in event detected, transfer Candidate Agile Car Charging Plan to Active Plan")
 
-                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected == 1) and (self.agile_car_plan_activated == 1):
+                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected_delayed == 1) and (self.agile_car_plan_activated == 1):
                     self.log("EV is connected but Candidate Car charging plan previously transfered.")
                     self.car_plugin_detected = 0
 
@@ -2349,7 +2349,7 @@ class PVOpt(hass.Hass):
             ### Currently there is nothing that clears "self.agile_prices_updated". I think this only needs doing if the car is already plugged in,
               # so just clear it after this routine is finished? (i.e. not within the if)
 
-            if self.car_plugin_detected == 1 or (self.agile_prices_updated and self.car_plugged_in) or car_button == True: 
+            if (self.car_plugin_detected == 1 and self.car_plugin_detected_delayed == 0) or (self.agile_prices_updated and self.car_plugged_in) or car_button == True: 
                 self.log("Transferring EV Candidate Plan to Active Plan")
 
                 self.log("Candidate Plan is:.....")
@@ -2365,8 +2365,8 @@ class PVOpt(hass.Hass):
                 self.log("Active Plan after transfer is:.....")
                 self.log(f"\n{self.car_slots.to_string()}")
                 
-                self.agile_car_plan_activated = 1    #Set car plan active flag
-                self.car_plugin_detected = 0         #Clear plugin detected flag
+                self.agile_car_plan_activated = 1            #Set car plan active flag
+                self.car_plugin_detected_delayed = self.car_plugin_detected         
                 
                 # Set the manual transfer switch back to off (if routine triggered by manual car switch)
                 if car_button:
