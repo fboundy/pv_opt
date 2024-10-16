@@ -562,7 +562,7 @@ class InverterController:
             changed = True
             if entity_id is not None and self.host.entity_exists(entity_id):
                 old_mode = (self.host.get_state_retry(entity_id=entity_id))
-                if old_mode != mode:
+                if old_mode == mode:
                     self.log(f"Inverter value already set to {mode}.")
                     changed = False
 
@@ -571,7 +571,7 @@ class InverterController:
             if changed:
                 address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
                 self.log(f">>> Solarman_V2, need to change {old_mode} to {mode}")
-                self.log(f">>> Solarman_V2, calling _solis_write_holding_register, writing {code} to inverter register {address} using Solarman")
+                self.log(f">>> Solarman_V2, calling _solis_write_holding_register, writing {code} to inverter register {address} using Solarman_V2")
                 self._solis_write_holding_register(address=address, value=code)
         
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
@@ -740,7 +740,7 @@ class InverterController:
             if changed:
                 data = {"register": address, "value": value}
                 # self.host.call_service("solarman/write_holding_register", **data)
-                self.log(">>> Writing {value} to inverter register {address} using Solarman")
+                self.log(f">>> Writing {value} to inverter register {address} using Solarman")
                 written = True
 
         return changed, written
