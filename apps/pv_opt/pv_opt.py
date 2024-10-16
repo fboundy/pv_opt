@@ -75,7 +75,7 @@ DEBUG = False
 
 # Default is all, include desired string in Config.yaml to enable filtering
 
-DEBUG_CATEGORIES = "STPQCDWXFVIE"
+DEBUG_CATEGORIES = "STPQCDWOXFVIE"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M %Z"
@@ -1031,9 +1031,12 @@ class PVOpt(hass.Hass):
             ev_total_cost = car_charge_slots["import"].sum()
             ev_percent_to_add = (ev_total_charge / self.ev_capacity) * 100
 
-        self.log("Candidate EV charge slots")
+        self.log("Candidate EV Charge Plan")
+        ### Make a neater job of this, i.e use .iterrows
+
         self.log(f"\n{car_charge_slots.to_string()}")
         self.log("")
+        
         self.log(f"Charge to Add = {ev_total_charge} kWh, Total Cost = {ev_total_cost}p, % to Add = {ev_percent_to_add}%")
 
         return car_charge_slots, ev_total_charge, ev_total_cost, ev_percent_to_add
@@ -2397,10 +2400,15 @@ class PVOpt(hass.Hass):
                 self.ev_total_cost = self.car_slots["import"].sum()
                 self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
 
-            self.log("Active EV charge plan")
-            self.log(f"\n{self.car_slots.to_string()}")
-            self.log("")
-            self.log(f"Charge to Add = {self.ev_total_charge} kWh, Total Cost = {self.ev_total_cost}p, % to Add = {self.ev_percent_to_add}%")
+                self.log("Active EV charge plan")
+
+                ### Make a neater job of this, i.e using .iterrows
+                self.log(f"\n{self.car_slots.to_string()}")
+                self.log("")
+                self.log(f"Charge to Add = {self.ev_total_charge} kWh, Total Cost = {self.ev_total_cost}p, % to Add = {self.ev_percent_to_add}%")
+            else:
+                self.log("No Active EV Charge Plan")
+
 
         # If all slots expired then car charging plan is finished, clear activation flags.
         # Note: needs to be done after checking for car plugins, otherwise for agile a load of the candidate plan will be triggered as it thinks the car is charging
@@ -2775,8 +2783,9 @@ class PVOpt(hass.Hass):
             self.log("")
             self.log(f"Slot_left_factor = {slot_left_factor}")
             self.log("")
-            self.log("After assignment of 'period', self.opt is........")
 
+        if self.debug and "O" in self.debug_cat:                
+            self.log("1/2 Hour Optimsation summary")
             self.log(f"\n{self.opt.to_string()}")
 
         # If there is either a charge/discharge plan or a car charging plan, create windows.
