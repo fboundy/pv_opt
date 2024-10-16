@@ -1031,12 +1031,12 @@ class PVOpt(hass.Hass):
             ev_total_cost = car_charge_slots["import"].sum()
             ev_percent_to_add = (ev_total_charge / self.ev_capacity) * 100
 
-        self.log("Candidate EV Charge Plan")
+        self.log("Candidate EV Charge Plan:")
         ### Make a neater job of this, i.e use .iterrows
 
         self.log(f"\n{car_charge_slots.to_string()}")
         self.log("")
-        
+
         self.log(f"Charge to Add = {ev_total_charge} kWh, Total Cost = {ev_total_cost}p, % to Add = {ev_percent_to_add}%")
 
         return car_charge_slots, ev_total_charge, ev_total_cost, ev_percent_to_add
@@ -2400,6 +2400,7 @@ class PVOpt(hass.Hass):
                 self.ev_total_cost = self.car_slots["import"].sum()
                 self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
 
+                self.log("")
                 self.log("Active EV charge plan")
 
                 ### Make a neater job of this, i.e using .iterrows
@@ -2407,6 +2408,7 @@ class PVOpt(hass.Hass):
                 self.log("")
                 self.log(f"Charge to Add = {self.ev_total_charge} kWh, Total Cost = {self.ev_total_cost}p, % to Add = {self.ev_percent_to_add}%")
             else:
+                self.log("")
                 self.log("No Active EV Charge Plan")
 
 
@@ -2457,9 +2459,10 @@ class PVOpt(hass.Hass):
             # Get the current status of the inverter
             did_something = True
             self._status("Updating Inverter")
-            self.log("")
-            entity_id = self.config[f"id_timed_charge_current"]
-            self.log(self.get_state_retry(entity_id))
+
+            #self.log("")
+            #entity_id = self.config[f"id_timed_charge_current"]
+            #self.log(self.get_state_retry(entity_id))
             ##End logging
 
             inverter_update_count = 0
@@ -2784,8 +2787,9 @@ class PVOpt(hass.Hass):
             self.log(f"Slot_left_factor = {slot_left_factor}")
             self.log("")
 
-        if self.debug and "O" in self.debug_cat:                
-            self.log("1/2 Hour Optimsation summary")
+        if self.debug and "O" in self.debug_cat:
+            self.log("")                
+            self.ulog("1/2 Hour Optimsation summary")
             self.log(f"\n{self.opt.to_string()}")
 
         # If there is either a charge/discharge plan or a car charging plan, create windows.
@@ -2919,8 +2923,12 @@ class PVOpt(hass.Hass):
             self.windows["hold_soc"] = ""
 
             if self.config["supports_hold_soc"]:
-                self.log("")
-                self.log("Checking for Hold SOC slots (SOC changes less than 3%)")
+
+                if self.debug and "W" in self.debug_cat:
+                    self.log("")
+                    self.log("Checking for Hold SOC slots (SOC changes less than 3%)")
+
+
                 self.windows.loc[
                     ((self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE)
                     & (
@@ -2939,9 +2947,10 @@ class PVOpt(hass.Hass):
             
             if self.intelligent or (self.agile and self.ev) :
                 self.log("")
-                self.log(
-                    "Setting Car slots (Forced = 1) to hold"
-                )  
+                
+                if self.debug and "W" in self.debug_cat:
+                    self.log("Setting Car slots (Forced = 1) to hold")  
+
                 # If forced = 1 then the window is an Car Slot. It will already have a "<=" set as we made start SOC = end SOC, but we
                 # possibly want to differentiate the two for later processing.
                 self.windows.loc[
