@@ -3254,9 +3254,9 @@ class PVOpt(hass.Hass):
                     for window1 in self.ev_windows.iterrows()
                 ],
             }
-            | {"ev_total_charge": ev_total_charge}
-            | {"ev_total_cost": ev_total_cost}
-            | {"ev_percent_to_add": ev_percent_to_add}
+            | {"ev_total_charge": self.ev_total_charge}
+            | {"ev_total_cost": self.ev_total_cost}
+            | {"ev_percent_to_add": self.ev_percent_to_add}
             | {"ev_car_slots_last_loaded": self.car_slots_last_loaded}
         ) 
 
