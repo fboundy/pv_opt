@@ -866,7 +866,7 @@ class PVOpt(hass.Hass):
                     self.car_plugin_detected = 1
                     self.log("EV is connected but no Car charging plan exists, transfer Candidate Agile Car Charging Plan to Active Plan")
 
-                elif (plug_status == "Charging") and (self.agile_car_plan_activated == 0):  # probably don't need this one, should never happen
+                elif (plug_status == "Charging") and (self.agile_car_plan_activated == 0):  # needed for Pv_opt restart during car charging, where active plan will then be empty
                     self.log("Car has commenced charging but no plan exists. Transfer Candidate Plan to Active Plan")
                     self.car_plugin_detected = 1
 
