@@ -2406,7 +2406,7 @@ class PVOpt(hass.Hass):
                 ### Make a neater job of this, i.e using .iterrows
                 self.log(f"\n{self.car_slots.to_string()}")
                 self.log("")
-                self.log(f"Charge to Add = {self.ev_total_charge} kWh, Total Cost = {self.ev_total_cost}p, % to Add = {self.ev_percent_to_add}%")
+                self.log(f"Charge to Add = {self.ev_total_charge} kWh, Total Cost = {self.ev_total_cost:0.2f}p, % to Add = {self.ev_percent_to_add:0.1f}%")
             else:
                 self.log("")
                 self.log("No Active EV Charge Plan")
