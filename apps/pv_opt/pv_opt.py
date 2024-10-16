@@ -1031,12 +1031,10 @@ class PVOpt(hass.Hass):
             ev_total_cost = car_charge_slots["import"].sum()
             ev_percent_to_add = (ev_total_charge / self.ev_capacity) * 100
 
-        if self.debug and "E" in self.debug_cat:
-            self.log("Candidate EV charge slots")
-            self.log(f"\n{car_charge_slots.to_string()}")
-            self.log(f"Charge to Add = {ev_total_charge}, Total Cost = {ev_total_cost}, % to Add = {ev_percent_to_add}")
-
-
+        self.log("Candidate EV charge slots")
+        self.log(f"\n{car_charge_slots.to_string()}")
+        self.log("")
+        self.log(f"Charge to Add = {ev_total_charge} kWh, Total Cost = {ev_total_cost}p, % to Add = {ev_percent_to_add}%")
 
         return car_charge_slots, ev_total_charge, ev_total_cost, ev_percent_to_add
 
@@ -2389,21 +2387,26 @@ class PVOpt(hass.Hass):
                 # Update plan time transfer for display in Dashboard
                 self.car_slots_last_loaded = pd.Timestamp.now(tz="UTC")
 
+            #Calculate summary for active plan, for dashboard display
+            self.ev_total_charge = 0
+            self.ev_total_cost = 0
+            self.ev_percent_to_add = 0
+        
+            if not self.car_slots.empty:
+                self.ev_total_charge = self.car_slots["charge_in_kwh"].sum()
+                self.ev_total_cost = self.car_slots["import"].sum()
+                self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
+
+            self.log("Active EV charge plan")
+            self.log(f"\n{self.car_slots.to_string()}")
+            self.log("")
+            self.log(f"Charge to Add = {self.ev_total_charge} kWh, Total Cost = {self.ev_total_cost}p, % to Add = {self.ev_percent_to_add}%")
+
         # If all slots expired then car charging plan is finished, clear activation flags.
-        # Note: needs to be done after checking for car plugins, otherwise for agile a load of the candidate plan will be triggered as it thinks the car charging
+        # Note: needs to be done after checking for car plugins, otherwise for agile a load of the candidate plan will be triggered as it thinks the car is charging
         if self.car_slots.empty:
             self.agile_car_plan_activated = 0
             self.tariff_reloaded = 0
-
-        #Calculate summary for active plan, for dashboard display
-        self.ev_total_charge = 0
-        self.ev_total_cost = 0
-        self.ev_percent_to_add = 0
-        
-        if not self.car_slots.empty:
-            self.ev_total_charge = self.car_slots["charge_in_kwh"].sum()
-            self.ev_total_cost = self.car_slots["import"].sum()
-            self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
 
 
         self._create_windows()
