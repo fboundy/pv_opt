@@ -49,6 +49,8 @@ VERSION = "3.17.1-Beta-5"
 # Beta-5 
 # Final fixes for trial above to ensure updates to _active don't retrigger optimiser
 # Add Debug category "X" for verbose logging of charge/discharge windows
+# Calculate EV windows from slots for dashboard display
+# Move calculations of EV charging summaries from _write_output to more appropriate place.
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -1020,11 +1022,23 @@ class PVOpt(hass.Hass):
         # Reorder dataframe back to date order
         car_charge_slots = car_charge_slots.sort_index()
 
-        if self.debug and "E" in self.debug_cat:
-            self.log("Final charge slots")
-            self.log(f"\n{car_charge_slots.to_string()}")
+        ev_total_charge = 0
+        ev_total_cost = 0
+        ev_percent_to_add = 0
 
-        return car_charge_slots
+        if not car_charge_slots.empty:
+            ev_total_charge = car_charge_slots["charge_in_kwh"].sum()
+            ev_total_cost = car_charge_slots["import"].sum()
+            ev_percent_to_add = (ev_total_charge / self.ev_capacity) * 100
+
+        if self.debug and "E" in self.debug_cat:
+            self.log("Candidate EV charge slots")
+            self.log(f"\n{car_charge_slots.to_string()}")
+            self.log(f"Charge to Add = {ev_total_charge}, Total Cost = {ev_total_cost}, % to Add = {ev_percent_to_add}")
+
+
+
+        return car_charge_slots, ev_total_charge, ev_total_cost, ev_percent_to_add
 
     def _control_EV_charger(self): 
 
@@ -2285,7 +2299,7 @@ class PVOpt(hass.Hass):
         if self.agile and self.ev and self.car_charging:
             self.log("")
             self.ulog("Calculating candidate Car Charging Plan")
-            self.candidate_car_slots = self.calculate_agile_car_slots()
+            self.candidate_car_slots, self.candidate_ev_total_charge, self.candidate_ev_total_cost, self.candidate_ev_percent_to_add = self.calculate_agile_car_slots()
 
         if self.debug and "E" in self.debug_cat:
             self.log("Self.candidate_car_slots is")
@@ -2380,6 +2394,16 @@ class PVOpt(hass.Hass):
         if self.car_slots.empty:
             self.agile_car_plan_activated = 0
             self.tariff_reloaded = 0
+
+        #Calculate summary for active plan, for dashboard display
+        self.ev_total_charge = 0
+        self.ev_total_cost = 0
+        self.ev_percent_to_add = 0
+        
+        if not self.car_slots.empty:
+            self.ev_total_charge = self.car_slots["charge_in_kwh"].sum()
+            self.ev_total_cost = self.car_slots["import"].sum()
+            self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
 
 
         self._create_windows()
@@ -3158,18 +3182,6 @@ class PVOpt(hass.Hass):
         else:
             io_slot_datetime = self.static.index[0].tz_convert(self.tz)
 
-
-        # For Agile Tariff, calculate total charge to be added (both in kWh and in % of car battery) and total cost of charge, for display on Dashboard
-        ### This calculating code should really be elsewhere
-        ev_total_charge = 0
-        ev_total_cost = 0
-        ev_percent_to_add = 0
-
-        if not self.candidate_car_slots.empty:
-            ev_total_charge = self.candidate_car_slots["charge_in_kwh"].sum()
-            ev_total_cost = self.candidate_car_slots["import"].sum()
-            ev_percent_to_add = (ev_total_charge / self.ev_capacity) * 100
-
         attributes = (
             {
                 "friendly_name": "Pv Opt Candidate Car Charging Slots",
@@ -3187,9 +3199,9 @@ class PVOpt(hass.Hass):
                     for window1 in self.candidate_car_slots.iterrows()
                 ],
             }
-            | {"ev_total_charge": ev_total_charge}
-            | {"ev_total_cost": ev_total_cost}
-            | {"ev_percent_to_add": ev_percent_to_add}
+            | {"ev_total_charge": self.candidate_ev_total_charge}
+            | {"ev_total_cost": self.candidate_ev_total_cost}
+            | {"ev_percent_to_add": self.candidate_ev_percent_to_add}
         ) 
 
         self.write_to_hass(
@@ -3197,18 +3209,6 @@ class PVOpt(hass.Hass):
             state=io_slot_datetime,
             attributes=attributes,
         )
-
-
-        # Zero EV data previously set in candidate plan for re-use in active plan
-        ### This calculating code should really be elsewhere
-        ev_total_charge = 0
-        ev_total_cost = 0
-        ev_percent_to_add = 0
-        
-        if not self.car_slots.empty:
-            ev_total_charge = self.car_slots["charge_in_kwh"].sum()
-            ev_total_cost = self.car_slots["import"].sum()
-            ev_percent_to_add = (ev_total_charge / self.ev_capacity) * 100
 
         attributes = (
             {
@@ -3227,9 +3227,9 @@ class PVOpt(hass.Hass):
                     for window1 in self.car_slots.iterrows()
                 ],
             }
-            | {"ev_total_charge": ev_total_charge}
-            | {"ev_total_cost": ev_total_cost}
-            | {"ev_percent_to_add": ev_percent_to_add}
+            | {"ev_total_charge": self.ev_total_charge}
+            | {"ev_total_cost": self.ev_total_cost}
+            | {"ev_percent_to_add": self.ev_percent_to_add}
             | {"ev_car_slots_last_loaded": self.car_slots_last_loaded}
         ) 
 
