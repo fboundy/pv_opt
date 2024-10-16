@@ -450,7 +450,7 @@ class InverterController:
             status = self._solis_core_mode_switch()
 
         switches = status["switches"]
-        if self.host.debug:
+        if self.host.debug and "I" in self.host.debug_cat:
             self.log(f">>> kwargs: {kwargs}")
             self.log(">>> Solis switch status:")
 

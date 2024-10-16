@@ -639,8 +639,13 @@ class PVOpt(hass.Hass):
         self.contract_last_loaded = pd.Timestamp(2024,1,1)
         self.car_slots_last_loaded = pd.Timestamp(2024,1,1)
         self.agile_prices_updated = False
+        self.candidate_ev_total_charge = 0
+        self.candidate_ev_total_cost = 0
+        self.candidate_ev_percent_to_add = 0
+        self.ev_total_charge = 0
+        self.ev_total_cost = 0
+        self.ev_percent_to_add = 0
         
-
         self.bottlecap_entities = {"import": None, "export": None}
 
         # Load arguments from the YAML file
@@ -2297,6 +2302,8 @@ class PVOpt(hass.Hass):
         # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load.
         # If on Agile tariff, (re)calculate them now. 
 
+
+
         if self.agile and self.ev and self.car_charging:
             self.log("")
             self.ulog("Calculating candidate Car Charging Plan")
@@ -2391,9 +2398,6 @@ class PVOpt(hass.Hass):
                 self.car_slots_last_loaded = pd.Timestamp.now(tz="UTC")
 
             #Calculate summary for active plan, for dashboard display
-            self.ev_total_charge = 0
-            self.ev_total_cost = 0
-            self.ev_percent_to_add = 0
         
             if not self.car_slots.empty:
                 self.ev_total_charge = self.car_slots["charge_in_kwh"].sum()
