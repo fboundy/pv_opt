@@ -1038,8 +1038,8 @@ class PVOpt(hass.Hass):
 
         self.log("Candidate EV Charge Plan:")
 
-        self.log(f"\n{car_charge_slots.to_string()}")
-        self.log("")
+        #self.log(f"\n{car_charge_slots.to_string()}")
+        #self.log("")
 
         for window in car_charge_slots.iterrows():
             self.log(
@@ -2379,18 +2379,21 @@ class PVOpt(hass.Hass):
             if (self.car_plugin_detected == 1 and self.car_plugin_detected_delayed == 0) or (self.agile_prices_updated and self.car_plugged_in) or car_button == True: 
                 self.log("Transferring EV Candidate Plan to Active Plan")
 
-                self.log("Candidate Plan is:.....")
-                self.log(f"\n{self.candidate_car_slots.to_string()}")
+                
+                if self.debug and "E" in self.debug_cat:
+                    self.log("Candidate Plan is:.....")
+                    self.log(f"\n{self.candidate_car_slots.to_string()}")
     
-                self.log("Active Plan before transfer is.....")
-                self.log(f"\n{self.car_slots.to_string()}")
-                self.log("Active Plan last loaded (UTC).....")
-                self.log(self.car_slots_last_loaded)
+                    self.log("Active Plan before transfer is.....")
+                    self.log(f"\n{self.car_slots.to_string()}")
+                    self.log("Active Plan last loaded (UTC).....")
+                    self.log(self.car_slots_last_loaded)
                 
                 self.car_slots = self.candidate_car_slots
 
-                self.log("Active Plan after transfer is:.....")
-                self.log(f"\n{self.car_slots.to_string()}")
+                if self.debug and "E" in self.debug_cat:
+                    self.log("Active Plan after transfer is:.....")
+                    self.log(f"\n{self.car_slots.to_string()}")
                 
                 self.agile_car_plan_activated = 1            #Set car plan active flag
                 self.car_plugin_detected_delayed = self.car_plugin_detected         
@@ -2411,8 +2414,8 @@ class PVOpt(hass.Hass):
                 self.log("")
                 self.log("Active EV charge plan:")
 
-                self.log(f"\n{self.car_slots.to_string()}")
-                self.log("")
+                #self.log(f"\n{self.car_slots.to_string()}")
+                #self.log("")
 
                 for window in self.car_slots.iterrows():
                     self.log(
