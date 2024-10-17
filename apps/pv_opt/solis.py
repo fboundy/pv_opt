@@ -48,8 +48,8 @@ INVERTER_DEFS = {
         # required config. These config items can be over-written by config specified in the config.yaml
         # file. They are required for the main PV_Opt module and if they cannot be found an ERROR will be
         # raised
-        ### house_load_x and _bypass_load_x are not the defaults for Solax. Not changed, as they are potentially
-        # causing issues for some users
+        # house_load_x and _bypass_load_x are not the defaults for Solax. 
+        # This is probably intentional, as the datafiles are large and loading kWh is preferred
         
         "default_config": {
             "maximum_dod_percent": "number.{device_name}_battery_minimum_soc",
@@ -374,7 +374,7 @@ class InverterController:
                         changed, written = self.host.write_and_poll_value(
                             entity_id=entity_id, value=value, verbose=True
                         )
-                        self.log("Write and poll value called")
+                        #self.log("Write and poll value called")
                     elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                         changed, written = self._solis_write_time_register(direction, limit, unit, value)
                         #self.log("Calling _solis_write_time_register")
