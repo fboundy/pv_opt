@@ -956,7 +956,8 @@ class PVOpt(hass.Hass):
         # Convert to number of slots by mutiplying by 2, then rounding up
         ev_slots_required = math.ceil(ev_charge_time*2)
 
-        self.log(f"EV Charging Candidate plan requires {ev_slots_required} 1/2 hour slots")
+        self.log(f"EV Charging Candidate plan requires {ev_slots_required} x 1/2 hour slots")
+        self.log("")
 
         # now = datetime.now()
         # ready_by_time = datetime.strptime(self.ev_ready_by_time, "%H:%M")
@@ -1036,6 +1037,9 @@ class PVOpt(hass.Hass):
             ev_total_cost = car_charge_slots["import"].sum()
             ev_percent_to_add = (ev_total_charge / self.ev_capacity) * 100
 
+        self.log(f"Target % to add = {self.ev_charge_target:3.0f}%")
+        self.log("")
+
         self.log("Candidate EV Charge Plan:")
 
         #self.log(f"\n{car_charge_slots.to_string()}")
@@ -1043,10 +1047,10 @@ class PVOpt(hass.Hass):
 
         for window in car_charge_slots.iterrows():
             self.log(
-                f"  {window[1]['start_local'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end_local'].strftime('%d-%b %H:%M %Z'):<13s}  Charge: {window[1]['charge_in_kwh']:5.0f}kWh  Slot Price: {window[1]['import']:4d}p"
+                f"  {window[1]['start_local'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end_local'].strftime('%d-%b %H:%M %Z'):<13s}  Charge: {window[1]['charge_in_kwh']:3.2f}kWh  Slot Price: {window[1]['import']:3.1f}p"
             )
         self.log("")
-        self.log(f"Charge to Add = {ev_total_charge} kWh, Total Cost = {ev_total_cost}p, % to Add = {ev_percent_to_add}%")
+        self.log(f"Charge to Add = {ev_total_charge} kWh, Total Cost = {ev_total_cost:4.0f}p, % to Add = {ev_percent_to_add:3.0f}%")
 
         return car_charge_slots, ev_total_charge, ev_total_cost, ev_percent_to_add
 
@@ -2419,10 +2423,10 @@ class PVOpt(hass.Hass):
 
                 for window in self.car_slots.iterrows():
                     self.log(
-                        f"  {window[1]['start_local'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end_local'].strftime('%d-%b %H:%M %Z'):<13s}  Charge: {window[1]['charge_in_kwh']:5.0f}kWh  Slot Price: {window[1]['import']:4d}p"
+                        f"  {window[1]['start_local'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end_local'].strftime('%d-%b %H:%M %Z'):<13s}  Charge: {window[1]['charge_in_kwh']:3.2f}kWh  Slot Price: {window[1]['import']:3.1f}p"
                     )
                 self.log("")
-                self.log(f"Charge to Add = {self.ev_total_charge} kWh, Total Cost = {self.ev_total_cost:0.2f}p, % to Add = {self.ev_percent_to_add:0.1f}%")
+                self.log(f"Charge to Add = {self.ev_total_charge} kWh, Total Cost = {self.ev_total_cost:4.0f}p, % to Add = {self.ev_percent_to_add:3.0f}%")
             else:
                 self.log("")
                 self.log("No Active EV Charge Plan")
