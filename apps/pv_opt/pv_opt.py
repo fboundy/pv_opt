@@ -3068,8 +3068,9 @@ class PVOpt(hass.Hass):
                ],
                axis=1,
             )
-            #   self.charge_start_datetime = self.windows["start"].iloc[0].tz_convert(self.tz)
-            #   self.charge_end_datetime = self.windows["end"].iloc[0].tz_convert(self.tz) 
+
+            ### SVB to do
+            ### Add a "Average slot price" and a "total kWh" to each window
 
             if self.debug and "E" in self.debug_cat:
                 self.log("")      
