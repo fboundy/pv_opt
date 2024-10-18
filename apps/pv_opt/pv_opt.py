@@ -1816,7 +1816,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log("Writing Solarman_V2 test write of '5' to timed_charge_start_minutes")
         data = {"register": 43144, "value": 5}
-        self.host.call_service("solarman/write_holding_register", **data)
+        self.call_service("solarman/write_holding_register", **data)
 
         if self.get_config("read_only"):
             self.log("Read only mode enabled. Not querying inverter.")
