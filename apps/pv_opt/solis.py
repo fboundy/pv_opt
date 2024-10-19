@@ -278,7 +278,7 @@ INVERTER_DEFS = {
             
             "id_timed_discharge_current": "number.{device_name}_timed_discharge_current",
             
-            "id_inverter_mode": "sensor.{device_name}_storage_control_mode",
+            "id_inverter_mode": "select.{device_name}_storage_control_mode",
             "id_backup_mode_soc": "sensor.{device_name}_backup_mode_soc",
         },
     },
@@ -435,36 +435,54 @@ class InverterController:
 
         for limit in times:
             if times[limit] is not None:
-                for unit in ["hours", "minutes"]:
-                    # entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] 
-                    if unit == "hours":
-                        value = times[limit].hour
-                    else:
-                        value = times[limit].minute
+                if self.type == "SOLIS_SOLARMAN_V2":
+                    value = times[limit]
+                    unit = "hours and minutes"    # Done so logging is correct
+                    entity_id = self.host.config[f"id_timed_{direction}_{limit}"] 
 
-                    if self.type == "SOLIS_SOLAX_MODBUS":
+                    self.log("")
+                    self.log(f">>> Solarman V2 time writes: about to write {value} to entity {entity_id}")
+                    
+                    #changed, written = self.host.write_and_poll_value(
+                    #    entity_id=entity_id, value=value, verbose=True
+                    #)
+
+                elif self.type == "SOLIS_SOLAX_MODBUS":
+                    for unit in ["hours", "minutes"]:
+                        # entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] 
+                        if unit == "hours":
+                            value = times[limit].hour
+                        else:
+                            value = times[limit].minute
+
                         entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]   # moved - now only runs for Solax integration, the others don't need it. 
                         changed, written = self.host.write_and_poll_value(
                             entity_id=entity_id, value=value, verbose=True
                         )
-                    elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
+
+                elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+                    for unit in ["hours", "minutes"]:
+                        if unit == "hours":
+                            value = times[limit].hour
+                        else:
+                            value = times[limit].minute
                         changed, written = self._solis_write_time_register(direction, limit, unit, value)
 
-                    else:
-                        e = "Unknown inverter type"
-                        self.log(e, level="ERROR")
-                        raise Exception(e)
+                else:
+                    e = "Unknown inverter type"
+                    self.log(e, level="ERROR")
+                    raise Exception(e)
 
-                    if changed:
-                        if written:
-                            self.log(f"Wrote {direction} {limit} {unit} of {value} to inverter")
-                            value_changed = True
-                        else:
-                            self.log(
-                                f"Failed to write {direction} {limit} {unit} to inverter",
-                                level="ERROR",
-                            )
-                            write_flag = False
+                if changed:
+                    if written:
+                        self.log(f"Wrote {direction} {limit} {unit} of {value} to inverter")
+                        value_changed = True
+                    else:
+                        self.log(
+                            f"Failed to write {direction} {limit} {unit} to inverter",
+                            level="ERROR",
+                        )
+                        write_flag = False
 
         if value_changed:
             if self.type == "SOLIS_SOLAX_MODBUS" and write_flag:
@@ -494,9 +512,16 @@ class InverterController:
             current = abs(round(power / self.host.get_config("battery_voltage"), 1))
             current = min(current, self.host.get_config("battery_current_limit_amps"))
             self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
+            
             if self.type == "SOLIS_SOLAX_MODBUS":
                 changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
-            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN" or self.type == "SOLIS_SOLARMAN_V2":
+
+            elif self.type == "SOLIS_SOLARMAN_V2":
+                self.log("")
+                self.log(f">>> Solarman V2 current writes: about to write {current} to entity {entity_id}")
+                #changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
+
+            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self._solis_write_current_register(direction, current, tolerance=1)
             else:
                 e = "Unknown inverter type"
@@ -549,31 +574,17 @@ class InverterController:
             self.host.set_select("inverter_mode", mode)
 
         elif self.type == "SOLIS_SOLARMAN_V2":
-            # 1) Work out the value to write as per Solax above
-          
+                      
             mode = INVERTER_DEFS[self.type]["modes"].get(code)
             
             self.log("SolarMan_V2")
             self.log(f">>> Inverter Code: {code}")
             self.log(f">>> Inverter Mode: {mode}")
-            
-            # 2) Read the existing entity (which is a string) to see what its current mode is
-            
-            changed = True
-            if entity_id is not None and self.host.entity_exists(entity_id):
-                old_mode = (self.host.get_state_retry(entity_id=entity_id))
-                if old_mode == mode:
-                    self.log(f"Inverter value already set to {mode}.")
-                    changed = False
 
-            # 3) If it needs modifying, Call _solis_write_holding_register but without an entity id - this suppress the old value check at register level
-            
-            if changed:
-                address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
-                self.log(f">>> Solarman_V2, need to change {old_mode} to {mode}")
-                self.log(f">>> Solarman_V2, calling _solis_write_holding_register, writing {code} to inverter register {address} using Solarman_V2")
-                self._solis_write_holding_register(address=address, value=code)
-        
+            self.log(f">>> Solarman_V2, writing {mode} to entity {entity_id}")
+            #self.host.set_select("inverter_mode", mode)
+       
+
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
             self._solis_write_holding_register(address=address, value=code, entity_id=entity_id)
@@ -630,19 +641,20 @@ class InverterController:
                     
 
                 else:   # for SOLARMAN_V2
+                    
                     #Code for combined hours/minutes entity
-                    #entity_id = self.host.config[f"id_timed_{direction}_{limit}"]
-                    #time_stamp = (self.host.get_state_retry(entity_id=entity_id))
-                    #status[direction][limit] = pd.Timestamp(time_stamp, tz=self.host.tz)
+                    entity_id = self.host.config[f"id_timed_{direction}_{limit}"]
+                    time_stamp = (self.host.get_state_retry(entity_id=entity_id))
+                    status[direction][limit] = pd.Timestamp(time_stamp, tz=self.host.tz)
 
                     #Code for hours and minutes entities that are seperate
-                    for unit in ["hours", "minutes"]:
-                        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
-                        states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
-
-                    status[direction][limit] = pd.Timestamp(
-                        f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
-                    )
+                    #for unit in ["hours", "minutes"]:
+                    #    entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
+                    #    states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
+                    #
+                    #status[direction][limit] = pd.Timestamp(
+                    #    f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
+                    #)
                     
                     ### SVB debug logging
                     self.log("Direction is....")
@@ -720,27 +732,6 @@ class InverterController:
                 data = {"register": address, "value": value}
                 # self.host.call_service("solarman/write_holding_register", **data)
                 self.log(">>> Writing {value} to inverter register {address} using Solarman")
-                written = True
-
-        ### For solarman_v2, the entity_id passed to do the writes (hours and minutes seperately) 
-        #   won't exist as something to read (time value includes hours and minutes)
-        #   this means the inverter value will always be written to. Needs fixing.
-        # 10-10-24 update, looks like old_value = int/float is errorinng which means it is being run,
-        # therefore the entity must exist. added logging to see what the entity name is. 
-        
-        elif self.type == "SOLIS_SOLARMAN_V2":
-            self.log("solis_write_holding_register....Entity ID is.....")
-            self.log(entity_id)
-            if entity_id is not None and self.host.entity_exists(entity_id):
-                old_value = int(float(self.host.get_state_retry(entity_id=entity_id))) 
-                if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
-                    self.log(f"Inverter value already set to {value}.")
-                    changed = False
-
-            if changed:
-                data = {"register": address, "value": value}
-                # self.host.call_service("solarman/write_holding_register", **data)
-                self.log(f">>> Writing {value} to inverter register {address} using Solarman")
                 written = True
 
         return changed, written

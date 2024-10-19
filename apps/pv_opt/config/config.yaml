@@ -311,7 +311,7 @@ pv_opt:
 
   # id_timed_discharge_current: number.{device_name}_timed_discharge_current
 
-  # id_inverter_mode: sensor.{device_name}_storage_control_mode
+  # id_inverter_mode: select.{device_name}_storage_control_mode
 
 
   # The following do not have defaults stored within Pv_opt so require uncommenting if used:
