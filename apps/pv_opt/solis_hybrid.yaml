@@ -347,6 +347,8 @@ parameters:
             value: "Off-Grid Storage"
           - key: 0x28
             value: "Battery Wake-Up"
+          - key: 0x31
+            value: "Backup/Reserve"
           - key: 0x60
             value: "Feed-In Priority"
 

@@ -214,6 +214,7 @@ INVERTER_DEFS = {
             0x23: "Time of Use",
             0x24: "Off-Grid Storage",
             0x28: "Battery Wake-Up",
+            0x31: "Backup/Reserve",
             0x60: "Feed-In Priority",
         },
         "bits": [
@@ -258,24 +259,14 @@ INVERTER_DEFS = {
         "brand_config": {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
 
-            #"id_timed_charge_start": "time.{device_name}_timed_charge_start",
-            #"id_timed_charge_end": "time.{device_name}_timed_charge_end",
+            "id_timed_charge_start": "time.{device_name}_timed_charge_start",
+            "id_timed_charge_end": "time.{device_name}_timed_charge_end",
   
-            "id_timed_charge_start_hours": "number.{device_name}_timed_charge_start_hours",
-            "id_timed_charge_start_minutes": "number.{device_name}_timed_charge_start_minutes",
-            "id_timed_charge_end_hours": "number.{device_name}_timed_charge_end_hours",
-            "id_timed_charge_end_minutes": "number.{device_name}_timed_charge_end_minutes",
-            
             "id_timed_charge_current": "number.{device_name}_timed_charge_current",
             
-            #"id_timed_discharge_start": "time.{device_name}_timed_discharge_start",
-            #"id_timed_discharge_end": "time.{device_name}_timed_discharge_end",
+            "id_timed_discharge_start": "time.{device_name}_timed_discharge_start",
+            "id_timed_discharge_end": "time.{device_name}_timed_discharge_end",
 
-            "id_timed_discharge_start_hours": "number.{device_name}_timed_discharge_start_hours",
-            "id_timed_discharge_start_minutes": "number.{device_name}_timed_discharge_start_minutes",
-            "id_timed_discharge_end_hours": "number.{device_name}_timed_discharge_end_hours",
-            "id_timed_discharge_end_minutes": "number.{device_name}_timed_discharge_end_minutes",
-            
             "id_timed_discharge_current": "number.{device_name}_timed_discharge_current",
             
             "id_inverter_mode": "select.{device_name}_storage_control_mode",
