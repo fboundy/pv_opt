@@ -3911,7 +3911,8 @@ class PVOpt(hass.Hass):
         self.ulog(f"Available entities for device {self.device_name}:")
         for domain in domains:
             states = self.get_state_retry(domain)
-            states = {k: states[k] for k in states if self.device_name in k}
+            #states = {k: states[k] for k in states if (self.device_name) in k}
+            states = {k: states[k] for k in states if self.device_name in k or "zappi" in k}  ### temporary : print zappi entities as well
             for entity_id in states:
                 x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
                 x = f"  {x:60s}"
