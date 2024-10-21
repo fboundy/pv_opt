@@ -13,7 +13,7 @@ from numpy import nan
 from datetime import datetime
 import re
 
-VERSION = "3.17.0-beta-9"
+VERSION = "3.17.0-beta-10"
 
 
 # Change history
@@ -32,6 +32,8 @@ VERSION = "3.17.0-beta-9"
 # Beta-9:
 # Introduce category based logging (i.e a filter on debug = true)
 # Correct error in Forced Discharging introduced in 3.15.4
+# Beta-10:
+# Add extra logging of kWh power consumption, and temporarily add logging of all Zappi sensors on startup 
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -2893,6 +2895,11 @@ class PVOpt(hass.Hass):
         )
 
         if df is not None:
+
+            if self.debug and "P" in self.debug_cat:
+                self.log(f"kWh data from {entity_id} is")
+                self.log(f"\n{df.to_string()}")
+
             df.index = pd.to_datetime(df.index)
             x = df.diff().clip(0).fillna(0).cumsum() + df.iloc[0]
             x.index = x.index.round("1s")
@@ -3373,6 +3380,7 @@ class PVOpt(hass.Hass):
         for domain in domains:
             states = self.get_state_retry(domain)
             states = {k: states[k] for k in states if self.device_name in k}
+            states = {k: states[k] for k in states if self.device_name in k or "zappi" in k} ### temporary logging
             for entity_id in states:
                 x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
                 x = f"  {x:60s}"
