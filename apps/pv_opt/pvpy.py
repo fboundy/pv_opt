@@ -3,6 +3,8 @@ import pandas as pd
 import requests
 from copy import copy
 from numpy import isnan
+
+# from scipy.stats import linregress
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -900,6 +902,11 @@ class PVsystemModel:
             self.log("")
 
 
+            if log and (self.host.debug and "C" in self.host.debug_cat):
+                self.log ("SPR = Slot Power Required, SCPA = Slot Charger Power Available, SAC = Slot Available Capacity")
+                self.log ("")
+
+
         # self.log(slots)
         net_cost = []
         net_cost_opt = base_cost
@@ -1011,12 +1018,24 @@ class PVsystemModel:
                             # We should factor this reduced power back up again just prior to inverter programming.
 
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
-                                if log:
-                                    self.log ("")
-                                    self.log ("   >>> SPR = Slot Power Required, SCPA = Slot Charger Power Available, SAC = Slot Available Capacity")
+
+                                ### Objective - value of forced stays constant when 10 mins and 20 mins into a slot. 
+                                # SPR has a factor in it to share power between complete slots, however its also being used to deal with a slot thats halfway through.
+                                # This is reducing the value of forced because High Cost swaps is not allocating as much power to the current slot any more. 
+                                # Should the available capacity deal with this? No it can't - forced is what is fed to def flows. 
+                                # Two factors, a current slot reduction factor (based on time gone) and an "all slot factor" based on pricing?
+                                # No, need to share each high cost swap equally between slots. 
+                                
+                                # Need to check if once the slot is full it gets allocated to other slots
+                                # it does, but SAC isnt the limit thats being run into, its SCPA. 
+                                # Do we need to limit SCPA if a slot is 10/20 mins in? No, this will limit forced. 
+                                # I think we just need to not multiply a slot back up if its 
+
 
                                 for slot, factor in zip(window, factors):
-                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
+                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
+
+                                                                                                               
                                     slot_charger_power_available = max(
                                         self.inverter.charger_power
                                         - x["forced"].loc[slot]
@@ -1057,8 +1076,8 @@ class PVsystemModel:
                                 net_cost_opt = net_cost[-1]
                                 str_log += f"Net: {net_cost_opt:6.1f}"
                                 if log:
-                                    self.log("")
                                     self.log(str_log)
+                                    self.log("")
                                     if (self.host.debug and "F" in self.host.debug_cat):
                                         xx = pd.concat(
                                             [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]],
@@ -1107,7 +1126,7 @@ class PVsystemModel:
 
         slots_added = 999
         # Only do the rest if there is an export tariff:
-        self.log(f"Sum of Export Prices = {prices['export'].sum()}")
+        # self.log(f"Sum of Export Prices = {prices['export'].sum()}")
         
         if prices["export"].sum() > 0:
             j = 0
