@@ -825,6 +825,10 @@ class PVOpt(hass.Hass):
         # If Zappi entities previously found and EV charger is Zappi, schedule an IOG tariff reload on the next optimizer run when its
         # detected the car has been plugged in.
 
+        ### For multiple Zappis this will trigger an IOG reload on any plugin. For IOG, we need to allocate
+        # which charger has been assigned, then do the reload on that. I tihnk plug_status should be assigned in config.yaml to do this, i.e.
+        # remove the "for entity_id in self.zappi_plug_entities:" and just run it once. 
+
         if (len(self.zappi_plug_entities) > 0) and self.ev:
             for entity_id in self.zappi_plug_entities:
                 plug_status = self.get_state(entity_id)
@@ -902,8 +906,8 @@ class PVOpt(hass.Hass):
         # Note: this requires the myEnergi integration https://github.com/cjne/ha-myenergi
         self.ulog("Checking for Zappi Sensors")
         sensor_entities = self.get_state("sensor")
-        self.zappi_entities = [k for k in sensor_entities if "zappi" in k for x in ["charge_added_session"] if x in k]
-        self.zappi_plug_entities = [k for k in sensor_entities if "zappi" in k for x in ["plug_status"] if x in k]
+        self.zappi_entities = [k for k in sensor_entities if "myenergi" in k for x in ["charge_added_session"] if x in k]
+        self.zappi_plug_entities = [k for k in sensor_entities if "myenergi" in k for x in ["plug_status"] if x in k]
 
         if len(self.zappi_entities) > 0:
             for entity_id in self.zappi_entities:
@@ -929,7 +933,10 @@ class PVOpt(hass.Hass):
             df = self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end, log=log)
             if log and (self.debug and "E" in self.debug_cat):
                 self.rlog(f">>> Zappi entity {entity_id}")
-                # self.log(f">>>\n{df.to_string()}")
+                self.log(f">>>\n{df.to_string()}")
+
+        ### We need to return consumption data from all sensors. At the moment this routine will only return data from the last for loop.
+        # Just add extra columns to df? 
         return df
     
     def calculate_agile_car_slots(self):
@@ -2357,7 +2364,11 @@ class PVOpt(hass.Hass):
                 self.log(pd.Timestamp.now(self.tz))
 
         # If no Charger selected, clear self.car_slots (catchall / helps with testing)
-        if not self.ev or not self.car_charging:
+        if not self.ev:
+            self.car_slots = pd.DataFrame()
+
+        # If Agile Tariff and car charging turned off, clear self.car_slots (catchall / helps with testing)
+        if self.agile and not self.car_charging:
             self.car_slots = pd.DataFrame()
 
             
@@ -3530,6 +3541,10 @@ class PVOpt(hass.Hass):
 
             self.log(f"  - {days} days was expected. {str_days}")
 
+            ### Need to modify the below to read the consumption from more than one Zappi. 
+            # This may be best done by passing the entity_id to _get_zappi so it only returns one df. 
+            # ie, use the line "for entity_id in self.zappi_entities:"
+
             if (len(self.zappi_entities) > 0) and self.ev:
                 self.log("Getting consumption in kWh from Zappi Charger")
                 ev_power = self._get_zappi(start=df.index[0], end=df.index[-1], log=True)
@@ -3564,12 +3579,6 @@ class PVOpt(hass.Hass):
                         )  # concatenate total consumption and ev consumption into a single dataframe (as they are different lengths)
                         df_EV_Total.columns = ["EV", "Total"]  # Set column names
                         df_EV_Total = df_EV_Total.fillna(0)  # fill any missing values with 0
-
-                        # self.log("Attempt to concatenate is")
-                        # self.log(df_EV_Total)
-                        # SVB logging
-                        # self.log("Printing Comsumption of house and EV.....")
-                        # self.log(df_EV_Total.to_string())
 
                         df_EV = df_EV_Total["EV"].squeeze()  # Extract EV consumption to Series
                         df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
