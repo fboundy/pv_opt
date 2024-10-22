@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.17.1-Beta-5"
+VERSION = "3.17.0-Beta-11"
 
 # Change history
 # -------
@@ -51,6 +51,9 @@ VERSION = "3.17.1-Beta-5"
 # Add Debug category "X" for verbose logging of charge/discharge windows
 # Calculate EV windows from slots for dashboard display
 # Move calculations of EV charging summaries from _write_output to more appropriate place.
+
+# 3.17.1 Beta changes merged back into 3.17.0-Beta-11. 
+
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
