@@ -1019,8 +1019,23 @@ class PVsystemModel:
 
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
 
+                                ### Objective - value of forced stays constant when 10 mins and 20 mins into a slot. 
+                                # SPR has a factor in it to share power between complete slots, however its also being used to deal with a slot thats halfway through.
+                                # This is reducing the value of forced because High Cost swaps is not allocating as much power to the current slot any more. 
+                                # Should the available capacity deal with this? No it can't - forced is what is fed to def flows. 
+                                # Two factors, a current slot reduction factor (based on time gone) and an "all slot factor" based on pricing?
+                                # No, need to share each high cost swap equally between slots. 
+                                
+                                # Need to check if once the slot is full it gets allocated to other slots
+                                # it does, but SAC isnt the limit thats being run into, its SCPA. 
+                                # Do we need to limit SCPA if a slot is 10/20 mins in? No, this will limit forced. 
+                                # I think we just need to not multiply a slot back up if its 
+
+
                                 for slot, factor in zip(window, factors):
-                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
+                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
+
+                                                                                                               
                                     slot_charger_power_available = max(
                                         self.inverter.charger_power
                                         - x["forced"].loc[slot]
