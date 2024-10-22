@@ -2363,6 +2363,11 @@ class PVOpt(hass.Hass):
         )
 
         if df is not None:
+
+            if self.debug and "P" in self.debug_cat:
+                self.log(f"kWh data from {entity_id} is")
+                self.log(f"\n{df.to_string()}")
+
             df.index = pd.to_datetime(df.index)
             x = df.diff().clip(0).fillna(0).cumsum() + df.iloc[0]
             x.index = x.index.round("1s")
