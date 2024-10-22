@@ -11,6 +11,8 @@
 # v1.3: further instances of mispelt "platform" corrected. 
 # v1.4: revert time start/end registers back to .time types
 #       add storage control register that can be written to
+# v1.5: change name of entity for 43110 to ensure seperation between entity name for 33132
+
 default:
   update_interval: 10
   code: 0x04
