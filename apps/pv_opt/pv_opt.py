@@ -33,8 +33,9 @@ VERSION = "3.17.0-Beta-11"
 # Add fixes for tariff overrides when Octopus Auto = False (to allow development of EV charge control on Agile)
 # Beta-9:
 # Introduce category based logging (i.e a filter on debug = true)
-# Beta-10:
 # Correct error in Forced Discharging introduced in 3.15.4 
+# Beta-10:
+# Add extra logging of kWh power consumption, and temporarily add logging of all Zappi sensors on startup 
 
 # 3.17.1:
 # Beta-1: #Start car charging for Agile
@@ -55,10 +56,7 @@ VERSION = "3.17.0-Beta-11"
 # Move calculations of EV charging summaries from _write_output to more appropriate place.
 
 # 3.17.1 Beta changes merged back into 3.17.0-Beta-11. 
-=======
-# Correct error in Forced Discharging introduced in 3.15.4
-# Beta-10:
-# Add extra logging of kWh power consumption, and temporarily add logging of all Zappi sensors on startup 
+
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
