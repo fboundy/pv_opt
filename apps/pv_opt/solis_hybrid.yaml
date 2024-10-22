@@ -353,9 +353,9 @@ parameters:
             value: "Feed-In Priority"
 
       # Register 33132 above is is read only
-      # Register 43110 below  is read/write
+      # Register 43110 below is the same but read/write
 
-      - name: "Storage Control Mode"
+      - name: "Storage Mode Switch"
         platform: select
         rule: 1
         registers: [43110]
