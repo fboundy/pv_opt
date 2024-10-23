@@ -1027,7 +1027,7 @@ class PVsystemModel:
                                 # No, need to share each high cost swap equally between slots. 
                                 
                                 # Need to check if once the slot is full it gets allocated to other slots
-                                # it does, but SAC isnt the limit thats being run into, its SCPA. 
+                                # it does, but SAC isnt the limit thats being run into, its SCPA. See below:
                                                                 
 
                                 for slot, factor in zip(window, factors):
@@ -1048,8 +1048,8 @@ class PVsystemModel:
                                     # SPR is factored, and needs to be if it to share power between slots of the same price
                                     # As partial slots are subject to another factor, its actually sharing energy between each slot
 
-                                    # SAC is factored. (Why? Theres no need to factor full slots. It must be there to factor partial slots if close to maximum SOC. Its not needed for
-                                    # 30 min slots but probably makes no difference. 
+                                    # SAC is factored. (Why? Theres no need to factor full slots. It must be there to factor partial slots if close to maximum SOC. Factoring is 
+                                    # not needed for 30 min slots, but probably makes no difference. 
 
                                     # SCPA is not factored. Why not? A partial slot is "full" well before it reaches SCPA. 
                                     # This is the answer. We need to declare a slot full when it reaches 66% (10 mins in) or 33% (20 mins in), then apply a slot factor at the end. 
