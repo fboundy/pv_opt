@@ -1028,9 +1028,7 @@ class PVsystemModel:
                                 
                                 # Need to check if once the slot is full it gets allocated to other slots
                                 # it does, but SAC isnt the limit thats being run into, its SCPA. 
-                                # Do we need to limit SCPA if a slot is 10/20 mins in? No, this will limit forced. 
-                                # I think we just need to not multiply a slot back up if its 
-
+                                                                
 
                                 for slot, factor in zip(window, factors):
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
@@ -1042,9 +1040,21 @@ class PVsystemModel:
                                         - x[cols["solar"]].loc[slot],
                                         0,
                                     )
+
                                     slot_available_capacity = max(
                                         ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0
                                     )
+
+                                    # SPR is factored, and needs to be if it to share power between slots of the same price
+                                    # As partial slots are subject to another factor, its actually sharing energy between each slot
+
+                                    # SAC is factored. (Why? Theres no need to factor full slots. It must be there to factor partial slots if close to maximum SOC. Its not needed for
+                                    # 30 min slots but probably makes no difference. 
+
+                                    # SCPA is not factored. Why not? A partial slot is "full" well before it reaches SCPA. 
+                                    # This is the answer. We need to declare a slot full when it reaches 66% (10 mins in) or 33% (20 mins in), then apply a slot factor at the end. 
+
+                                    
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
                                     )
