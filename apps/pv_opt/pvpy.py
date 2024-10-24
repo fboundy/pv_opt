@@ -923,6 +923,16 @@ class PVsystemModel:
             axis=1,
         )
 
+  
+        # Are we already partway through a slot?
+        #slot_amount_left = 1
+        #df["start"] = df.index.tz_convert(self.tz)
+        #charge_start_datetime = df["start"].iloc[0]
+
+        #if pd.Timestamp.now(self.tz) > charge_start_datetime:
+        #    slot_amount_left = 1800 / ((self.charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds())
+       
+
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
         net_cost = [base_cost]
         plunge_slots = slots
@@ -958,6 +968,7 @@ class PVsystemModel:
                         x = x[x["countback"] == 0]
 
                         # ignore slots which are already fully charging
+
                         x = x[x["forced"] < self.inverter.charger_power]
 
                         x = x[x["soc_end"] <= 97]
@@ -1027,7 +1038,7 @@ class PVsystemModel:
                                 # No, need to share each high cost swap equally between slots. 
                                 
                                 # Need to check if once the slot is full it gets allocated to other slots
-                                # it does, but SAC isnt the limit thats being run into, its SCPA. See below:
+                                # it does, but SAC isnt the limit thats being run into, its SCPA. 
                                                                 
 
                                 for slot, factor in zip(window, factors):
@@ -1134,6 +1145,21 @@ class PVsystemModel:
                 axis=1,
             )
 
+        ### I think this is the place to multiply up the value of forced in the current slot. 
+
+        #slot_left_multiplier = 0
+
+        #if pd.Timestamp.now(self.tz) > charge_start_datetime:
+        #    slot_left_multiplier = 1800 / (
+        #        (charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()
+        #    )
+        # self.log(f"Slot_left_multiplier = {slot_left_multiplier})
+        #if not slot_left_multiplier == 0:
+        #    if slot_left_multiplier > 6:
+        #        slot_left_multiplier = 6
+        #    df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier
+
+        
         slots_added = 999
         # Only do the rest if there is an export tariff:
         # self.log(f"Sum of Export Prices = {prices['export'].sum()}")
