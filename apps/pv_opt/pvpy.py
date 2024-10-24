@@ -958,6 +958,7 @@ class PVsystemModel:
                         x = x[x["countback"] == 0]
 
                         # ignore slots which are already fully charging
+
                         x = x[x["forced"] < self.inverter.charger_power]
 
                         x = x[x["soc_end"] <= 97]
@@ -1028,7 +1029,9 @@ class PVsystemModel:
                                 
                                 # Need to check if once the slot is full it gets allocated to other slots
                                 # it does, but SAC isnt the limit thats being run into, its SCPA. 
-                                                                
+                                
+                                ### Replace self.inverter.charger_power with a variable something that is reduced if the slot being evaluated has already started?
+                                ### Need to find the right place where the value of forced is restored so the inverter power stays constant in the current slot
 
                                 for slot, factor in zip(window, factors):
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
@@ -1134,6 +1137,10 @@ class PVsystemModel:
                 axis=1,
             )
 
+        ### I think this is the place to restore the value of forced in the current slot. 
+
+
+        
         slots_added = 999
         # Only do the rest if there is an export tariff:
         # self.log(f"Sum of Export Prices = {prices['export'].sum()}")
