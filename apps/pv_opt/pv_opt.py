@@ -2776,16 +2776,16 @@ class PVOpt(hass.Hass):
         # As the .flows calls are all done with now, the "forced" power can be set back to what the inverter needs it to be, which is the original value prior to factoring
 
         # Get the time of the first slot
-        self.opt["start"] = self.opt.index.tz_convert(self.tz)
-        self.charge_start_datetime = self.opt["start"].iloc[0]
+        #self.opt["start"] = self.opt.index.tz_convert(self.tz)
+        #self.charge_start_datetime = self.opt["start"].iloc[0]
 
-        slot_left_factor = 0
+        #slot_left_factor = 0
 
         # Are we already partway through that slot?
-        if pd.Timestamp.now(self.tz) > self.charge_start_datetime:
-            slot_left_factor = 1800 / (
-                (self.charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()
-            )
+        #if pd.Timestamp.now(self.tz) > self.charge_start_datetime:
+        #    slot_left_factor = 1800 / (
+        #        (self.charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()
+        #    )
 
         # If we are in a slot, then "forced" has already been factored by the slot time remaining to ensure the power flow calclations are correct
         # We need to remove that factor so the inverter charge power remains unchanged in the slot.
@@ -2797,10 +2797,10 @@ class PVOpt(hass.Hass):
 
         ### In 2), is it just a limit of charger power we need to apply? Or do we require something more complex? 
 
-        if not slot_left_factor == 0:
-            if slot_left_factor > 6:
-                slot_left_factor = 6
-            self.opt["forced"].iloc[0] = self.opt["forced"].iloc[0] * slot_left_factor
+        #if not slot_left_factor == 0:
+        #    if slot_left_factor > 6:
+        #        slot_left_factor = 6
+        #    self.opt["forced"].iloc[0] = self.opt["forced"].iloc[0] * slot_left_factor
         
 
         # SVB Previous code created a seperate period if the power stored in "forced" differed between rows (1/2 hour slots) by anything bigger than 0.
@@ -2823,7 +2823,7 @@ class PVOpt(hass.Hass):
             self.log("")
             self.ulog("Debugging - Charge/Discharge/Hold Windows")
             self.log("")
-            self.log(f"Slot_left_factor = {slot_left_factor}")
+            #self.log(f"Slot_left_factor = {slot_left_factor}")
             self.log("")
 
         if self.debug and "O" in self.debug_cat:

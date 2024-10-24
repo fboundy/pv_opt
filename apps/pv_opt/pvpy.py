@@ -925,13 +925,27 @@ class PVsystemModel:
 
   
         # Are we already partway through a slot?
-        #slot_amount_left = 1
-        #df["start"] = df.index.tz_convert(self.tz)
-        #charge_start_datetime = df["start"].iloc[0]
+        slot_amount_left = 1
+        
+        #if log:
+        #    self.log("Printing Df")
+        #    self.log(f"\n{df.to_string()}")
+        
+        z = df
+        z.index = pd.to_datetime(z.index)
 
-        #if pd.Timestamp.now(self.tz) > charge_start_datetime:
-        #    slot_amount_left = 1800 / ((self.charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds())
+        z["start"] = z.index.tz_convert(self.tz)
+        charge_start_datetime = z["start"].iloc[0]
+
+        if pd.Timestamp.now(self.tz) > charge_start_datetime:
+            slot_amount_left = ((charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()) / 1800
        
+        # Create a multiplier that is the inverse of slot_amount_left
+        slot_left_multiplier = 1 / slot_amount_left   
+        if log:
+            self.log("")
+            self.log(f"Slot left = {slot_amount_left}, Time now = {pd.Timestamp.now(self.tz)}, Charge_start_datetime = {charge_start_datetime}")
+
 
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
         net_cost = [base_cost]
@@ -968,14 +982,18 @@ class PVsystemModel:
                         x = x[x["countback"] == 0]
 
                         # ignore slots which are already fully charging
+                        # If already in a slot, factor by how much of the slot is left. 
 
-                        x = x[x["forced"] < self.inverter.charger_power]
+                        x = x[x["forced"] < (self.inverter.charger_power * slot_amount_left)]
 
                         x = x[x["soc_end"] <= 97]
 
-                        # self.log("")
-                        # self.log("Printing X")
-                        # self.log(x.to_string())
+                        ### SVB debug logging
+                        #if log:
+                        #    self.log("")
+                        #    self.log(f"Slot_amount_left = {slot_amount_left}")
+                        #    self.log("Printing X")
+                        #    self.log(f"\n{x.to_string()}")
 
                         search_window = x.index
                         str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
@@ -1042,19 +1060,14 @@ class PVsystemModel:
                                                                 
 
                                 for slot, factor in zip(window, factors):
+
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
-
                                                                                                                
-                                    slot_charger_power_available = max(
-                                        self.inverter.charger_power
-                                        - x["forced"].loc[slot]
-                                        - x[cols["solar"]].loc[slot],
-                                        0,
-                                    )
+                                    slot_charger_power_available = max(self.inverter.charger_power - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
 
-                                    slot_available_capacity = max(
-                                        ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0
-                                    )
+                                    slot_available_capacity = max(((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0)
+
+                                    # self.log(f"Slot = {slot}, Factor = {factor}, Forced = {x['forced'].loc[slot]}, Solar = {x[cols['solar']].loc[slot]}")
 
                                     # SPR is factored, and needs to be if it to share power between slots of the same price
                                     # As partial slots are subject to another factor, its actually sharing energy between each slot
@@ -1145,19 +1158,20 @@ class PVsystemModel:
                 axis=1,
             )
 
-        ### I think this is the place to multiply up the value of forced in the current slot. 
+        ### This isnt the right place to apply multiplying factors. Forced value is taken, but it gets 
+        # reduced again later on 
 
-        #slot_left_multiplier = 0
+        if slot_left_multiplier > 6:
+            slot_left_multiplier = 6
+        if log:
+            self.log(f"Slot_left_multiplier = {slot_left_multiplier}")
+            self.log(f"Forced in current slot = {df['forced'].iloc[0]}")
+        
+        df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier
 
-        #if pd.Timestamp.now(self.tz) > charge_start_datetime:
-        #    slot_left_multiplier = 1800 / (
-        #        (charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()
-        #    )
-        # self.log(f"Slot_left_multiplier = {slot_left_multiplier})
-        #if not slot_left_multiplier == 0:
-        #    if slot_left_multiplier > 6:
-        #        slot_left_multiplier = 6
-        #    df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier
+        if log:
+            self.log(f"Forced after applying multiplier = {df['forced'].iloc[0]}")
+            self.log(f"\n{df.to_string()}")
 
         
         slots_added = 999
@@ -1200,6 +1214,8 @@ class PVsystemModel:
             if log:
                 self.log(f"{available.sum()} slots have an import price less than the max export price")
             done = available.sum() == 0
+
+            self.log(f"\n{df.to_string()}")
 
             while not done:
                 x = (
@@ -1245,7 +1261,7 @@ class PVsystemModel:
                         self.log(f"SOC (before modelling Forced Charge): {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% ")
 
                     forced_charge = min(
-                        min(self.battery.max_charge_power, self.inverter.charger_power)
+                        min(self.battery.max_charge_power, self.inverter.charger_power) ### a factor goes here? 
                         - x["forced"].loc[start_window]
                         - x[cols["solar"]].loc[start_window],
                         ((100 - x["soc_end"].loc[start_window]) / 100 * self.battery.capacity) * 2 * factor,
