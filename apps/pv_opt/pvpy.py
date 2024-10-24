@@ -923,6 +923,16 @@ class PVsystemModel:
             axis=1,
         )
 
+  
+        # Are we already partway through a slot?
+        #slot_amount_left = 1
+        #df["start"] = df.index.tz_convert(self.tz)
+        #charge_start_datetime = df["start"].iloc[0]
+
+        #if pd.Timestamp.now(self.tz) > charge_start_datetime:
+        #    slot_amount_left = 1800 / ((self.charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds())
+       
+
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
         net_cost = [base_cost]
         plunge_slots = slots
@@ -1137,8 +1147,19 @@ class PVsystemModel:
                 axis=1,
             )
 
-        ### I think this is the place to restore the value of forced in the current slot. 
+        ### I think this is the place to multiply up the value of forced in the current slot. 
 
+        #slot_left_multiplier = 0
+
+        #if pd.Timestamp.now(self.tz) > charge_start_datetime:
+        #    slot_left_multiplier = 1800 / (
+        #        (charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()
+        #    )
+        # self.log(f"Slot_left_multiplier = {slot_left_multiplier})
+        #if not slot_left_multiplier == 0:
+        #    if slot_left_multiplier > 6:
+        #        slot_left_multiplier = 6
+        #    df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier
 
         
         slots_added = 999
