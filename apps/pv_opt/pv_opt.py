@@ -2823,9 +2823,7 @@ class PVOpt(hass.Hass):
             self.log("")
             self.ulog("Debugging - Charge/Discharge/Hold Windows")
             self.log("")
-            #self.log(f"Slot_left_factor = {slot_left_factor}")
-            self.log("")
-
+            
         if self.debug and "O" in self.debug_cat:
             self.log("")                
             self.ulog("1/2 Hour Optimsation summary")

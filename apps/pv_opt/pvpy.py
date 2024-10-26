@@ -923,19 +923,22 @@ class PVsystemModel:
             axis=1,
         )
 
-  
+        if log:
+            self.log("Printing Df")
+            self.log(f"\n{df.to_string()}")
+
         # Are we already partway through a slot?
         slot_amount_left = 1
-        
-        #if log:
-        #    self.log("Printing Df")
-        #    self.log(f"\n{df.to_string()}")
-        
+   
         z = df
         z.index = pd.to_datetime(z.index)
 
         z["start"] = z.index.tz_convert(self.tz)
         charge_start_datetime = z["start"].iloc[0]
+
+
+        if log:
+            self.log(f"Timenow is {pd.Timestamp.now(self.tz)}, charge_start_datetime is {charge_start_datetime}")
 
         if pd.Timestamp.now(self.tz) > charge_start_datetime:
             slot_amount_left = ((charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()) / 1800
@@ -948,6 +951,8 @@ class PVsystemModel:
 
 
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
+        if log:
+            self.log(f"available = {available.to_string()}")
         net_cost = [base_cost]
         plunge_slots = slots
         slot_count = [0]
@@ -962,6 +967,7 @@ class PVsystemModel:
 
             import_cost = ((df["import"] * df["grid"]).clip(0) / 2000)[available]
 
+
             if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 if len(import_cost[import_cost == max_import_cost]) > 0:
@@ -973,8 +979,12 @@ class PVsystemModel:
                             max_slot_energy / self.inverter.charger_efficiency / self.inverter.inverter_efficiency
                         )
 
+
                         # potential windows end at the max_slot
                         x = df.loc[:max_slot].copy()
+                        if log:
+                            self.log("Starting value of x is.....")
+                            self.log(f"\n{x.to_string()}")
 
                         # count back to find the slots where soc_end < 100
                         x["countback"] = (x["soc_end"] >= 97).sum() - (x["soc_end"] >= 97).cumsum()
@@ -982,18 +992,42 @@ class PVsystemModel:
                         x = x[x["countback"] == 0]
 
                         # ignore slots which are already fully charging
-                        # If already in a slot, factor by how much of the slot is left. 
-
-                        x = x[x["forced"] < (self.inverter.charger_power * slot_amount_left)]
-
+                        
+                        x = x[x["forced"] < (self.inverter.charger_power)]
+                        
                         x = x[x["soc_end"] <= 97]
 
+                        # ignore slot already started where forced is bigger than (inverter_charger_power * slot_amoumt_left)
+
+                        if log:
+                            self.log(f"Timestamp = {pd.Timestamp.now(tz=self.tz)}")
+                            self.log(f"Timestamp (UTC) = {pd.Timestamp.now(tz='UTC')}")
+                            self.log(f"Start Time in first entry = {x.index[0]}")
+                            self.log(f"Forced in first entry = {x['forced'][0]}")
+                            self.log(f"Partial slot limit = {self.inverter.charger_power * slot_amount_left}")
+
+
+                        if (pd.Timestamp.now(tz="UTC") > x.index[0]) and x["forced"][0] >= (self.inverter.charger_power * slot_amount_left):
+                            self.log("Slot dropped")
+                            x = x.drop(x.index[0])
+
+                        # If slot_amount_left != 1 then we are partway through a slot
+                            # If time in index 0 is less then current time then we are partway through slot, and that will be at index = 0. 
+                                  # x = x[x["forced"] < (self.inverter.charger_power * slot_amount_left)]
+                        
+                        
+                        
+                        #start_window = x[x["import"] == min_price].index[0]
+                        #if (pd.Timestamp.utcnow().tz_localize(None) > start_window.tz_localize(None))
+
+
                         ### SVB debug logging
-                        #if log:
-                        #    self.log("")
-                        #    self.log(f"Slot_amount_left = {slot_amount_left}")
-                        #    self.log("Printing X")
-                        #    self.log(f"\n{x.to_string()}")
+                        if log:
+                            self.log("")
+                            self.log(f"Slot_amount_left = {slot_amount_left}")
+                            self.log("End value of x is")
+                            self.log(f"\n{x.to_string()}")
+
 
                         search_window = x.index
                         str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
@@ -1024,16 +1058,19 @@ class PVsystemModel:
                             # Each slot is assigned a value of 1, if already in a slot then factor for time already gone.
 
                             for slot in window:
-                                if pd.Timestamp.utcnow().tz_localize(None) > slot.tz_localize(None):
-                                    factors.append(
-                                        (
-                                            (slot.tz_localize(None) + pd.Timedelta(30, "minutes"))
-                                            - pd.Timestamp.utcnow().tz_localize(None)
-                                        ).total_seconds()
-                                        / 1800
-                                    )
-                                else:
-                                    factors.append(1)
+                                factors.append(1)
+
+                            #for slot in window:
+                            #    if pd.Timestamp.utcnow().tz_localize(None) > slot.tz_localize(None):
+                            #        factors.append(
+                            #            (
+                            #                (slot.tz_localize(None) + pd.Timedelta(30, "minutes"))
+                            #                - pd.Timestamp.utcnow().tz_localize(None)
+                            #            ).total_seconds()
+                            #            / 1800
+                            #        )
+                            #    else:
+                            #        factors.append(1)
 
                             # Assign a factor to each slot so all slots sum to 1.
 
@@ -1058,31 +1095,52 @@ class PVsystemModel:
                                 # Need to check if once the slot is full it gets allocated to other slots
                                 # it does, but SAC isnt the limit thats being run into, its SCPA. 
                                                                 
+                                if log:
+                                    self.log(f"Window = {window}")
+                                    self.log(f"Factors = {factors}")
+
 
                                 for slot, factor in zip(window, factors):
 
+                                    # Applying factoring to SPR ensures that each slot gets filled at the same rate, including if the current slot is part way through
+                                    # However, this filling is being done by power.
+                                    
+                                    # However, once the future slots reach maximum power, the current slot will only be at 1/3 or 2/3s power. 
+                                    # This what we need to ensure that the energy flow to battery is correct. 
+                                    # THere is however nothing in place to then stop that slot filling up (to max charger power) with more high cost swaps? 
+                                    # Once partway through a slot, the starting battery charge (chg) take accounts of the slot already gone, so it shouldnt be allowed to fill. 
+                                    # So, we then need a limit on the partial slot power based on how far through the slot we are, and declare the slot "full" at that point. 
+
+                                    # If we do have the limit on partial slot power (via SCPA), then we don't actually need to factor the SPR for the partial slot at all. 
+                                    # This has the advantage that the final concatenation on df will have the correct values of "forced" because it loads then from "slots"
+                                    # so we don't need to bother with any multiplying factors. 
+
+                                    # The factored SCPA needs to be applied in two places - as we allocate power to each slot and also when we decide which slots are full. 
+
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
-                                                                                                               
+
                                     slot_charger_power_available = max(self.inverter.charger_power - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
 
+                                    if log:
+                                        self.log(f"Time now is {pd.Timestamp.now(tz='UTC')}, X.index[0] is {x.index[0]} ")
+
+                                    if (pd.Timestamp.now(tz="UTC") > x.index[0]) and slot == 0:
+                                        slot_charger_power_available = max((self.inverter.charger_power * slot_amount_left) - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
+                                    else:
+                                        slot_charger_power_available = max(self.inverter.charger_power - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
+
+                                    # slot_available_capactity is a measure of what capacity the battary has for being charged in a slot. Its calculated from "endSOC" and compared from
+                                    # 100% charged. I'm therefore not sure why its factored. Leave it as is for now but see if it implies a false limit. 
+
                                     slot_available_capacity = max(((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0)
-
-                                    # self.log(f"Slot = {slot}, Factor = {factor}, Forced = {x['forced'].loc[slot]}, Solar = {x[cols['solar']].loc[slot]}")
-
-                                    # SPR is factored, and needs to be if it to share power between slots of the same price
-                                    # As partial slots are subject to another factor, its actually sharing energy between each slot
-
-                                    # SAC is factored. (Why? Theres no need to factor full slots. It must be there to factor partial slots if close to maximum SOC. Factoring is 
-                                    # not needed for 30 min slots, but probably makes no difference. 
-
-                                    # SCPA is not factored. Why not? A partial slot is "full" well before it reaches SCPA. 
-                                    # This is the answer. We need to declare a slot full when it reaches 66% (10 mins in) or 33% (20 mins in), then apply a slot factor at the end. 
-
-                                    
+                                                                     
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
                                     )
                                     if log and (self.host.debug and "C" in self.host.debug_cat):
+                                        
+                                        self.log(f"Slot = {slot}, Factor = {factor:0.3f}, Forced = {x['forced'].loc[slot]:6.0f}, Solar = {x[cols['solar']].loc[slot]}")
+
                                         str_log_x = (
                                             f"   >>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
                                             + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
@@ -1127,6 +1185,7 @@ class PVsystemModel:
                 self.log("No slots available")
                 done = True
 
+
         df = pd.concat(
             [
                 prices,
@@ -1139,12 +1198,6 @@ class PVsystemModel:
 
         if base_cost - net_cost_opt <= self.host.get_config("pass_threshold_p"):
             if log:
-                # SVB logging
-                # self.log("Base cost =")
-                # self.log(base_cost)
-                # self.log("Net Cost Opt =")
-                # self.log(net_cost_opt)
-
                 self.log(
                     f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
                 )
@@ -1158,23 +1211,23 @@ class PVsystemModel:
                 axis=1,
             )
 
+
+        ### SVB shouldnt be needed, ready to remove. 
         ### This isnt the right place to apply multiplying factors. Forced value is taken, but it gets 
         # reduced again later on 
-
-        if slot_left_multiplier > 6:
-            slot_left_multiplier = 6
-        if log:
-            self.log(f"Slot_left_multiplier = {slot_left_multiplier}")
-            self.log(f"Forced in current slot = {df['forced'].iloc[0]}")
-        
-        df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier
-
-        if log:
-            self.log(f"Forced after applying multiplier = {df['forced'].iloc[0]}")
-            self.log(f"\n{df.to_string()}")
-
+        #if slot_left_multiplier > 6:
+        #    slot_left_multiplier = 6
+        #if log:
+        #    self.log(f"Slot_left_multiplier = {slot_left_multiplier}")
+        #    self.log(f"Forced in current slot = {df['forced'].iloc[0]}")
+        ### Not working, as being reset to lower value later on. 
+        #df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier
+        #if log:
+        #    self.log(f"Forced after applying multiplier = {df['forced'].iloc[0]}")
+        #    self.log(f"\n{df.to_string()}")
         
         slots_added = 999
+
         # Only do the rest if there is an export tariff:
         # self.log(f"Sum of Export Prices = {prices['export'].sum()}")
         
@@ -1456,6 +1509,14 @@ class PVsystemModel:
             if log:
                 self.log(f"Iteration {j:2d}: Slots added: {slots_added:3d}")
 
+        if log:
+            self.log(f"df before final concat = ")
+            self.log(f"\n{df.to_string()}")
+            
+            self.log("Slots before final concat = ")
+            temp = pd.DataFrame(slots)
+            self.log(f"\n{temp.to_string()}")
+
         df = pd.concat(
             [
                 prices,
@@ -1463,6 +1524,14 @@ class PVsystemModel:
             ],
             axis=1,
         )
+
+        if log:
+            self.log(f"df after final concat = ")
+            self.log(f"\n{df.to_string()}")
+
+
+
+
         df.index = pd.to_datetime(df.index)
 
         if (not self.host.get_config("allow_cyclic")) and (len(slots) > 0) and discharge:
