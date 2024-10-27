@@ -180,10 +180,10 @@ DEFAULT_CONFIG = {
         "domain": "number",
     },
     "pass_threshold_p": {
-        "default": 1.0,
+        "default": 4.0,
         "attributes": {
             "min": 0.0,
-            "max": 4.0,
+            "max": 10.0,
             "step": 0.5,
             "mode": "slider",
         },
@@ -1185,6 +1185,9 @@ class PVOpt(hass.Hass):
                 self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
+                self.log(f">>> Test: {self.entity_exists('update.home_assistant_core_update')}")
+                for v in values:
+                    self.log(f">>> {item} {v} {self.entity_exists(v)}")
                 if min([self.entity_exists(v) for v in values]):
                     if len(values) == 1:
                         self.config[item] = values[0]
@@ -2755,8 +2758,7 @@ class PVOpt(hass.Hass):
                 df = pd.DataFrame(
                     self.get_state_retry(self.bottlecap_entities[direction], attribute=("rates"))
                 ).set_index("start")["value_inc_vat"]
-                df.index = pd.to_datetime(df.index)
-                df.index = df.index.tz_convert("UTC")
+                df.index = pd.to_datetime(df.index, utc=True)
                 df *= 100
                 df = pd.concat(
                     [
