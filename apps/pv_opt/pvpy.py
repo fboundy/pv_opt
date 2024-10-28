@@ -461,7 +461,7 @@ class Tariff:
             return
 
         df = pd.DataFrame(r.json()[0]["prices"]).set_index("date_time")
-        df.index = pd.to_datetime(df.index).tz_convert("UTC")
+        df.index = pd.to_datetime(df.index, utc=True)
         return df["agile_pred"]
 
     def get_day_ahead(self, start):
