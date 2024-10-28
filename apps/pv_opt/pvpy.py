@@ -3,6 +3,8 @@ import pandas as pd
 import requests
 from copy import copy
 from numpy import isnan
+
+# from scipy.stats import linregress
 from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -900,6 +902,11 @@ class PVsystemModel:
             self.log("")
 
 
+            if log and (self.host.debug and "C" in self.host.debug_cat):
+                self.log ("SPR = Slot Power Required, SCPA = Slot Charger Power Available, SAC = Slot Available Capacity")
+                self.log ("")
+
+
         # self.log(slots)
         net_cost = []
         net_cost_opt = base_cost
@@ -916,7 +923,36 @@ class PVsystemModel:
             axis=1,
         )
 
+        if log:
+            self.log("Printing Df")
+            self.log(f"\n{df.to_string()}")
+
+        # Are we already partway through a slot?
+        slot_amount_left = 1
+   
+        z = df
+        z.index = pd.to_datetime(z.index)
+
+        z["start"] = z.index.tz_convert(self.tz)
+        charge_start_datetime = z["start"].iloc[0]
+
+
+        if log:
+            self.log(f"Timenow is {pd.Timestamp.now(self.tz)}, charge_start_datetime is {charge_start_datetime}")
+
+        if pd.Timestamp.now(self.tz) > charge_start_datetime:
+            slot_amount_left = ((charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()) / 1800
+       
+        # Create a multiplier that is the inverse of slot_amount_left
+        slot_left_multiplier = 1 / slot_amount_left   
+        if log:
+            self.log("")
+            self.log(f"Slot left = {slot_amount_left}, Time now = {pd.Timestamp.now(self.tz)}, Charge_start_datetime = {charge_start_datetime}")
+
+
         available = pd.Series(index=df.index, data=(df["forced"] == 0))
+        if log:
+            self.log(f"available = {available.to_string()}")
         net_cost = [base_cost]
         plunge_slots = slots
         slot_count = [0]
@@ -931,6 +967,7 @@ class PVsystemModel:
 
             import_cost = ((df["import"] * df["grid"]).clip(0) / 2000)[available]
 
+
             if len(import_cost[df["forced"] == 0]) > 0:
                 max_import_cost = import_cost[df["forced"] == 0].max()
                 if len(import_cost[import_cost == max_import_cost]) > 0:
@@ -942,8 +979,13 @@ class PVsystemModel:
                             max_slot_energy / self.inverter.charger_efficiency / self.inverter.inverter_efficiency
                         )
 
+
                         # potential windows end at the max_slot
                         x = df.loc[:max_slot].copy()
+
+                        #if log:
+                        #    self.log("Starting value of x is.....")
+                        #    self.log(f"\n{x.to_string()}")
 
                         # count back to find the slots where soc_end < 100
                         x["countback"] = (x["soc_end"] >= 97).sum() - (x["soc_end"] >= 97).cumsum()
@@ -951,13 +993,42 @@ class PVsystemModel:
                         x = x[x["countback"] == 0]
 
                         # ignore slots which are already fully charging
-                        x = x[x["forced"] < self.inverter.charger_power]
-
+                        
+                        x = x[x["forced"] < (self.inverter.charger_power)]
+                        
                         x = x[x["soc_end"] <= 97]
 
-                        # self.log("")
-                        # self.log("Printing X")
-                        # self.log(x.to_string())
+                        # ignore slot already started where forced is bigger than (inverter_charger_power * slot_amoumt_left)
+
+                        if log:
+                            self.log(f"Timestamp = {pd.Timestamp.now(tz=self.tz)}")
+                            self.log(f"Timestamp (UTC) = {pd.Timestamp.now(tz='UTC')}")
+                            self.log(f"Start Time in first entry = {x.index[0]}")
+                            self.log(f"Forced in first entry = {x['forced'][0]}")
+                            self.log(f"Partial slot limit = {self.inverter.charger_power * slot_amount_left}")
+
+
+                        if (pd.Timestamp.now(tz="UTC") > x.index[0]) and x["forced"][0] >= (self.inverter.charger_power * slot_amount_left):
+                            self.log("Slot dropped")
+                            x = x.drop(x.index[0])
+
+                        # If slot_amount_left != 1 then we are partway through a slot
+                            # If time in index 0 is less then current time then we are partway through slot, and that will be at index = 0. 
+                                  # x = x[x["forced"] < (self.inverter.charger_power * slot_amount_left)]
+                        
+                        
+                        
+                        #start_window = x[x["import"] == min_price].index[0]
+                        #if (pd.Timestamp.utcnow().tz_localize(None) > start_window.tz_localize(None))
+
+
+                        ### SVB debug logging
+                        if log:
+                            self.log("")
+                            self.log(f"Slot_amount_left = {slot_amount_left}")
+                        #    self.log("End value of x is")
+                        #    self.log(f"\n{x.to_string()}")
+
 
                         search_window = x.index
                         str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
@@ -988,6 +1059,9 @@ class PVsystemModel:
                             # Each slot is assigned a value of 1, if already in a slot then factor for time already gone.
 
                             for slot in window:
+                                factors.append(1)
+
+                            for slot in window:
                                 if pd.Timestamp.utcnow().tz_localize(None) > slot.tz_localize(None):
                                     factors.append(
                                         (
@@ -1006,34 +1080,61 @@ class PVsystemModel:
                             # self.log("Factors =")
                             # self.log(factors)
 
-                            # The reduction of the current slot reduces the power so the .flows algorithm calculates the correct charge added to the battery in the partial slot (I think)
+                            # The reduction of the current slot reduces the power so the .flows algorithm calculates the correct charge added to the battery in the partial slot.
                             # However, this same value should not then be used to program the inverter. The inverter should stick at the power assigned at the start of the slot.
                             # We should factor this reduced power back up again just prior to inverter programming.
 
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
-                                if log:
-                                    self.log ("")
-                                    self.log ("   >>> SPR = Slot Power Required, SCPA = Slot Charger Power Available, SAC = Slot Available Capacity")
+
+                                #if log:
+                                #    self.log(f"Window = {window}")
+                                #    self.log(f"Factors = {factors}")
+
 
                                 for slot, factor in zip(window, factors):
-                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
-                                    slot_charger_power_available = max(
-                                        self.inverter.charger_power
-                                        - x["forced"].loc[slot]
-                                        - x[cols["solar"]].loc[slot],
-                                        0,
-                                    )
-                                    slot_available_capacity = max(
-                                        ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0
-                                    )
+
+                                    # Applying factoring to SPR ensures that each slot gets filled at the same rate, including if the current slot is part way through
+                                    # However, this filling is being done by power.
+                                    
+                                    # However, once the future slots reach maximum power, the current slot will only be at 1/3 or 2/3s power. 
+                                    # This what we need to ensure that the energy flow to battery is correct. 
+                                    # THere is however nothing in place to then stop that slot filling up (to max charger power) with more high cost swaps? 
+                                    # Once partway through a slot, the starting battery charge (chg) take accounts of the slot already gone, so it shouldnt be allowed to fill. 
+                                    # So, we then need a limit on the partial slot power based on how far through the slot we are, and declare the slot "full" at that point. 
+
+                                    # Once we have the limit on partial slot power (via SCPA), we still need to factor SPR for the partial slot as this is the number that decides
+                                    # how much charge gets added to the battery in "flows" via "slots". So we still need to factor the final number back up to its original so the inveter 
+                                    # is programmed with the right charge value, this is done right at the end of this def. 
+
+                                    # Note: the factored SCPA is applied in two places - as we allocate power to each slot and also when we decide which slots are full. 
+
+                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
+
+                                    #if log:
+                                    #    self.log(f"Time now is {pd.Timestamp.now(tz='UTC')}, X.index[0] is {x.index[0]} ")
+
+                                    if (pd.Timestamp.now(tz="UTC") > x.index[0]) and slot == 0:
+                                        slot_charger_power_available = max((self.inverter.charger_power * slot_amount_left) - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
+                                    else:
+                                        slot_charger_power_available = max(self.inverter.charger_power - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
+
+                                    # slot_available_capactity is a measure of what capacity the battary has for being charged in a slot. Its calculated from "endSOC" and compared from
+                                    # 100% charged. I'm therefore not sure why its factored. Leave it as is for now but see if it implies a false limit. 
+
+                                    slot_available_capacity = max(((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0)
+                                                                     
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
                                     )
                                     if log and (self.host.debug and "C" in self.host.debug_cat):
+                                        
+                                        #self.log(f"Slot = {slot}, Factor = {factor:0.3f}, Forced = {x['forced'].loc[slot]:6.0f}, Solar = {x[cols['solar']].loc[slot]}")
+
                                         str_log_x = (
                                             f"   >>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
                                             + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
-                                            + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
+                                            + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W  "
+                                            + f"Solar = {x[cols['solar']].loc[slot]}"
                                         )
                                         self.log(str_log_x)
                                     slots.append(
@@ -1057,8 +1158,8 @@ class PVsystemModel:
                                 net_cost_opt = net_cost[-1]
                                 str_log += f"Net: {net_cost_opt:6.1f}"
                                 if log:
-                                    self.log("")
                                     self.log(str_log)
+                                    self.log("")
                                     if (self.host.debug and "F" in self.host.debug_cat):
                                         xx = pd.concat(
                                             [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]],
@@ -1074,6 +1175,7 @@ class PVsystemModel:
                 self.log("No slots available")
                 done = True
 
+
         df = pd.concat(
             [
                 prices,
@@ -1086,12 +1188,6 @@ class PVsystemModel:
 
         if base_cost - net_cost_opt <= self.host.get_config("pass_threshold_p"):
             if log:
-                # SVB logging
-                # self.log("Base cost =")
-                # self.log(base_cost)
-                # self.log("Net Cost Opt =")
-                # self.log(net_cost_opt)
-
                 self.log(
                     f"Charge net cost delta:  {base_cost - net_cost_opt:0.1f}p: < Pass Threshold ({self.host.get_config('pass_threshold_p'):0.1f}p) => Slots Excluded"
                 )
@@ -1105,9 +1201,13 @@ class PVsystemModel:
                 axis=1,
             )
 
+
+
+        
         slots_added = 999
+
         # Only do the rest if there is an export tariff:
-        self.log(f"Sum of Export Prices = {prices['export'].sum()}")
+        # self.log(f"Sum of Export Prices = {prices['export'].sum()}")
         
         if prices["export"].sum() > 0:
             j = 0
@@ -1145,6 +1245,8 @@ class PVsystemModel:
             if log:
                 self.log(f"{available.sum()} slots have an import price less than the max export price")
             done = available.sum() == 0
+
+            self.log(f"\n{df.to_string()}")
 
             while not done:
                 x = (
@@ -1189,8 +1291,14 @@ class PVsystemModel:
                     if (self.host.debug and "C" in self.host.debug_cat):
                         self.log(f"SOC (before modelling Forced Charge): {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% ")
 
+                    ###
+                    # If the partial slot is already set to charge via high cost swaps, the value of "forced" will be appropriate 
+                    # for energy transfer, not actual inverter power. However all this next bit does is max out the inverter power, which is not
+                    # then going to give an accurate reflection of energy transferred to battery. We need to factor "forced_charge" for partial slots in
+                    # just the same way as we did in high cost swaps. 
+
                     forced_charge = min(
-                        min(self.battery.max_charge_power, self.inverter.charger_power)
+                        min(self.battery.max_charge_power, self.inverter.charger_power) 
                         - x["forced"].loc[start_window]
                         - x[cols["solar"]].loc[start_window],
                         ((100 - x["soc_end"].loc[start_window]) / 100 * self.battery.capacity) * 2 * factor,
@@ -1311,6 +1419,12 @@ class PVsystemModel:
 
                         str_log += f"SOC: {x.loc[start_window]['soc']:5.1f}%->{x.loc[start_window]['soc_end']:5.1f}% "
 
+                        ###
+                        # All this next bit does is max out the inverter power to discharge, which means that "flows" is not
+                        # then going to give an accurate reflection of energy transferred to battery if already part way through a slot. 
+                        # We need to factor "slot" for partial slots in just the same way as we did in high cost swaps (and low cost charging). 
+                        # Factoring is only being applied to energy in the battery, which will only kick in when almost empty. 
+
                         slot = (
                             start_window,
                             -min(
@@ -1385,6 +1499,14 @@ class PVsystemModel:
             if log:
                 self.log(f"Iteration {j:2d}: Slots added: {slots_added:3d}")
 
+        if log:
+            self.log(f"df before final concat = ")
+            self.log(f"\n{df.to_string()}")
+            
+            self.log("Slots before final concat = ")
+            temp = pd.DataFrame(slots)
+            self.log(f"\n{temp.to_string()}")
+
         df = pd.concat(
             [
                 prices,
@@ -1392,6 +1514,27 @@ class PVsystemModel:
             ],
             axis=1,
         )
+
+        if log:
+            self.log(f"df after final concat = ")
+            self.log(f"\n{df.to_string()}")
+
+
+        # If in a partial slot, remove the factor applied during SPR assignment so the inverter stays at a constant power all the way through the slot. 
+
+        if slot_left_multiplier > 6:
+            slot_left_multiplier = 6
+        if log:
+            self.log(f"Slot_left_multiplier = {slot_left_multiplier}")
+            self.log(f"Forced in current slot = {df['forced'].iloc[0]}")
+
+        if df["forced"].iloc[0] > 0:   ### only apply to slots that are charging (temporary fix until discharging also does factors correctly). 
+            df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier
+        if log:
+            self.log(f"Forced after applying multiplier = {df['forced'].iloc[0]}")
+            self.log(f"\n{df.to_string()}")
+
+
         df.index = pd.to_datetime(df.index)
 
         if (not self.host.get_config("allow_cyclic")) and (len(slots) > 0) and discharge:
