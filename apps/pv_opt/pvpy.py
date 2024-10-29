@@ -1058,8 +1058,24 @@ class PVsystemModel:
 
                             # Each slot is assigned a value of 1, if already in a slot then factor for time already gone.
 
+
+                            #self.log("Time logging")
+                            #self.log(f"Timenow = {pd.Timestamp.utcnow().tz_localize(None)}")
+
+                            #Test: Code for not doing factoring if in a partial slot
+                            #for slot in window:
+                            #    factors.append(1)
+
                             for slot in window:
+                                if log:
+                                    self.log(f"Slot time = {slot.tz_localize(None)}")
+
                                 if pd.Timestamp.utcnow().tz_localize(None) > slot.tz_localize(None):
+                                    #if log:
+                                    #    self.log("Partial slot detected")
+                                    #    self.log("Factor to be written is....")
+                                    #    self.log(((slot.tz_localize(None) + pd.Timedelta(30, 'minutes')) - pd.Timestamp.utcnow().tz_localize(None)).total_seconds() / 1800)
+
                                     factors.append(
                                         (
                                             (slot.tz_localize(None) + pd.Timedelta(30, "minutes"))
@@ -1074,8 +1090,9 @@ class PVsystemModel:
 
                             factors = [f / sum(factors) for f in factors]
 
-                            # self.log("Factors =")
-                            # self.log(factors)
+                            #if log:
+                            #    self.log("Factors =")
+                            #    self.log(factors)
 
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
 
