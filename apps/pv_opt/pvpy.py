@@ -1069,6 +1069,7 @@ class PVsystemModel:
                             for slot in window:
                                 if log:
                                     self.log(f"Slot time = {slot.tz_localize(None)}")
+
                                 if pd.Timestamp.utcnow().tz_localize(None) > slot.tz_localize(None):
                                     #if log:
                                     #    self.log("Partial slot detected")
@@ -1093,10 +1094,6 @@ class PVsystemModel:
                             #    self.log("Factors =")
                             #    self.log(factors)
 
-                            # The reduction of the current slot reduces the power so the .flows algorithm calculates the correct charge added to the battery in the partial slot.
-                            # However, this same value should not then be used to program the inverter. The inverter should stick at the power assigned at the start of the slot.
-                            # We should factor this reduced power back up again just prior to inverter programming.
-
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
 
                                 #if log:
@@ -1110,7 +1107,7 @@ class PVsystemModel:
                                     # However, this filling is being done by power.
                                     
                                     # However, once the future slots reach maximum power, the current slot will only be at 1/3 or 2/3s power. 
-                                    # This what we need to ensure that the energy flow to battery is correct. 
+                                    # This what we need to ensure that the energy flow to battery is correct (because 10 or 20 minutes in flows updates "chg" to be equal to battery SOC)
                                     # THere is however nothing in place to then stop that slot filling up (to max charger power) with more high cost swaps? 
                                     # Once partway through a slot, the starting battery charge (chg) take accounts of the slot already gone, so it shouldnt be allowed to fill. 
                                     # So, we then need a limit on the partial slot power based on how far through the slot we are, and declare the slot "full" at that point. 
