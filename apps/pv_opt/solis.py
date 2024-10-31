@@ -434,9 +434,10 @@ class InverterController:
                     self.log("")
                     self.log(f">>> Solarman V2 time writes: about to write {value} to entity {entity_id}")
                     
-                    #changed, written = self.host.write_and_poll_value(
-                    #    entity_id=entity_id, value=value, verbose=True
-                    #)
+                    ###
+                    changed, written = self.host.write_and_poll_value(
+                        entity_id=entity_id, value=value, verbose=True
+                    )
 
                 elif self.type == "SOLIS_SOLAX_MODBUS":
                     for unit in ["hours", "minutes"]:
@@ -510,7 +511,8 @@ class InverterController:
             elif self.type == "SOLIS_SOLARMAN_V2":
                 self.log("")
                 self.log(f">>> Solarman V2 current writes: about to write {current} to entity {entity_id}")
-                #changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
+                ###
+                changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
 
             elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self._solis_write_current_register(direction, current, tolerance=1)
@@ -573,7 +575,8 @@ class InverterController:
             self.log(f">>> Inverter Mode: {mode}")
 
             self.log(f">>> Solarman_V2, writing {mode} to entity {entity_id}")
-            #self.host.set_select("inverter_mode", mode)
+            ###
+            self.host.set_select("inverter_mode", mode)
        
 
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
