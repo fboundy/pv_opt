@@ -774,7 +774,7 @@ class PVOpt(hass.Hass):
 
     def _get_io_car_slots(self):
         # IOG: Get Planned Car dispatches from Intelligent Dispatching sensor
-        self.ulog("Intelligent Octopus Status")
+        self.ulog("Reloading IOG Car slots from Intelligent Dispatching Sensor")
         self.io_dispatch_active = self.get_state(self.io_dispatching_sensor)
 
         self.log(f"  Current Dispatch Status (On/off) = : {self.io_dispatch_active}")
@@ -816,7 +816,7 @@ class PVOpt(hass.Hass):
             )
 
         if len(df) == 0:
-            self.log("    No Smart Charging Schedule found.")
+            self.log("    No IOG Smart Charging Schedule found.")
 
         return df
 
@@ -1356,6 +1356,7 @@ class PVOpt(hass.Hass):
                         #Set import import price to 0 for slots (isnt used/displayed if using IOG, but is in Agile)
                         
                         car_slots['import'] = 0  
+
                         if self.debug and "E" in self.debug_cat:
                             self.log("")
                             self.log("Car_slots = ")
@@ -2180,7 +2181,7 @@ class PVOpt(hass.Hass):
 
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
-        if self.debug and "I" in self.debug_cat:
+        if self.debug and "S" in self.debug_cat:
             self.log(f">>> soc_now: {self.soc_now}")
             self.log(f">>> x: {x}")
             self.log(f">>> Original: {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
@@ -2198,7 +2199,7 @@ class PVOpt(hass.Hass):
         x = pd.to_numeric(x, errors="coerce").interpolate()
 
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
-        if self.debug and "I" in self.debug_cat:
+        if self.debug and "S" in self.debug_cat:
             self.log(f">>> Fixed   : {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
 
         x = pd.concat(
@@ -2210,6 +2211,7 @@ class PVOpt(hass.Hass):
                 ),
             ]
         ).sort_index()
+
         self.initial_soc = x.interpolate().loc[self.static.index[0]]
         if not isinstance(self.initial_soc, float):
             self.log("")
@@ -2324,10 +2326,16 @@ class PVOpt(hass.Hass):
         # to 0 unless on 1) IOG and dispatches are planned or 2) Car charging on agile is required
         car_on = pd.Series(index=y.index, data=0, name="carslot")
 
-        # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load.
-        # If on Agile tariff, (re)calculate them now. 
+        # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load on car plugin
+        # However, with recent changes (Nov 2024) to the IOG algorithms they are now changing the slots regularly, so load them every optimiser run.
 
-
+        if self.intelligent:
+            car_slots = self._get_io_car_slots()  # Load the car charging slots
+            car_slots['import'] = 0
+            self.car_slots = car_slots
+            self.car_slots_last_loaded = pd.Timestamp.now(tz="UTC")
+        
+        # If on Agile tariff, (re)calculate car slots now. 
 
         if self.agile and self.ev and self.car_charging:
             self.log("")

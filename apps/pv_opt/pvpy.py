@@ -1007,6 +1007,7 @@ class PVsystemModel:
                         x = x[x["soc_end"] <= 97]
 
                         # ignore slot already started where forced is bigger than (inverter_charger_power * slot_amoumt_left)
+                        # no longer needed (as initial SOC is consistent for partial slots)
 
                         if log:
                             self.log(f"Timestamp = {pd.Timestamp.now(tz=self.tz)}")
@@ -1015,12 +1016,9 @@ class PVsystemModel:
                             self.log(f"Forced in first entry = {x['forced'][0]}")
                             self.log(f"Partial slot limit = {self.inverter.charger_power * slot_amount_left}")
 
-
-
-
-                        if Timenow_utc > x.index[0] and x["forced"][0] >= (self.inverter.charger_power * slot_amount_left):
-                            self.log("Slot dropped")
-                            x = x.drop(x.index[0])
+                        #if Timenow_utc > x.index[0] and x["forced"][0] >= (self.inverter.charger_power * slot_amount_left):
+                        #    self.log("Slot dropped")
+                        #    x = x.drop(x.index[0])
 
                         # If slot_amount_left != 1 then we are partway through a slot
                             # If time in index 0 is less then current time then we are partway through slot, and that will be at index = 0. 
@@ -1072,27 +1070,28 @@ class PVsystemModel:
                             #self.log(f"Timenow = {pd.Timestamp.utcnow().tz_localize(None)}")
 
                             #Test: Code for not doing factoring if in a partial slot
-                            #for slot in window:
-                            #    factors.append(1)
-
                             for slot in window:
-                                if log:
-                                    self.log(f"Slot time = {slot.tz_localize(None)}")
-                                if Timenow_utc_naive > slot.tz_localize(None):
-                                    #if log:
-                                    #    self.log("Partial slot detected")
-                                    #    self.log("Factor to be written is....")
-                                    #    self.log(((slot.tz_localize(None) + pd.Timedelta(30, 'minutes')) - pd.Timestamp.utcnow().tz_localize(None)).total_seconds() / 1800)
+                                factors.append(1)
 
-                                    factors.append(
-                                        (
-                                            (slot.tz_localize(None) + pd.Timedelta(30, "minutes"))
-                                            - Timenow_utc_naive 
-                                        ).total_seconds()
-                                        / 1800
-                                    )
-                                else:
-                                    factors.append(1)
+                            # Code for doing factoring if in a partial slot
+                            #for slot in window:
+                            #    if log:
+                            #        self.log(f"Slot time = {slot.tz_localize(None)}")
+                            #    if Timenow_utc_naive > slot.tz_localize(None):
+                            #        #if log:
+                            #        #    self.log("Partial slot detected")
+                            #        #    self.log("Factor to be written is....")
+                            #        #    self.log(((slot.tz_localize(None) + pd.Timedelta(30, 'minutes')) - pd.Timestamp.utcnow().tz_localize(None)).total_seconds() / 1800)
+                            #
+                            #        factors.append(
+                            #            (
+                            #                (slot.tz_localize(None) + pd.Timedelta(30, "minutes"))
+                            #                - Timenow_utc_naive 
+                            #            ).total_seconds()
+                            #            / 1800
+                            #        )
+                            #    else:
+                            #        factors.append(1)
 
                             # Assign a factor to each slot so all slots sum to 1.
 
@@ -1103,11 +1102,6 @@ class PVsystemModel:
                             #    self.log(factors)
 
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
-
-                                #if log:
-                                #    self.log(f"Window = {window}")
-                                #    self.log(f"Factors = {factors}")
-
 
                                 for slot, factor in zip(window, factors):
 
@@ -1126,15 +1120,22 @@ class PVsystemModel:
 
                                     # Note: the factored SCPA is applied in two places - as we allocate power to each slot and also when we decide which slots are full. 
 
-                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
+                                    ### Update, starting battery charge is based on self.inital_soc which appears to not be changed (much) during a partial slot. 
+                                    # So it may be possible just to remove partial slot factoring from SPR after all. 
 
+                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
+                                    
                                     if log:
                                         self.log(f"Time now is {Timenow_utc}, X.index[0] is {x.index[0]}, slot = {slot}")
 
-                                    if Timenow_utc > x.index[0] and slot == 0:
-                                        slot_charger_power_available = max((self.inverter.charger_power * slot_amount_left) - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
-                                    else:
-                                        slot_charger_power_available = max(self.inverter.charger_power - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
+                                    # Code for factoring SPCA in partial slots
+                                    #if Timenow_utc > x.index[0] and slot == 0:
+                                    #    slot_charger_power_available = max((self.inverter.charger_power * slot_amount_left) - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
+                                    #else:
+                                    #    slot_charger_power_available = max(self.inverter.charger_power - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
+
+                                    slot_charger_power_available = max(self.inverter.charger_power - x["forced"].loc[slot]- x[cols["solar"]].loc[slot], 0)
+
 
                                     # slot_available_capactity is a measure of what capacity the battary has for being charged in a slot. Its calculated from "endSOC" and compared from
                                     # 100% charged. I'm therefore not sure why its factored. Leave it as is for now but see if it implies a false limit. 
@@ -1314,15 +1315,14 @@ class PVsystemModel:
                     # that is factored for partial slots, and max it out to that. 
 
                     # If partway through slot, apply a factor to "slot_charger_power_available"
-
-                    slot_charger_power_available = max(
-                        (min(self.inverter.charger_power, self.battery.max_charge_power)  * factor)
-                        , 0)
+                    #slot_charger_power_available = max(
+                    #    (min(self.inverter.charger_power, self.battery.max_charge_power)  * factor)
+                    #    , 0)
 
 
                     forced_charge = min(
                         min(self.battery.max_charge_power, self.inverter.charger_power) - x["forced"].loc[start_window]- x[cols["solar"]].loc[start_window],
-                        slot_charger_power_available,
+                    #    slot_charger_power_available,
                         ((100 - x["soc_end"].loc[start_window]) / 100 * self.battery.capacity) * 2 * factor,
                     )
                     if (self.host.debug and "C" in self.host.debug_cat):
@@ -1471,10 +1471,10 @@ class PVsystemModel:
 
                         # If partway through slot, apply a factor to "slot_discharge_power_available"
 
-
-                        slot_discharge_power_available = max(
-                            (min(self.inverter.charger_power, self.battery.max_discharge_power)  * factor)
-                            , 0)
+                        #Code to factor SDPA in a partial slot
+                        #slot_discharge_power_available = max(
+                        #    (min(self.inverter.charger_power, self.battery.max_discharge_power)  * factor)
+                        #    , 0)
 
 
                         slot = (
@@ -1482,7 +1482,7 @@ class PVsystemModel:
                             -min(
                                 min(self.battery.max_discharge_power, self.inverter.inverter_power) -x[kwargs.get("solar", "solar")].loc[start_window],
                                 ((x["soc_end"].loc[start_window] - self.battery.max_dod) / 100 * self.battery.capacity) * 2 * factor,
-                                slot_discharge_power_available
+                                #slot_discharge_power_available
                             ),
                         )
                                   
@@ -1578,8 +1578,8 @@ class PVsystemModel:
             self.log(f"Slot_left_multiplier_charge = {slot_left_multiplier_charge}")
             self.log(f"Forced in current slot = {df['forced'].iloc[0]}")
 
-        if df["forced"].iloc[0] > 1:   ### only apply to slots that are charging. 
-            df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier_charge
+        #if df["forced"].iloc[0] > 1:   # only apply to slots that are charging. 
+        #    df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier_charge
 
         if log:
             self.log(f"Forced after applying charge multiplier = {df['forced'].iloc[0]}")
@@ -1595,8 +1595,8 @@ class PVsystemModel:
             self.log(f"Slot_left_multiplier_discharge = {slot_left_multiplier_discharge}")
             self.log(f"Forced in current slot = {df['forced'].iloc[0]}")
 
-        if df["forced"].iloc[0] < 0:   ### only apply to slots that are discharging. 
-            df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier_discharge
+        #if df["forced"].iloc[0] < 0:   # only apply to slots that are discharging. 
+        #    df["forced"].iloc[0] = df["forced"].iloc[0] * slot_left_multiplier_discharge
 
         if log:
             self.log(f"Forced after applying discharge multiplier = {df['forced'].iloc[0]}")
