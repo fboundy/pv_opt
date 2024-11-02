@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 import re
 
 
-VERSION = "3.17.0-Beta-11"
+VERSION = "3.17.0-Beta-12"
 
 # Change history
 # -------
@@ -56,6 +56,12 @@ VERSION = "3.17.0-Beta-11"
 # Move calculations of EV charging summaries from _write_output to more appropriate place.
 
 # 3.17.1 Beta changes merged back into 3.17.0-Beta-11. 
+
+# 3.17.0 Beta-12
+# Fixed factoring
+# Reloaded IOG car plan on every optimiser run
+
+
 
 
 
