@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 import re
 
 
-VERSION = "3.17.0-Beta-12"
+VERSION = "3.17.0-Beta-13"
 
 # Change history
 # -------
@@ -60,9 +60,8 @@ VERSION = "3.17.0-Beta-12"
 # 3.17.0 Beta-12
 # Fixed factoring
 # Reloaded IOG car plan on every optimiser run
-
-
-
+# 3.17.0 Beta-13
+# Tidied up logging and added additonal logging category "B". 
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
