@@ -1,5 +1,6 @@
 import pandas as pd
 import time
+import datetime as dt
 
 TIMEFORMAT = "%H:%M"
 INVERTER_DEFS = {
@@ -427,15 +428,21 @@ class InverterController:
         for limit in times:
             if times[limit] is not None:
                 if self.type == "SOLIS_SOLARMAN_V2":
-                    value = times[limit]
+
+                    value_pd = times[limit]
+                    self.log("")
+                    self.log(f">>> Solarman V2 times: value_pd = {value_pd}, value {value}")
+
+                    value = value_pd.to_pydatetime().time
+
                     unit = "hours and minutes"    # Done so logging is correct
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}"] 
 
                     self.log("")
-                    self.log(f">>> Solarman V2 time writes: about to write {value} to entity {entity_id}")
+                    self.log(f">>> Solarman V2 time writes: about to write {value} to entity {entity_id} using write_and_poll_time")
                     
                     ###
-                    changed, written = self.host.write_and_poll_value(
+                    changed, written = self.host.write_and_poll_time(
                         entity_id=entity_id, value=value, verbose=True
                     )
 

@@ -2895,6 +2895,36 @@ class PVOpt(hass.Hass):
 
         return (changed, written)
 
+    def write_and_poll_time(self, entity_id, value, tolerance=0.0, verbose=False):
+        changed = False
+        written = False
+        state = self.get_state_retry(entity_id=entity_id)
+        new_state = None
+        diff = abs(state - value)
+        if diff > tolerance:
+            changed = True
+            try:
+                self.call_service("number/set_value", entity_id=entity_id, value=value)
+
+                written = False
+                retries = 0
+                while not written and retries < WRITE_POLL_RETRIES:
+                    retries += 1
+                    time.sleep(WRITE_POLL_SLEEP)
+                    new_state = self.get_state_retry(entity_id=entity_id)
+                    written = new_state == value
+
+            except:
+                written = False
+
+            str_log = f"Entity: {entity_id:30s} Value: {value}  Old State: {state} "
+            str_log += f"New state: {(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
+            self.log(str_log)
+
+        return (changed, written)
+
+
+
     def set_select(self, item, state):
         if state is not None:
             entity_id = self.config[f"id_{item}"]
