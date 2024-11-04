@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 import re
 
 
-VERSION = "3.17.0-Beta-13"
+VERSION = "3.17.0-Beta-14"
 
 # Change history
 # -------
@@ -62,6 +62,8 @@ VERSION = "3.17.0-Beta-13"
 # Reloaded IOG car plan on every optimiser run
 # 3.17.0 Beta-13
 # Tidied up logging and added additonal logging category "B". 
+# 3.17.0 Beta-14
+# Fixes to pickup IOG slots that have already started or are <1/2 hour long
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -2316,15 +2318,16 @@ class PVOpt(hass.Hass):
         self.opt = self.flows[self.selected_case]
 
         # SVB debug logging
-        # self.log("")
-        # self.log("Returned from .flows. self.opt is........")
-        # self.log(self.opt.to_string())
+        self.log("")
+        self.log("Returned from .flows. self.opt is........")
+        self.log(f"\n{self.opt.to_string()}")
 
         # create a df with an index value the same as self.opt (just copy it from self.opt)
         # Copy two columns to force y to be a dataframe
 
         y = self.opt[["import", "forced"]]
         y["start"] = y.index.tz_convert(self.tz)
+        y["end"] = y.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
 
         # Create a Pd series to store any 1/2 hour car charge slots  (1 = car charge slot, 0 = not a car charge slot)
         # Note: self.opt will now include attribute "carslot" regardless of actual tariff, but be set 
@@ -2358,11 +2361,20 @@ class PVOpt(hass.Hass):
             self.log(y.to_string())
 
         # For each time range in the IOG Charging Schedule/Agile Car Charge Plan, set 1/2 hour Car slot flag to "1"
+        ### Problem: If the car is plugged in and starts to charge, car slot flag is not being set. 
+        ### i.e y(start) = 22:00, car_slots(start) = 22:07 should set a car_on flag but it isnt. 
+        ### need to not only use y["start"] but also y["end"] to search. 
         if not self.car_slots.empty and self.ev:
             for h in range(len(self.car_slots)):
                 for i in range(len(y)):
                     if (y["start"].iloc[i] >= self.car_slots["start_dt"].iloc[h]) and (
                         y["start"].iloc[i] < self.car_slots["end_dt"].iloc[h]
+                    ):
+                    # Repeat for end times in case car just plugged in and already charging
+                    # also needed for IOG slots that are less than 1/2 hour long. 
+                        car_on.iat[i] = 1
+                    if (y["end"].iloc[i] > self.car_slots["start_dt"].iloc[h]) and (
+                        y["end"].iloc[i] <= self.car_slots["end_dt"].iloc[h]
                     ):
                         car_on.iat[i] = 1
 
