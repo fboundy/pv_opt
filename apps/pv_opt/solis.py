@@ -429,12 +429,12 @@ class InverterController:
             if times[limit] is not None:
                 if self.type == "SOLIS_SOLARMAN_V2":
 
-                    value_pd = times[limit]
+                    #value_pd = times[limit]
                     #value = value_pd.to_pydatetime().time
-                    value = value_pd.strftime('%X')
+                    #value = value_pd.strftime('%X')
                     
                     self.log("")
-                    self.log(f">>> Solarman V2 times: value_pd = {value_pd}, value {value}")
+                    self.log(f">>> Solarman V2 times:  value {value}")
 
                     unit = "hours and minutes"    # Done so logging is correct
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}"] 
@@ -444,7 +444,7 @@ class InverterController:
                     
                     ###
                     changed, written = self.host.write_and_poll_time(
-                        entity_id=entity_id, value=value, verbose=True
+                        entity_id=entity_id, time=times[limit], verbose=True
                     )
 
                 elif self.type == "SOLIS_SOLAX_MODBUS":

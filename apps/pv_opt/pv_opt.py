@@ -2895,12 +2895,16 @@ class PVOpt(hass.Hass):
 
         return (changed, written)
 
-    def write_and_poll_time(self, entity_id, value, tolerance=0.0, verbose=False):
+    def write_and_poll_time(self, entity_id, time, tolerance=0.0, verbose=False):
         changed = False
         written = False
-        state = self.get_state_retry(entity_id=entity_id)
-        new_state = None
-        diff = abs(state - value)
+        old_time = self.get_state_retry(entity_id=entity_id)
+        new_time = None
+        diff = abs(float(old_time) - float(time))
+
+        #Convert time to HH:MM:SS for call_service routine
+        value = time.strftime('%X')
+
         if diff > tolerance:
             changed = True
             try:
@@ -2912,14 +2916,14 @@ class PVOpt(hass.Hass):
                 while not written and retries < WRITE_POLL_RETRIES:
                     retries += 1
                     time.sleep(WRITE_POLL_SLEEP)
-                    new_state = self.get_state_retry(entity_id=entity_id)
-                    written = new_state == value
+                    new_time = self.get_state_retry(entity_id=entity_id)
+                    written = new_time == time
 
             except:
                 written = False
 
-            str_log = f"Entity: {entity_id:30s} Value: {value}  Old State: {state} "
-            str_log += f"New state: {(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
+            str_log = f"Entity: {entity_id:30s} Time: {time}  Value: {value}  Old Time: {old_time} "
+            str_log += f"New time: {(new_time):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
             self.log(str_log)
 
         return (changed, written)
