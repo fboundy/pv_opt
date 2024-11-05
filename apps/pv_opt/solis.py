@@ -430,12 +430,11 @@ class InverterController:
                 if self.type == "SOLIS_SOLARMAN_V2":
 
                     value_pd = times[limit]
-                    value = value_pd.to_pydatetime().time
+                    #value = value_pd.to_pydatetime().time
+                    value = value_pd.strftime('%X')
                     
                     self.log("")
                     self.log(f">>> Solarman V2 times: value_pd = {value_pd}, value {value}")
-
-
 
                     unit = "hours and minutes"    # Done so logging is correct
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}"] 
