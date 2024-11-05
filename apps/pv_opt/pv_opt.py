@@ -2904,7 +2904,8 @@ class PVOpt(hass.Hass):
         if diff > tolerance:
             changed = True
             try:
-                self.call_service("number/set_value", entity_id=entity_id, value=value)
+                #self.call_service("number/set_value", entity_id=entity_id, value=value)
+                self.call_service("time/set_value", entity_id=entity_id, value=value)
 
                 written = False
                 retries = 0
