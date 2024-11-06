@@ -440,7 +440,7 @@ class InverterController:
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}"] 
 
                     self.log("")
-                    self.log(f">>> Solarman V2 time writes: about to write {value} to entity {entity_id} using write_and_poll_time")
+                    self.log(f">>> Solarman V2 time writes: about to write {times[limit]} to entity {entity_id} using write_and_poll_time")
                     
                     ###
                     changed, written = self.host.write_and_poll_time(
