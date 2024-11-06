@@ -444,7 +444,7 @@ class InverterController:
                     
                     ###
                     changed, written = self.host.write_and_poll_time(
-                        entity_id=entity_id, time=times[limit], verbose=True
+                        entity_id=entity_id, time=times[limit]
                     )
 
                 elif self.type == "SOLIS_SOLAX_MODBUS":
