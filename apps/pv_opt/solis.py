@@ -434,7 +434,7 @@ class InverterController:
                     #value = value_pd.strftime('%X')
                     
                     self.log("")
-                    self.log(f">>> Solarman V2 times:  value {value}")
+                    self.log(f">>> Solarman V2 times, Limit = {limit}, Value {times[limit]}")
 
                     unit = "hours and minutes"    # Done so logging is correct
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}"] 
