@@ -2895,7 +2895,7 @@ class PVOpt(hass.Hass):
 
         return (changed, written)
 
-    def write_and_poll_time(self, entity_id, time, tolerance=0.0, verbose=False):
+    def write_and_poll_time(self, entity_id, time):
         changed = False
         written = False
         old_time_str = self.get_state_retry(entity_id=entity_id)
@@ -2923,7 +2923,7 @@ class PVOpt(hass.Hass):
             except:
                 written = False
 
-            str_log = f"Entity: {entity_id:30s} Time: {time}  Value: {value}  Old Time: {old_time} New time: {(new_time):4.1f} "
+            str_log = f"Entity: {entity_id} Time: {time}  Value: {value}  Old Time: {old_time} New time: {(new_time)} "
             self.log(str_log)
 
         return (changed, written)
