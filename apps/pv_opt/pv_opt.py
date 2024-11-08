@@ -2898,24 +2898,14 @@ class PVOpt(hass.Hass):
     def write_and_poll_time(self, entity_id, time):
         changed = False
         written = False
-        
-        #x = self.get_state_retry(entity_id=entity_id)
-        #y = "2024/01/01 " + x
-        # old_time = pd.to_datetime(y, errors="coerce", format="%H:%M:%S")
 
         # Set consistent date for all comparisons
-        time.replace(year=2024, month=01, day=01)
+        time.replace(year=2024, month=1, day=1)
         
-        y = f"2024/01/01 " + {self.get_state_retry(entity_id=entity_id)}"
-        old_time = pd.to_datetime(y)
-        
-        self.log(f" Old Time string concat is {y}")
-        self.log(f" Old time after conversion to datetime is {y}")
-
+        old_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
         new_time = None
         
         #Convert time to string of HH:MM:SS for call_service routine
-        
         value = time.strftime('%X')
 
         if old_time != time:
@@ -2929,13 +2919,8 @@ class PVOpt(hass.Hass):
                 while not written and retries < WRITE_POLL_RETRIES:
                     retries += 1
                     time.sleep(WRITE_POLL_SLEEP)
-                    
-                    #new_time_str = self.get_state_retry(entity_id=entity_id)
-                    #new_time = pd.to_datetime(new_time_str, errors="coerce", format="%H:%M:%S")
-                    
-                    # Set arbitary date
-                    y = f"2024/01/01 " + {self.get_state_retry(entity_id=entity_id)}"
-                    new_time = pd.to_datetime(y)
+
+                    new_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
 
                     written = new_time == time
 
