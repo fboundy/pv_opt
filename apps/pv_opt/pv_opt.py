@@ -2900,7 +2900,7 @@ class PVOpt(hass.Hass):
         written = False
 
         # Set consistent date for all comparisons
-        time.replace(year=2024, month=1, day=1)
+        time = time.replace(year=2024, month=1, day=1)
         
         old_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
         new_time = None
