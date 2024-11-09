@@ -177,6 +177,7 @@ DEFAULT_CONFIG = {
     "allow_cyclic": {"default": False, "domain": "switch"},
     "use_solar": {"default": True, "domain": "switch"},
     "ev_part_of_house_load": {"default": True, "domain": "switch"},
+    "prevent_discharge": {"default": False, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
         "attributes": {
@@ -2361,9 +2362,9 @@ class PVOpt(hass.Hass):
             self.log(y.to_string())
 
         # For each time range in the IOG Charging Schedule/Agile Car Charge Plan, set 1/2 hour Car slot flag to "1"
-        ### Problem: If the car is plugged in and starts to charge, car slot flag is not being set. 
-        ### i.e y(start) = 22:00, car_slots(start) = 22:07 should set a car_on flag but it isnt. 
-        ### need to not only use y["start"] but also y["end"] to search. 
+        # Problem: If the car is plugged in and starts to charge, car slot flag is not being set. 
+        # i.e y(start) = 22:00, car_slots(start) = 22:07 should set a car_on flag but it isnt. 
+        # need to not only use y["start"] but also y["end"] to search. 
         if not self.car_slots.empty and self.ev:
             for h in range(len(self.car_slots)):
                 for i in range(len(y)):
@@ -2377,6 +2378,11 @@ class PVOpt(hass.Hass):
                         y["end"].iloc[i] <= self.car_slots["end_dt"].iloc[h]
                     ):
                         car_on.iat[i] = 1
+
+        ### Read "prevent_discharge" switch to set a car slot in the current slot
+
+        if self.get_config("prevent_discharge"):
+            car_on.iat[0] = 1
 
         self.opt = pd.concat([self.opt, car_on], axis=1)  # Add car charge slot flags to self.opt
 
