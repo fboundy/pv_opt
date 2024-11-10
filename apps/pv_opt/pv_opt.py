@@ -2135,8 +2135,8 @@ class PVOpt(hass.Hass):
                 self.log("   About to reload Octopus Intelligent Pricing - 00:20")
                 self._load_contract()
                 
-            if (pd.Timestamp.now(tz=self.tz).hour == 4) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
-                self.log("   About to reload Octopus Intelligent Pricing - 04:40")
+            if (pd.Timestamp.now(tz=self.tz).hour == 5) and (pd.Timestamp.now(tz=self.tz).minute >= 10):
+                self.log("   About to reload Octopus Intelligent Pricing - 05:10")
                 self._load_contract()
                 
             if self.car_plugin_detected == 1:
