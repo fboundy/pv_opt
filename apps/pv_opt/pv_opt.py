@@ -2916,7 +2916,7 @@ class PVOpt(hass.Hass):
 
             try:
                 #self.call_service("number/set_value", entity_id=entity_id, value=value)
-                self.call_service("time/set_value", entity_id=entity_id, value=value)
+                self.call_service("time/set_value", entity_id=entity_id, time=value)
 
                 written = False
                 retries = 0
@@ -2926,12 +2926,14 @@ class PVOpt(hass.Hass):
                     time.sleep(WRITE_POLL_SLEEP)
 
                     new_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
+                    
                     self.log(f"Write_and_poll_time:  while loop, new_time = {new_time}")
 
                     written = new_time == time
 
             except:
                 written = False
+                self.log("Write_and_poll_time: Exception logged")
 
             str_log = f"Entity: {entity_id} Time: {time}  Value: {value}  Old Time: {old_time} New time: {(new_time)} "
             self.log(str_log)
