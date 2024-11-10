@@ -519,6 +519,50 @@ These parameters will define how PV Opt estimates daily consumption:
 | Car Charge Slot max price | p | `number.max_ev_price_p` | 30 | Maximum 1/2 hour slot price per kWh in pence added to the candidate car charging plan. Disable by setting to 0. Note: setting a low value may mean the car will not charge to the required SOC if overnight Agile rates are high. |
 | Car Charge Efficiency | % | `number.ev_charger_efficiency_percent` | 92 | Charging Efficiency for EV Charger/Car. 92% is average for most cars/chargers but adjust if the car is consistently undercharging or overcharging against its target. |
 
+<h3>Pricing Parameters</h3>
+These parameters set the price that PV Opt uses:
+
+<h4>Octopus Tariffs (usinng the Octopus API)</h4>
+
+| Parameter | Units | Entity | Default | Description |
+|:--|:--:| :-- | :--:|:--|
+| Octopus Auto|`on`/`off` | `octopus_auto` | On | Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+| Octopus Account | `string`  | `octopus_account` |  | Octopus Account ID (Axxxxxxxx) - not required if Octopus Auto is set|
+| Octopus API Key | `string` | `octopus_api_key` |  | Octopus API Key - not required if Octopus Auto is set |
+| Octopus Import Tariff Code| fraction | `octopus_import_tariff_code` |  | Import Tariff Code (eg `E-1R-AGILE-23-12-06-G`) |
+| Octopus Export Tariff Code| fraction | `octopus_export_tariff_code` |  | Export Tariff Code (eg `E-1R-AGILE-OUTGOING-19-05-13-G`)| 
+
+<h4>Manual Tariffs</h4>
+
+Import and/or export tarifs can be set manually as follows. These can be combined with Octopus Account Codes (ie you could set Octopus Agile for input using `octopus_import_tariff_code` and a manual export). Manual tariffs <b>will not work</b> with either `Octopus Auto` or `Octopus Account`.
+
+    manual_import_tariff: True
+    manual_import_tariff_name: Test Importe
+    manual_import_tariff_tz: GB
+    manual_import_tariff_standing: 43
+    manual_import_tariff_unit:
+      - period_start: "00:00"
+        price: 4.2
+      - period_start: "05:00"
+        price: 9.7
+      - period_start: "16:00"
+        price: 77.0
+      - period_start: "19:00"
+        price: -2.0
+
+    manual_export_tariff: True
+    manual_export_tariff_name: Test Export
+    manual_export_tariff_tz: GB
+    manual_export_tariff_unit:
+      - period_start: "01:00"
+        price: 14.2
+      - period_start: "03:00"
+        price: 19.7
+      - period_start: "16:00"
+        price: 50.0
+      - period_start: "14:00"
+        price: 0.0
+
 
 <h3>Tuning Parameters</h3>
 These parameters will tweak how PV Opt runs:
