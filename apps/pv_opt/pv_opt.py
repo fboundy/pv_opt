@@ -2895,28 +2895,28 @@ class PVOpt(hass.Hass):
 
         return (changed, written)
 
-    def write_and_poll_time(self, entity_id, time):
+    def write_and_poll_time(self, entity_id, value):
         changed = False
         written = False
 
         # Set consistent date for all comparisons
-        time = time.replace(year=2024, month=1, day=1)
+        value = value.replace(year=2024, month=1, day=1)
         
         old_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
         new_time = None
 
-        self.log(f"Write_and_poll_time: time = {time}, old_time = {old_time}")
+        self.log(f"Write_and_poll_time: time = {value}, old_time = {old_time}")
         
         #Convert time to string of HH:MM:SS for call_service routine
-        value = time.strftime('%X')
+        value_str = value.strftime('%X')
 
-        if old_time != time:
+        if old_time != value:
             changed = True
             self.log(f"Write_and_poll_time: Changed = true")
 
             try:
                 #self.call_service("number/set_value", entity_id=entity_id, value=value)
-                self.call_service("time/set_value", entity_id=entity_id, time=value)
+                self.call_service("time/set_value", entity_id=entity_id, time=value_str)
 
                 written = False
                 retries = 0
@@ -2929,13 +2929,13 @@ class PVOpt(hass.Hass):
                     
                     self.log(f"Write_and_poll_time:  while loop, new_time = {new_time}")
 
-                    written = new_time == time
+                    written = new_time == value
 
             except:
                 written = False
                 self.log("Write_and_poll_time: Exception logged")
 
-            str_log = f"Entity: {entity_id} Time: {time}  Value: {value}  Old Time: {old_time} New time: {(new_time)} "
+            str_log = f"Entity: {entity_id} Time: {value}  Value_str: {value_str}  Old Time: {old_time} New time: {(new_time)} "
             self.log(str_log)
 
         return (changed, written)

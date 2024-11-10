@@ -445,7 +445,7 @@ class InverterController:
                     z = times[limit].tz_localize(None)
 
                     changed, written = self.host.write_and_poll_time(
-                        entity_id=entity_id, time=z
+                        entity_id=entity_id, value=z
                     )
 
                 elif self.type == "SOLIS_SOLAX_MODBUS":
