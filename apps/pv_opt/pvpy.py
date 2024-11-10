@@ -63,6 +63,7 @@ class Tariff:
         octopus=True,
         eco7_start="01:00",
         host=None,
+        manual=False,
         **kwargs,
     ) -> None:
         self.name = name
@@ -80,16 +81,22 @@ class Tariff:
         self.day_ahead = None
         self.agile_predict = None
         self.eco7_start = pd.Timestamp(eco7_start, tz="UTC")
+        self.manual = manual
 
         if octopus:
             self.get_octopus(**kwargs)
 
         else:
-            self.fixed = [{"value_inc_vat": fixed, "valid_from": valid_from}]
-            self.unit = [{"value_inc_vat": unit, "valid_from": valid_from}]
-            if eco7:
-                self.day = [{"value_inc_vat": day, "valid_from": valid_from}]
-                self.night = [{"value_inc_vat": night, "valid_from": valid_from}]
+
+            if self.manual:
+                self.unit = unit
+                self.fixed = fixed
+            else:
+                self.fixed = [{"value_inc_vat": fixed, "valid_from": valid_from}]
+                self.unit = [{"value_inc_vat": unit, "valid_from": valid_from}]
+                if eco7:
+                    self.day = [{"value_inc_vat": day, "valid_from": valid_from}]
+                    self.night = [{"value_inc_vat": night, "valid_from": valid_from}]
 
     def _oct_time(self, d):
         # print(d)
@@ -150,10 +157,16 @@ class Tariff:
         return str
 
     def start(self):
-        return min([pd.Timestamp(x["valid_from"]) for x in self.unit])
+        if self.manual:
+            return pd.Timestamp("2020-01-01", tz=self.tz)
+        else:
+            return min([pd.Timestamp(x["valid_from"]) for x in self.unit])
 
     def end(self):
-        return max([pd.Timestamp(x["valid_to"]) for x in self.unit])
+        if self.manual:
+            return pd.Timestamp.now(tz=self.tz)
+        else:
+            return max([pd.Timestamp(x["valid_to"]) for x in self.unit])
 
     def to_df(self, start=None, end=None, **kwargs):
         if self.host.debug:
@@ -161,11 +174,13 @@ class Tariff:
             self.log(f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}")
 
         time_now = pd.Timestamp.now(tz="UTC")
-        use_day_ahead = kwargs.get("day_ahead", ((start > time_now) or (end > time_now)))
 
         if start is None:
             if self.eco7:
                 start = min([pd.Timestamp(x["valid_from"]) for x in self.day])
+
+            elif self.manual:
+                start = pd.Timestamp.now(tz=self.tz).floor("1D")
 
             else:
                 start = min([pd.Timestamp(x["valid_from"]) for x in self.unit])
@@ -173,7 +188,14 @@ class Tariff:
         if end is None:
             end = pd.Timestamp.now(tz=start.tzinfo).ceil("30min")
 
+        use_day_ahead = kwargs.get("day_ahead", ((start > time_now) or (end > time_now)))
+
         # self.get_octopus(area=self.area, period_from=start, period_to=end)
+        # self.log(f">>> Name: {self.name}")
+        # self.log(f">>> Export: {self.export}")
+        # self.log(f">>> Manual: {self.manual}")
+        # self.log(f">>> Start: {start}")
+        # self.log(f">>> End: {end}")
 
         if self.eco7:
             df = pd.concat(
@@ -195,60 +217,78 @@ class Tariff:
             df.loc[mask, "unit"] = df.loc[mask, "Night"]
             df = df["unit"].loc[start:end]
 
+        elif self.manual:
+            df = (
+                pd.concat(
+                    [
+                        pd.DataFrame(
+                            index=[midnight + pd.Timedelta(f"{x['period_start']}:00") for x in self.unit],
+                            data=[{"unit": x["price"]} for x in self.unit],
+                        ).sort_index()
+                        for midnight in pd.date_range(
+                            start.floor("1D") - pd.Timedelta("1D"), end.ceil("1D"), freq="1D"
+                        )
+                    ]
+                )
+                .resample("30min")
+                .ffill()
+                .loc[start:end]
+            )
+
         else:
             df = pd.DataFrame(self.unit).set_index("valid_from")["value_inc_vat"]
             df.index = pd.to_datetime(df.index)
             df = df.sort_index()
 
             if "AGILE" in self.name and use_day_ahead:
-                if self.day_ahead is not None and df.index[-1].day == end.day:
-                    # reset the day ahead forecasts if we've got a forecast going into tomorrow
-                    self.agile_predict = None
-                    self.day_ahead = None
-                    self.log("")
-                    self.log(f"Cleared day ahead forecast for tariff {self.name}")
+                # if self.day_ahead is not None and df.index[-1].day == end.day:
+                #     # reset the day ahead forecasts if we've got a forecast going into tomorrow
+                #     self.agile_predict = None
+                #     self.day_ahead = None
+                #     self.log("")
+                #     self.log(f"Cleared day ahead forecast for tariff {self.name}")
 
-                if pd.Timestamp.now(tz=self.tz).hour > 11 and df.index[-1].day != end.day:
-                    # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
-                    if self.day_ahead is None:
-                        self.day_ahead = self.get_day_ahead(df.index[0])
-                        if self.day_ahead is not None:
-                            self.day_ahead = self.day_ahead.sort_index()
-                            self.log("")
-                            self.log(
-                                f"Retrieved day ahead forecast for period {self.day_ahead.index[0].strftime(TIME_FORMAT)} - {self.day_ahead.index[-1].strftime(TIME_FORMAT)} for tariff {self.name}"
-                            )
+                # if pd.Timestamp.now(tz=self.tz).hour > 11 and df.index[-1].day != end.day:
+                #     # if it is after 11 but we don't have new Agile prices yet, check for a day-ahead forecast
+                #     if self.day_ahead is None:
+                #         self.day_ahead = self.get_day_ahead(df.index[0])
+                #         if self.day_ahead is not None:
+                #             self.day_ahead = self.day_ahead.sort_index()
+                #             self.log("")
+                #             self.log(
+                #                 f"Retrieved day ahead forecast for period {self.day_ahead.index[0].strftime(TIME_FORMAT)} - {self.day_ahead.index[-1].strftime(TIME_FORMAT)} for tariff {self.name}"
+                #             )
 
-                    if self.day_ahead is not None:
-                        if self.export:
-                            factors = AGILE_FACTORS["export"][self.area]
-                        else:
-                            factors = AGILE_FACTORS["import"][self.area]
+                #     if self.day_ahead is not None:
+                #         if self.export:
+                #             factors = AGILE_FACTORS["export"][self.area]
+                #         else:
+                #             factors = AGILE_FACTORS["import"][self.area]
 
-                        mask = (self.day_ahead.index.tz_convert("GB").hour >= 16) & (
-                            self.day_ahead.index.tz_convert("GB").hour < 19
-                        )
+                #         mask = (self.day_ahead.index.tz_convert("GB").hour >= 16) & (
+                #             self.day_ahead.index.tz_convert("GB").hour < 19
+                #         )
 
-                        agile = (
-                            pd.concat(
-                                [
-                                    (self.day_ahead[mask] * factors[0] + factors[1] + factors[2]),
-                                    (self.day_ahead[~mask] * factors[0] + factors[1]),
-                                ]
-                            )
-                            .sort_index()
-                            .loc[df.index[-1] :]
-                            .iloc[1:]
-                        )
+                #         agile = (
+                #             pd.concat(
+                #                 [
+                #                     (self.day_ahead[mask] * factors[0] + factors[1] + factors[2]),
+                #                     (self.day_ahead[~mask] * factors[0] + factors[1]),
+                #                 ]
+                #             )
+                #             .sort_index()
+                #             .loc[df.index[-1] :]
+                #             .iloc[1:]
+                #         )
 
-                        df = pd.concat([df, agile])
-                else:
-                    # Otherwise download the latest forecast from AgilePredict
-                    if self.agile_predict is None:
-                        self.agile_predict = self._get_agile_predict()
+                #         df = pd.concat([df, agile])
+                # else:
+                # Otherwise download the latest forecast from AgilePredict
+                if self.agile_predict is None:
+                    self.agile_predict = self._get_agile_predict()
 
-                    if self.agile_predict is not None:
-                        df = pd.concat([df, self.agile_predict.loc[df.index[-1] + pd.Timedelta("30min") : end]])
+                if self.agile_predict is not None:
+                    df = pd.concat([df, self.agile_predict.loc[df.index[-1] + pd.Timedelta("30min") : end]])
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (len(df) > 1 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30) or len(df) == 1:
@@ -270,13 +310,16 @@ class Tariff:
             df.name = "unit"
 
         if not self.export:
-            x = pd.DataFrame(self.fixed).set_index("valid_from")["value_inc_vat"].sort_index()
-            x.index = pd.to_datetime(x.index)
-            newindex = pd.date_range(x.index[0], df.index[-1], freq="30min")
-            x = x.reindex(newindex).sort_index()
-            x = x.ffill().loc[df.index[0] :]
-            df = pd.concat([df, x], axis=1).set_axis(["unit", "fixed"], axis=1)
+            if not self.manual:
+                x = pd.DataFrame(self.fixed).set_index("valid_from")["value_inc_vat"].sort_index()
+                x.index = pd.to_datetime(x.index)
+                newindex = pd.date_range(x.index[0], df.index[-1], freq="30min")
+                x = x.reindex(newindex).sort_index()
+                x = x.ffill().loc[df.index[0] :]
+            else:
+                x = pd.DataFrame(index=df.index, data={"fixed": self.fixed})
 
+            df = pd.concat([df, x], axis=1).set_axis(["unit", "fixed"], axis=1)
             mask = df.index.time != pd.Timestamp("00:00", tz="UTC").time()
             df.loc[mask, "fixed"] = 0
 
