@@ -1975,9 +1975,9 @@ class PVOpt(hass.Hass):
                         did_something = True
 
                     elif status["discharge"]["start"] != status["discharge"]["end"]:
-                        str_log += " but charge start and end times are different."
+                        str_log += " but discharge start and end times are different."
                         self.log(str_log)
-                        self.inverter.control_charge(enable=False)
+                        self.inverter.control_discharge(enable=False)
                         did_something = True
 
                     if len(self.windows) > 0:
