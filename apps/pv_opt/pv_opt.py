@@ -43,6 +43,7 @@ MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
 WRITE_POLL_SLEEP = 0.5
+WRITE_POLL_TIME_SLEEP = 2
 WRITE_POLL_RETRIES = 5
 GET_STATE_RETRIES = 5
 GET_STATE_WAIT = 0.5
@@ -2923,7 +2924,7 @@ class PVOpt(hass.Hass):
                 while not written and retries < WRITE_POLL_RETRIES:
                     self.log("Write_and_poll_time: Entered while loop")
                     retries += 1
-                    time.sleep(WRITE_POLL_SLEEP)
+                    time.sleep(WRITE_POLL_TIME_SLEEP)
 
                     new_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
                     
