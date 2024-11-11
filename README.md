@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.17.0
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.17.1
 
 <h2>This documentation needs updating!</h2>
 
@@ -269,6 +269,7 @@ And add the `client_user` and `client_password` keys to `secrets.yaml` like this
     ```
 
 That's it. AppDaemon is up and running. There is futher documentation for the on the [Add-on](https://github.com/hassio-addons/addon-appdaemon/blob/main/appdaemon/DOCS.md) and for [AppDaemon](https://appdaemon.readthedocs.io/en/latest/)
+
 
 <h3>12. Install PV Opt from HACS</h3>
 
@@ -620,6 +621,16 @@ The dashboards also depend on the following Frontend components from HACS:
  - layout-card
  - apexcharts-card
 
+
+<h2> Known Issues</h2>
+
+<h3>Docker MariaDB Cache Size</h3>
+
+If you are using MariaDB for your database in a standalone container (ie Docker or Proxmox) rather than the Home Assistnt Add-On you may find that AppDaemon struggles to pull in enough history with the default cache settings.
+
+MariaDB defaults to an in memory cache of 10MB. increasing `innodb_buffer_pool_size` to will allow more history to be transferred. This setting does not appear to be available in the Add-On configuration.
+
+Full details are here: https://github.com/fboundy/pv_opt/issues/270
 
 <h2>Development - Adding Additional Inverters: the PV Opt API</h2>
 

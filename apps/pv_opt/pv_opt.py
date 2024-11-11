@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.17.0"
+VERSION = "3.17.1"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -183,7 +183,7 @@ DEFAULT_CONFIG = {
         "default": 4.0,
         "attributes": {
             "min": 0.0,
-            "max": 10.0,
+            "max": 20.0,
             "step": 0.5,
             "mode": "slider",
         },
@@ -1032,7 +1032,6 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {direction.title()}: {tariff.name:40s} Start: {tariff.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
                 )
-                self.log(tariff.to_df().to_string())
                 if "AGILE" in tariff.name:
                     self.agile = True
                 if "INTELLI" in tariff.name:
@@ -1232,9 +1231,10 @@ class PVOpt(hass.Hass):
                 self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
-                self.log(f">>> Test: {self.entity_exists('update.home_assistant_core_update')}")
-                for v in values:
-                    self.log(f">>> {item} {v} {self.entity_exists(v)}")
+                if self.debug:
+                    self.log(f">>> Test: {self.entity_exists('update.home_assistant_core_update')}")
+                    for v in values:
+                        self.log(f">>> {item} {v} {self.entity_exists(v)}")
                 if min([self.entity_exists(v) for v in values]):
                     if len(values) == 1:
                         self.config[item] = values[0]

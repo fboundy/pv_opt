@@ -119,36 +119,36 @@ pv_opt:
   # ========================================
   # Octopus account parameters
   # ========================================
-  octopus_auto: False # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
+  # octopus_auto: False # Read tariffs from the Octopus Energy integration. If successful this over-rides the following parameters
   # octopus_account: !secret octopus_account
   # octopus_api_key: !secret octopus_api_key
 
-  manual_import_tariff: True
-  manual_import_tariff_name: Test Importe
-  manual_import_tariff_tz: GB
-  manual_import_tariff_standing: 43
-  manual_import_tariff_unit:
-    - period_start: "00:00"
-      price: 4.2
-    - period_start: "05:00"
-      price: 9.7
-    - period_start: "16:00"
-      price: 77.0
-    - period_start: "19:00"
-      price: -2.0
+  # manual_import_tariff: True
+  # manual_import_tariff_name: Test Importe
+  # manual_import_tariff_tz: GB
+  # manual_import_tariff_standing: 43
+  # manual_import_tariff_unit:
+  #   - period_start: "00:00"
+  #     price: 4.2
+  #   - period_start: "05:00"
+  #     price: 9.7
+  #   - period_start: "16:00"
+  #     price: 77.0
+  #   - period_start: "19:00"
+  #     price: -2.0
 
-  manual_export_tariff: True
-  manual_export_tariff_name: Test Export
-  manual_export_tariff_tz: GB
-  manual_export_tariff_unit:
-    - period_start: "01:00"
-      price: 14.2
-    - period_start: "03:00"
-      price: 19.7
-    - period_start: "16:00"
-      price: 50.0
-    - period_start: "14:00"
-      price: 0.0
+  # manual_export_tariff: True
+  # manual_export_tariff_name: Test Export
+  # manual_export_tariff_tz: GB
+  # manual_export_tariff_unit:
+  #   - period_start: "01:00"
+  #     price: 14.2
+  #   - period_start: "03:00"
+  #     price: 19.7
+  #   - period_start: "16:00"
+  #     price: 50.0
+  #   - period_start: "14:00"
+  #     price: 0.0
 
 
   # The following Can be omitted if either of the above options is working correctly:
