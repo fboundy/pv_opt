@@ -13,7 +13,7 @@ The application will integrate fully with Solis inverters which are controlled u
 - [Home Assistant Solarman Integration](https://github.com/davidrapan/ha-solarman) (1)
 
 (1) https://github.com/StephanJoubert/home_assistant_solarman appears to be no longer maintained so has been replaced with
-https://github.com/davidrapan/ha-solarman. This should be used for new installs for PvOpt v3.15.6 onwards. 
+https://github.com/davidrapan/ha-solarman. This should be used for new installs for PvOpt v3.17.0 onwards. 
 
 
 Once installed it should require miminal configuration. Other inverters/integrations can be added if required or can be controlled indirectly using automations.
@@ -107,6 +107,10 @@ Follow the Github instruction here: https://github.com/hultenvp/solis_control
 <h4>Solarman</h4>
 
 Follow the Github instructions here: (https://github.com/davidrapan/ha-solarman) 
+
+For Solis Inverters, replace existing Solis_Hybrid.yaml with this one:
+
+https://github.com/stevebuk1/pv_opt/blob/patch2/apps/pv_opt/solis_hybrid.yaml
 
 <h3>6. Install the MQTT Integraion in Home Assistant</h3>
 
