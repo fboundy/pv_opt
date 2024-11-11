@@ -758,7 +758,7 @@ class PVOpt(hass.Hass):
                 io_charge_to_add_sensor = [
                     name
                     for name in self.get_state_retry(BOTTLECAP_DAVE["domain2"]).keys()
-                    if ("octopus_energy_" in name and "intelligent_charge_limit" in name)
+                    if ("octopus_energy_" in name and "intelligent_charge_target" in name)
                 ]
                 self.io_charge_to_add_sensor = io_charge_to_add_sensor[0]
                 self.rlog(f"    Found Charge to Add entity:  {self.io_charge_to_add_sensor}")
