@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.16.1"
+VERSION = "3.17.0"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -922,35 +922,43 @@ class PVOpt(hass.Hass):
                             )
 
             if self.contract is None:
+                tariffs = {x: None for x in IMPEXP}
+
                 if (
                     "octopus_import_tariff_code" in self.config
                     and self.config["octopus_import_tariff_code"] is not None
                 ):
-                    try:
-                        str = f"Trying to load tariff codes: Import: {self.config['octopus_import_tariff_code']}"
+                    self.rlog(f"Trying to load tariff codes: Import: {self.config['octopus_import_tariff_code']}")
+                    # try:
+                    # First load the import as we always need that
+                    tariffs["import"] = pv.Tariff(
+                        self.config[f"octopus_import_tariff_code"],
+                        export=False,
+                        host=self,
+                    )
+                elif self.get_config("manual_import_tariff", False):
+                    tariffs["import"] = self._manual_tariff("import")
 
-                        if "octopus_export_tariff_code" in self.config:
-                            str += f" Export: {self.config['octopus_export_tariff_code']}"
-                        self.rlog(str)
-
-                        tariffs = {x: None for x in IMPEXP}
-                        for imp_exp in IMPEXP:
-                            if f"octopus_{imp_exp}_tariff_code" in self.config:
-                                tariffs[imp_exp] = pv.Tariff(
-                                    self.config[f"octopus_{imp_exp}_tariff_code"],
-                                    export=(imp_exp == "export"),
-                                    host=self,
-                                )
-
-                        self.contract = pv.Contract(
-                            "current",
-                            imp=tariffs["import"],
-                            exp=tariffs["export"],
+                if tariffs["import"] is not None:
+                    if "octopus_export_tariff_code" in self.config:
+                        self.rlog(f"Trying to load tariff codes: Export: {self.config['octopus_export_tariff_code']}")
+                        tariffs["export"] = pv.Tariff(
+                            self.config[f"octopus_export_tariff_code"],
+                            export=False,
                             host=self,
                         )
-                        self.rlog("Contract tariffs loaded OK from Tariff Codes")
-                    except Exception as e:
-                        self.rlog(f"Unable to load Tariff Codes {e}", level="ERROR")
+                    elif self.get_config("manual_export_tariff", False):
+                        tariffs["export"] = self._manual_tariff("export")
+
+                    self.contract = pv.Contract(
+                        "current",
+                        imp=tariffs["import"],
+                        exp=tariffs["export"],
+                        host=self,
+                    )
+                    self.rlog("Contract tariffs loaded OK from Tariff Codes / Manual Spec")
+                # except Exception as e:
+                #     self.rlog(f"Unable to load Tariff Codes {e}", level="ERROR")
 
             if self.contract is None:
                 i += 1
@@ -976,6 +984,26 @@ class PVOpt(hass.Hass):
             self._check_for_io()
 
         self.rlog("Finished loading contract")
+
+    def _manual_tariff(self, direction="import"):
+        name = self.get_config(f"manual_{direction}_tariff_name")
+        self.log(f"Trying to load manual {direction} tariff {name}")
+        tz = self.get_config(f"manual_{direction}_tariff_tz")
+        if direction == "import":
+            fixed = self.get_config(f"manual_{direction}_tariff_standing", 0.0)
+        else:
+            fixed = None
+        unit = self.get_config(f"manual_{direction}_tariff_unit")
+
+        return pv.Tariff(
+            name=name,
+            octopus=False,
+            export=(direction == "export"),
+            fixed=fixed,
+            unit=unit,
+            host=self,
+            manual=True,
+        )
 
     def _check_tariffs(self):
         if self.bottlecap_entities["import"] is not None:
@@ -1005,6 +1033,7 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {direction.title()}: {tariff.name:40s} Start: {tariff.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
                 )
+                self.log(tariff.to_df().to_string())
                 if "AGILE" in tariff.name:
                     self.agile = True
                 if "INTELLI" in tariff.name:
@@ -1183,6 +1212,24 @@ class PVOpt(hass.Hass):
                         str3 = "     "
                         str4 = "            "
                     self.rlog(f"    {str1:34s} {str2} {str3} {x['hour']:5.2f} {str4} {x['consumption']:5.0f} W")
+                self.yaml_config[item] = self.config[item]
+
+            elif re.match("^manual_..port_tariff_unit$", item):
+                self.config[item] = values
+                for i, x in enumerate(values):
+                    if i == 0:
+                        str1 = item
+                        str2 = "="
+                        str3 = "Period Start:"
+                        str4 = "Price:"
+                    else:
+                        str1 = ""
+                        str2 = " "
+                        str3 = "             "
+                        str4 = "      "
+                    self.rlog(
+                        f"    {str1:34s} {str2} {str3} {pd.Timestamp(x['period_start']).strftime('%H:%M')} {str4} {x['price']:5.0f} p/kWh"
+                    )
                 self.yaml_config[item] = self.config[item]
 
             elif "id_" in item:
