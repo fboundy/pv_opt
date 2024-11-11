@@ -1541,7 +1541,7 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {direction.title()}: {tariff.name:40s} Start: {tariff.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
                 )
-                self.log(tariff.to_df().to_string())
+                
                 if "AGILE" in tariff.name:
                     self.agile = True
                 if "INTELLI" in tariff.name:
