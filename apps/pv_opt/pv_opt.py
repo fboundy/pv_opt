@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 import re
 
 
-VERSION = "3.17.0-Beta-11"
+VERSION = "3.18.0-Beta-15"
 
 # Change history
 # -------
@@ -57,6 +57,18 @@ VERSION = "3.17.0-Beta-11"
 
 # 3.17.1 Beta changes merged back into 3.17.0-Beta-11. 
 
+# 3.17.0 Beta-12
+# Fixed factoring
+# Reloaded IOG car plan on every optimiser run
+# 3.17.0 Beta-13
+# Tidied up logging and added additonal logging category "B". 
+# 3.17.0 Beta-14
+# Fixes to pickup IOG slots that have already started or are <1/2 hour long
+
+# 3.18.0 Beta-15
+# Roll minor version to 18 to reflect latest production release
+# Change search string on Intelligent Charge Limit/Target to suit new Octopus Energy Integration
+# Minor bugfixes and logging fixes
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -169,6 +181,7 @@ DEFAULT_CONFIG = {
     "allow_cyclic": {"default": False, "domain": "switch"},
     "use_solar": {"default": True, "domain": "switch"},
     "ev_part_of_house_load": {"default": True, "domain": "switch"},
+    "prevent_discharge": {"default": False, "domain": "switch"},
     "optimise_frequency_minutes": {
         "default": 10,
         "attributes": {
@@ -431,7 +444,7 @@ DEFAULT_CONFIG = {
             "mode": "slider",
         },
     },
-    "car_charging_ready_by1": {
+    "car_charging_ready_by": {
         "default": "07:00",
         "domain": "select",
         "attributes": {"options": OPTIONS_TIME},
@@ -494,7 +507,7 @@ DEFAULT_CONFIG = {
         "domain": "select",
         "attributes": {"options": ["mean", "median", "max"]},
     },
-    "forced_power_group_tolerance1": {
+    "forced_power_group_tolerance": {
         "default": 100,
         "domain": "number",
         "attributes": {
@@ -750,7 +763,7 @@ class PVOpt(hass.Hass):
                 io_charge_to_add_sensor = [
                     name
                     for name in self.get_state_retry(BOTTLECAP_DAVE["domain2"]).keys()
-                    if ("octopus_energy_" in name and "intelligent_charge_limit" in name)
+                    if ("octopus_energy_" in name and "intelligent_charge_" in name)
                 ]
                 self.io_charge_to_add_sensor = io_charge_to_add_sensor[0]
                 self.rlog(f"    Found Charge to Add entity:  {self.io_charge_to_add_sensor}")
@@ -773,7 +786,7 @@ class PVOpt(hass.Hass):
 
     def _get_io_car_slots(self):
         # IOG: Get Planned Car dispatches from Intelligent Dispatching sensor
-        self.ulog("Intelligent Octopus Status")
+        self.ulog("Reloading IOG Car slots from Intelligent Dispatching Sensor")
         self.io_dispatch_active = self.get_state(self.io_dispatching_sensor)
 
         self.log(f"  Current Dispatch Status (On/off) = : {self.io_dispatch_active}")
@@ -815,7 +828,7 @@ class PVOpt(hass.Hass):
             )
 
         if len(df) == 0:
-            self.log("    No Smart Charging Schedule found.")
+            self.log("    No IOG Smart Charging Schedule found.")
 
         return df
 
@@ -837,19 +850,23 @@ class PVOpt(hass.Hass):
                 ):
                     self.car_plugin_detected = 1
                     self.log("EV plug-in event detected, IOG tariff reload scheduled for next optimiser run")
+
                 elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
                     self.tariff_reloaded == 1
                 ):
                     self.log("EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded")
                     self.car_plugin_detected = 0
+
                 elif (plug_status == "Charging") and (self.tariff_reloaded == 0):
                     self.log(
                         "EV plug-in event detected and car has commenced charging. IOG tariff reload scheduled for next optimiser run"
                     )
                     self.car_plugin_detected = 1
+
                 elif (plug_status == "Charging") and (self.tariff_reloaded == 1):
                     self.log("EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded")
                     self.car_plugin_detected = 0
+
                 else:
                     self.log("EV not plugged in. IOG tariff reload not necessary")
                     self.car_plugin_detected = 0
@@ -942,7 +959,7 @@ class PVOpt(hass.Hass):
 
         # Reload charge target, ready by time and max price on each run
         self.ev_charge_target = self.get_config("ev_charge_target_percent")
-        self.ev_ready_by_time = self.get_config("car_charging_ready_by1")
+        self.ev_ready_by_time = self.get_config("car_charging_ready_by")
         self.ev_max_slot_price = self.get_config("max_ev_price_p")
 
         if self.debug and "E" in self.debug_cat:
@@ -1185,7 +1202,7 @@ class PVOpt(hass.Hass):
         self.ev_charger_efficiency = self.get_config("ev_charger_efficiency_percent")
         self.ev_max_slot_price = self.get_config("max_ev_price_p")
         self.ev_charge_target = self.get_config("ev_charge_target_percent")
-        self.ev_ready_by_time = self.get_config("car_charging_ready_by1")
+        self.ev_ready_by_time = self.get_config("car_charging_ready_by")
             
     # def _setup_agile_schedule(self):
     #     start = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(1, "minutes")).to_pydatetime()
@@ -1355,6 +1372,7 @@ class PVOpt(hass.Hass):
                         #Set import import price to 0 for slots (isnt used/displayed if using IOG, but is in Agile)
                         
                         car_slots['import'] = 0  
+
                         if self.debug and "E" in self.debug_cat:
                             self.log("")
                             self.log("Car_slots = ")
@@ -1528,6 +1546,7 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {direction.title()}: {tariff.name:40s} Start: {tariff.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
                 )
+
                 if "AGILE" in tariff.name:
                     self.agile = True
                 if "INTELLI" in tariff.name:
@@ -2160,20 +2179,20 @@ class PVOpt(hass.Hass):
             # self.log("Printing time.....")
             # self.log(pd.Timestamp.now(tz=self.tz).hour)
             if (pd.Timestamp.now(tz=self.tz).hour == 16) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
-                self.log("   About to reload Octopus Intelligent Tariff - 16:40")
+                self.log("   About to reload Octopus Intelligent Pricing - 16:40")
                 self._load_contract()
                 
             if (pd.Timestamp.now(tz=self.tz).hour == 0) and (pd.Timestamp.now(tz=self.tz).minute <= 20):
-                self.log("   About to reload Octopus Intelligent Tariff - 00:20")
+                self.log("   About to reload Octopus Intelligent Pricing - 00:20")
                 self._load_contract()
                 
-            if (pd.Timestamp.now(tz=self.tz).hour == 4) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
-                self.log("   About to reload Octopus Intelligent Tariff - 04:40")
+            if (pd.Timestamp.now(tz=self.tz).hour == 5) and (pd.Timestamp.now(tz=self.tz).minute >= 10):
+                self.log("   About to reload Octopus Intelligent Pricing - 05:10")
                 self._load_contract()
                 
             if self.car_plugin_detected == 1:
                 self.log(
-                    "Car plugin detected or charge to add value changed. About to reload Octopus Intelligent Tariff"
+                    "Car plugin detected or charge to add value changed. About to reload Octopus Intelligent Pricing"
                 )
                 self._load_contract()
                 self.tariff_reloaded = 1
@@ -2225,7 +2244,7 @@ class PVOpt(hass.Hass):
 
         self.soc_now = self.get_config("id_battery_soc")
         x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
-        if self.debug and "I" in self.debug_cat:
+        if self.debug and "S" in self.debug_cat:
             self.log(f">>> soc_now: {self.soc_now}")
             self.log(f">>> x: {x}")
             self.log(f">>> Original: {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
@@ -2243,7 +2262,7 @@ class PVOpt(hass.Hass):
         x = pd.to_numeric(x, errors="coerce").interpolate()
 
         x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
-        if self.debug and "I" in self.debug_cat:
+        if self.debug and "S" in self.debug_cat:
             self.log(f">>> Fixed   : {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
 
         x = pd.concat(
@@ -2255,6 +2274,7 @@ class PVOpt(hass.Hass):
                 ),
             ]
         ).sort_index()
+
         self.initial_soc = x.interpolate().loc[self.static.index[0]]
         if not isinstance(self.initial_soc, float):
             self.log("")
@@ -2354,25 +2374,32 @@ class PVOpt(hass.Hass):
         self.opt = self.flows[self.selected_case]
 
         # SVB debug logging
-        # self.log("")
-        # self.log("Returned from .flows. self.opt is........")
-        # self.log(self.opt.to_string())
+        self.log("")
+        self.log("Returned from .flows. self.opt is........")
+        self.log(f"\n{self.opt.to_string()}")
 
         # create a df with an index value the same as self.opt (just copy it from self.opt)
         # Copy two columns to force y to be a dataframe
 
         y = self.opt[["import", "forced"]]
         y["start"] = y.index.tz_convert(self.tz)
+        y["end"] = y.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
 
         # Create a Pd series to store any 1/2 hour car charge slots  (1 = car charge slot, 0 = not a car charge slot)
         # Note: self.opt will now include attribute "carslot" regardless of actual tariff, but be set 
         # to 0 unless on 1) IOG and dispatches are planned or 2) Car charging on agile is required
         car_on = pd.Series(index=y.index, data=0, name="carslot")
 
-        # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load.
-        # If on Agile tariff, (re)calculate them now. 
+        # If on IOG tariff, "self.car_slots" will have already been calculated via a Contract load on car plugin
+        # However, with recent changes (Nov 2024) to the IOG algorithms they are now changing the slots regularly, so load them every optimiser run.
 
-
+        if self.intelligent:
+            car_slots = self._get_io_car_slots()  # Load the car charging slots
+            car_slots['import'] = 0
+            self.car_slots = car_slots
+            self.car_slots_last_loaded = pd.Timestamp.now(tz="UTC")
+        
+        # If on Agile tariff, (re)calculate car slots now. 
 
         if self.agile and self.ev and self.car_charging:
             self.log("")
@@ -2390,13 +2417,27 @@ class PVOpt(hass.Hass):
             self.log(y.to_string())
 
         # For each time range in the IOG Charging Schedule/Agile Car Charge Plan, set 1/2 hour Car slot flag to "1"
+        # Problem: If the car is plugged in and starts to charge, car slot flag is not being set. 
+        # i.e y(start) = 22:00, car_slots(start) = 22:07 should set a car_on flag but it isnt. 
+        # need to not only use y["start"] but also y["end"] to search. 
         if not self.car_slots.empty and self.ev:
             for h in range(len(self.car_slots)):
                 for i in range(len(y)):
                     if (y["start"].iloc[i] >= self.car_slots["start_dt"].iloc[h]) and (
                         y["start"].iloc[i] < self.car_slots["end_dt"].iloc[h]
                     ):
+                    # Repeat for end times in case car just plugged in and already charging
+                    # also needed for IOG slots that are less than 1/2 hour long. 
                         car_on.iat[i] = 1
+                    if (y["end"].iloc[i] > self.car_slots["start_dt"].iloc[h]) and (
+                        y["end"].iloc[i] <= self.car_slots["end_dt"].iloc[h]
+                    ):
+                        car_on.iat[i] = 1
+
+        ### Read "prevent_discharge" switch to set a car slot in the current slot
+
+        if self.get_config("prevent_discharge"):
+            car_on.iat[0] = 1
 
         self.opt = pd.concat([self.opt, car_on], axis=1)  # Add car charge slot flags to self.opt
 
@@ -2420,7 +2461,7 @@ class PVOpt(hass.Hass):
             self.car_slots = pd.DataFrame()
 
             
-        if self.intelligent:
+        if self.intelligent and self.ev:
             self.log("")
             self.ulog("Checking EV Status (IOG tariff)")
             self._check_car_plugin_iog()
@@ -2736,9 +2777,9 @@ class PVOpt(hass.Hass):
                         did_something = True
 
                     elif status["discharge"]["start"] != status["discharge"]["end"]:
-                        str_log += " but charge start and end times are different."
+                        str_log += " but discharge start and end times are different."
                         self.log(str_log)
-                        self.inverter.control_charge(enable=False)
+                        self.inverter.control_discharge(enable=False)
                         did_something = True
 
                     if len(self.windows) > 0:
@@ -2858,7 +2899,7 @@ class PVOpt(hass.Hass):
 
         # Now changed this so its based on the value of forced_power_group_tolerance (currently set to 100W), say half of it (50W).
 
-        tolerance = self.get_config("forced_power_group_tolerance1")
+        tolerance = self.get_config("forced_power_group_tolerance")
 
         # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous car slot detected (when charge power = 0).
 
@@ -2985,7 +3026,7 @@ class PVOpt(hass.Hass):
 
             self.windows["hold_soc"] = ""
 
-            tolerance = self.get_config("forced_power_group_tolerance1")
+            tolerance = self.get_config("forced_power_group_tolerance")
             if tolerance > 0:
                 self.windows["forced"] = ((self.windows["forced"] / tolerance).round(0) * tolerance).astype(int)
 
