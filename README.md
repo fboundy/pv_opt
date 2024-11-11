@@ -1,6 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.17.0 Beta 11
-
-<h2>This documentation needs updating!</h2>
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.18.0 Beta-15
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -70,7 +68,7 @@ This app is not stand-alone it requires the following:
 
 
 
-This excellent integration will pull Octopus Price data in to Home Assistant. Solar Opt pulls data from Octopus independently of this integration but will extract current tariff codes from it if they are avaiable. If not it will either use account details supplied in `secrets.yaml` or explicitly defined Octopus tariff codes set in `config.yaml`. If on Intelligent Octopus Go, this integration is required for Pv opt to utilise any slots allocated outside of 23:30 to 05:30 in its charging plan. 
+This excellent integration will pull Octopus Price data in to Home Assistant. Pv Opt pulls data from Octopus independently of this integration but will extract current tariff codes from it if they are avaiable. If not it will either use account details supplied in `secrets.yaml` or explicitly defined Octopus tariff codes set in `config.yaml`. If on Intelligent Octopus Go, this integration is required, as Pv_opt will use this to identify any slots allocated outside of 23:30 to 05:30 for use in its charge plan and managing the house battery during car charging slots. 
 
 
 <h3>5. Install the Integration to Control Your Inverter</h3>
