@@ -429,18 +429,14 @@ class InverterController:
             if times[limit] is not None:
                 if self.type == "SOLIS_SOLARMAN_V2":
 
-                    #value_pd = times[limit]
-                    #value = value_pd.to_pydatetime().time
-                    #value = value_pd.strftime('%X')
-                    
-                    self.log("")
-                    self.log(f">>> Solarman V2 times, Limit = {limit}, Value {times[limit]}")
+                    #self.log("")
+                    #self.log(f">>> Solarman V2 times, Limit = {limit}, Value {times[limit]}")
 
                     unit = "hours and minutes"    # Done so logging is correct
                     entity_id = self.host.config[f"id_timed_{direction}_{limit}"] 
 
-                    self.log("")
-                    self.log(f">>> Solarman V2 time writes: about to write {times[limit]} to entity {entity_id} using write_and_poll_time")
+                    #self.log("")
+                    #self.log(f">>> Solarman V2 time writes: about to write {times[limit]} to entity {entity_id} using write_and_poll_time")
                     
                     z = times[limit].tz_localize(None)
                     value = z
@@ -651,24 +647,15 @@ class InverterController:
                     time_stamp = (self.host.get_state_retry(entity_id=entity_id))
                     status[direction][limit] = pd.Timestamp(time_stamp, tz=self.host.tz)
 
-                    #Code for hours and minutes entities that are seperate
-                    #for unit in ["hours", "minutes"]:
-                    #    entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
-                    #    states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
-                    #
-                    #status[direction][limit] = pd.Timestamp(
-                    #    f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
-                    #)
-                    
                     ### SVB debug logging
-                    self.log("Direction is....")
-                    self.log(direction)
+                    #self.log("Direction is....")
+                    #self.log(direction)
 
-                    self.log("Limit is ....")
-                    self.log(limit)
+                    #self.log("Limit is ....")
+                    #self.log(limit)
 
-                    self.log("Status of status is....")
-                    self.log(status[direction][limit])
+                    #self.log("Status of status is....")
+                    #self.log(status[direction][limit])
                     ### end of SVB debug logging
 
 
@@ -735,7 +722,7 @@ class InverterController:
             if changed:
                 data = {"register": address, "value": value}
                 # self.host.call_service("solarman/write_holding_register", **data)
-                self.log(">>> Writing {value} to inverter register {address} using Solarman")
+                # self.log(">>> Writing {value} to inverter register {address} using Solarman")
                 written = True
 
         return changed, written

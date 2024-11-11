@@ -2953,14 +2953,14 @@ class PVOpt(hass.Hass):
         old_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
         new_time = None
 
-        self.log(f"Write_and_poll_time: time = {value}, old_time = {old_time}")
+        #self.log(f"Write_and_poll_time: time = {value}, old_time = {old_time}")
         
         #Convert time to string of HH:MM:SS for call_service routine
         value_str = value.strftime('%X')
 
         if old_time != value:
             changed = True
-            self.log(f"Write_and_poll_time: Changed = true")
+            #self.log(f"Write_and_poll_time: Changed = true")
 
             try:
                 #self.call_service("number/set_value", entity_id=entity_id, value=value)
@@ -2969,19 +2969,19 @@ class PVOpt(hass.Hass):
                 written = False
                 retries = 0
                 while not written and retries < WRITE_POLL_RETRIES:
-                    self.log("Write_and_poll_time: Entered while loop")
+                    #self.log("Write_and_poll_time: Entered while loop")
                     retries += 1
                     time.sleep(WRITE_POLL_TIME_SLEEP)
 
                     new_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
                     
-                    self.log(f"Write_and_poll_time:  while loop, new_time = {new_time}")
+                    #self.log(f"Write_and_poll_time:  while loop, new_time = {new_time}")
 
                     written = new_time == value
 
             except:
                 written = False
-                self.log("Write_and_poll_time: Exception logged")
+                #self.log("Write_and_poll_time: Exception logged")
 
             str_log = f"Entity: {entity_id} Time: {value}  Value_str: {value_str}  Old Time: {old_time} New time: {(new_time)} "
             self.log(str_log)
