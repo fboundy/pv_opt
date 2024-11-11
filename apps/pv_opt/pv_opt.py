@@ -439,7 +439,7 @@ DEFAULT_CONFIG = {
             "mode": "slider",
         },
     },
-    "car_charging_ready_by1": {
+    "car_charging_ready_by": {
         "default": "07:00",
         "domain": "select",
         "attributes": {"options": OPTIONS_TIME},
@@ -502,7 +502,7 @@ DEFAULT_CONFIG = {
         "domain": "select",
         "attributes": {"options": ["mean", "median", "max"]},
     },
-    "forced_power_group_tolerance1": {
+    "forced_power_group_tolerance": {
         "default": 100,
         "domain": "number",
         "attributes": {
@@ -954,7 +954,7 @@ class PVOpt(hass.Hass):
 
         # Reload charge target, ready by time and max price on each run
         self.ev_charge_target = self.get_config("ev_charge_target_percent")
-        self.ev_ready_by_time = self.get_config("car_charging_ready_by1")
+        self.ev_ready_by_time = self.get_config("car_charging_ready_by")
         self.ev_max_slot_price = self.get_config("max_ev_price_p")
 
         if self.debug and "E" in self.debug_cat:
@@ -1197,7 +1197,7 @@ class PVOpt(hass.Hass):
         self.ev_charger_efficiency = self.get_config("ev_charger_efficiency_percent")
         self.ev_max_slot_price = self.get_config("max_ev_price_p")
         self.ev_charge_target = self.get_config("ev_charge_target_percent")
-        self.ev_ready_by_time = self.get_config("car_charging_ready_by1")
+        self.ev_ready_by_time = self.get_config("car_charging_ready_by")
             
     # def _setup_agile_schedule(self):
     #     start = (pd.Timestamp.now(tz="UTC") + pd.Timedelta(1, "minutes")).to_pydatetime()
@@ -2893,7 +2893,7 @@ class PVOpt(hass.Hass):
 
         # Now changed this so its based on the value of forced_power_group_tolerance (currently set to 100W), say half of it (50W).
 
-        tolerance = self.get_config("forced_power_group_tolerance1")
+        tolerance = self.get_config("forced_power_group_tolerance")
 
         # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous car slot detected (when charge power = 0).
 
@@ -3020,7 +3020,7 @@ class PVOpt(hass.Hass):
 
             self.windows["hold_soc"] = ""
 
-            tolerance = self.get_config("forced_power_group_tolerance1")
+            tolerance = self.get_config("forced_power_group_tolerance")
             if tolerance > 0:
                 self.windows["forced"] = ((self.windows["forced"] / tolerance).round(0) * tolerance).astype(int)
 
