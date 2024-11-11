@@ -190,13 +190,6 @@ class Tariff:
 
         use_day_ahead = kwargs.get("day_ahead", ((start > time_now) or (end > time_now)))
 
-        # self.get_octopus(area=self.area, period_from=start, period_to=end)
-        # self.log(f">>> Name: {self.name}")
-        # self.log(f">>> Export: {self.export}")
-        # self.log(f">>> Manual: {self.manual}")
-        # self.log(f">>> Start: {start}")
-        # self.log(f">>> End: {end}")
-
         if self.eco7:
             df = pd.concat(
                 [pd.DataFrame(x).set_index("valid_from")["value_inc_vat"] for x in [self.day, self.night]],
