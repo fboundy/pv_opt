@@ -443,6 +443,7 @@ class InverterController:
                     self.log(f">>> Solarman V2 time writes: about to write {times[limit]} to entity {entity_id} using write_and_poll_time")
                     
                     z = times[limit].tz_localize(None)
+                    value = z
 
                     changed, written = self.host.write_and_poll_time(
                         entity_id=entity_id, value=z
