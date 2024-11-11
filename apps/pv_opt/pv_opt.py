@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 import re
 
 
-VERSION = "3.17.0-Beta-14"
+VERSION = "3.18.0-Beta-15"
 
 # Change history
 # -------
@@ -64,6 +64,11 @@ VERSION = "3.17.0-Beta-14"
 # Tidied up logging and added additonal logging category "B". 
 # 3.17.0 Beta-14
 # Fixes to pickup IOG slots that have already started or are <1/2 hour long
+
+# 3.18.0 Beta-15
+# Roll minor version to 18 to reflect latest production release
+# Change search string on Intelligent Charge Limit/Target to suit new Octopus Energy Integration
+# Minor bugfixes and logging fixes
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
