@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.17.1"
+VERSION = "3.17.2"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -594,11 +594,13 @@ class PVOpt(hass.Hass):
     def _check_for_io(self):
         self.ulog("Checking for Intelligent Octopus")
         entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
-        self.rlog(f">>> {entity_id}")
         io_dispatches = self.get_state(entity_id)
-        self.log(f">>> IO entity state:  {io_dispatches}")
+        if self.debug:
+            self.rlog(f">>> {entity_id}")
+            self.log(f">>> IO entity state:  {io_dispatches}")
         self.io = io_dispatches is not None
         if self.io:
+
             self.rlog(f"IO entity {entity_id} found")
             self.log("")
             self.io_entity = entity_id
@@ -873,9 +875,9 @@ class PVOpt(hass.Hass):
                         exp=tariffs["export"],
                         host=self,
                     )
-                    self.log("Contract =")
-                    self.log(self.contract)
-                    self.log("")
+                    # self.log("Contract =")
+                    # self.log(self.contract)
+                    # self.log("")
                     self.rlog("Contract tariffs loaded OK")
 
                 except Exception as e:
@@ -2504,7 +2506,7 @@ class PVOpt(hass.Hass):
 
             self.log(f"  - {days} days was expected. {str_days}")
 
-            if (len(self.zappi_entities) > 0) and (self.get_config("ev_charger") == "Zappi"):
+            if (len(self.zappi_entities) > 0) and (self.get_config("ev_charger", "None") == "Zappi"):
                 ev_power = self._get_zappi(start=df.index[0], end=df.index[-1], log=True)
                 if len(ev_power) > 0:
                     self.log("")
