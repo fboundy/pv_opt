@@ -834,125 +834,159 @@ class PVOpt(hass.Hass):
 
     def _check_car_plugin_iog(self):
 
-        # If Zappi entities previously found and EV charger is Zappi, schedule an IOG tariff reload on the next optimizer run when its
+        # If a Zappi entity previously found/configured and EV charger is Zappi, schedule an IOG tariff reload on the next optimizer run when its
         # detected the car has been plugged in.
+              
+        if (len(self.zappi_plug_entity) > 0) and self.ev:
+            plug_status = self.get_state(self.zappi_plug_entity)
+            # self.log(plug_status)
+            if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
+                self.tariff_reloaded == 0
+            ):
+                self.car_plugin_detected = 1
+                self.log("EV plug-in event detected, IOG tariff reload scheduled for next optimiser run")
 
-        ### For multiple Zappis this will trigger an IOG reload on any plugin. For IOG, we need to allocate
-        # which charger has been assigned, then do the reload on that. I tihnk plug_status should be assigned in config.yaml to do this, i.e.
-        # remove the "for entity_id in self.zappi_plug_entities:" and just run it once. 
+            elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
+                self.tariff_reloaded == 1
+            ):
+                self.log("EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded")
+                self.car_plugin_detected = 0
 
-        if (len(self.zappi_plug_entities) > 0) and self.ev:
-            for entity_id in self.zappi_plug_entities:
-                plug_status = self.get_state(entity_id)
-                # self.log(plug_status)
-                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
-                    self.tariff_reloaded == 0
-                ):
+            elif (plug_status == "Charging") and (self.tariff_reloaded == 0):
+                self.log(
+                    "EV plug-in event detected and car has commenced charging. IOG tariff reload scheduled for next optimiser run"
+                )
+                self.car_plugin_detected = 1
+
+            elif (plug_status == "Charging") and (self.tariff_reloaded == 1):
+                self.log("EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded")
+                self.car_plugin_detected = 0
+
+            else:
+                self.log("EV not plugged in. IOG tariff reload not necessary")
+                self.car_plugin_detected = 0
+
+            # If EV plugged in, check charge to add hasnt changed
+            if self.get_config("octopus_auto"):
+                self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)
+                if (self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected"):
                     self.car_plugin_detected = 1
-                    self.log("EV plug-in event detected, IOG tariff reload scheduled for next optimiser run")
-
-                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
-                    self.tariff_reloaded == 1
-                ):
-                    self.log("EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded")
-                    self.car_plugin_detected = 0
-
-                elif (plug_status == "Charging") and (self.tariff_reloaded == 0):
-                    self.log(
-                        "EV plug-in event detected and car has commenced charging. IOG tariff reload scheduled for next optimiser run"
-                    )
-                    self.car_plugin_detected = 1
-
-                elif (plug_status == "Charging") and (self.tariff_reloaded == 1):
-                    self.log("EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded")
-                    self.car_plugin_detected = 0
-
-                else:
-                    self.log("EV not plugged in. IOG tariff reload not necessary")
-                    self.car_plugin_detected = 0
-
-                # If EV plugged in, check charge to add hasnt changed
-                if self.get_config("octopus_auto"):
-                    self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)
-                    if (self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected"):
-                        self.car_plugin_detected = 1
-                        self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
-                else:
-                    self.log("Octopus Energy Integration not detected (or disabled): Charge to add is not available, IOG tariff not reloaded")
+                    self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
+            else:
+                self.log("Octopus Energy Integration not detected (or disabled): Charge to add is not available, IOG tariff not reloaded")
 
     def _check_car_plugin_agile(self):
 
-        # If Zappi entities previously found and EV charger is Zappi, trigger a car charging plan to be generated on car plugin
+        # If Zappi entity previously found/selected and EV charger is Zappi, trigger a car charging plan to be generated on car plugin
+        # If more than one charger, currently limited to 1. 
+        # However, there is no reason why the whole of this logic cannot be replicated for multiple chargers.
 
-        if (len(self.zappi_plug_entities) > 0) and self.ev: 
-            for entity_id in self.zappi_plug_entities:
-                plug_status = self.get_state(entity_id)
-                # self.log(plug_status)
-                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected_delayed == 0):
-                    self.car_plugin_detected = 1
-                    self.log("EV plug-in event detected, transfer Candidate Agile Car Charging Plan to Active Plan")
+        if (len(self.zappi_plug_entity) > 0) and self.ev: 
+            plug_status = self.get_state(self.zappi_plug_entity)
+            # self.log(plug_status)
+            if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected_delayed == 0):
+                self.car_plugin_detected = 1
+                self.log("EV plug-in event detected, transfer Candidate Agile Car Charging Plan to Active Plan")
 
-                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected_delayed == 1) and (self.agile_car_plan_activated == 1):
-                    self.log("EV is connected but Candidate Car charging plan previously transfered.")
-                    self.car_plugin_detected = 0
+            elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.car_plugin_detected_delayed == 1) and (self.agile_car_plan_activated == 1):
+                self.log("EV is connected but Candidate Car charging plan previously transfered.")
+                self.car_plugin_detected = 0
 
-                elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.agile_car_plan_activated == 0):
-                    self.car_plugin_detected = 1
-                    self.log("EV is connected but no Car charging plan exists, transfer Candidate Agile Car Charging Plan to Active Plan")
+            elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (self.agile_car_plan_activated == 0):
+                self.car_plugin_detected = 1
+                self.log("EV is connected but no Car charging plan exists, transfer Candidate Agile Car Charging Plan to Active Plan")
 
-                elif (plug_status == "Charging") and (self.agile_car_plan_activated == 0):  # needed for Pv_opt restart during car charging, where active plan will then be empty
-                    self.log("Car has commenced charging but no plan exists. Transfer Candidate Plan to Active Plan")
-                    self.car_plugin_detected = 1
+            elif (plug_status == "Charging") and (self.agile_car_plan_activated == 0):  # needed for Pv_opt restart during car charging, where active plan will then be empty
+                self.log("Car has commenced charging but no plan exists. Transfer Candidate Plan to Active Plan")
+                self.car_plugin_detected = 1
 
-                elif (plug_status == "Charging") and (self.agile_car_plan_activated == 1):
-                    self.log("EV is charging, Car charging plan already transferred")
-                    self.car_plugin_detected = 0
+            elif (plug_status == "Charging") and (self.agile_car_plan_activated == 1):
+                self.log("EV is charging, Car charging plan already transferred")
+                self.car_plugin_detected = 0
 
-                else:
-                    self.log("EV not plugged in. Car charging plan not required.")
-                    self.car_plugin_detected = 0
+            else:
+                self.log("EV not plugged in. Car charging plan not required.")
+                self.car_plugin_detected = 0
                 
-                if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")):
-                    self.car_plugged_in = True
-                else:
-                    self.car_plugged_in = False
+            if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")):
+                self.car_plugged_in = True
+            else:
+                self.car_plugged_in = False
 
     def _check_for_zappi(self):
         # Check for Zappi sensors for power consumption and car connected/charging status.
         # Note: this requires the myEnergi integration https://github.com/cjne/ha-myenergi
-        self.ulog("Checking for Zappi Sensors")
-        sensor_entities = self.get_state("sensor")
-        self.zappi_entities = [k for k in sensor_entities if "myenergi" in k for x in ["charge_added_session"] if x in k]
-        self.zappi_plug_entities = [k for k in sensor_entities if "myenergi" in k for x in ["plug_status"] if x in k]
 
-        if len(self.zappi_entities) > 0:
-            for entity_id in self.zappi_entities:
+        # For charge added entities
+        # 1) Store all the entity names (as currently done)
+        # 2) Check for any manual overrides via "_id" setting in config.yaml and if they exist, use those instead
+     
+
+        # For plug entities
+        # 1) If zappi_plug_entities is greater than one then choose the first one (deals with all the single Zappis automatically)
+        # 2) Check to see if there is an "_id" setting in config.yaml, if so then overwrite it with that (allows users with multiple Zappis to select which one is tied to IOG)
+
+
+
+
+        # if self.get_config("zappi_auto") and self.ev:
+                #1) do autodetects
+
+        #  if len(self.zappi_consumption entities) = 0 or not self.get_config("zappi_auto"):
+                 #do manual overides
+        
+        # do we really need to ever override the consumption sensor autodetect? Yes, as the entity names might not have "zappi" in them.
+
+
+        self.log("Attempting to autodetect Zappi consumption sensor")
+        sensor_entities = self.get_state("sensor")
+
+        self.zappi_consumption_entities = [k for k in sensor_entities if "zappi" in k for x in ["charge_added_session"] if x in k]
+        if len(self.zappi_consumption_entities) > 0:
+            for entity_id in self.zappi_consumption_entities:
                 zappi_sn = entity_id.split("_")[2]
                 self.redact_regex.append(zappi_sn)
+                self.log("Zappi consumption sensor(s) found")
                 self.rlog(f"  {entity_id}")
         else:
-            self.log("No Zappi Consumption sensors found")
+            self.log("No Zappi Consumption sensors autodetected")
 
+        # Insert code here to lookup "_id" values from config.yaml if it exists and use those entries instead.
+        # This needs to clear "self.zappi_consumption_entities" and replace with however many id_ values are present in config.yaml.  
+
+        self.log("Attempting to Autodetect Zappi Plugin status sensor")
+        self.zappi_plug_entities = [k for k in sensor_entities if "zappi" in k for x in ["plug_status"] if x in k]
         if len(self.zappi_plug_entities) > 0:
             for entity_id in self.zappi_plug_entities:
                 zappi_sn = entity_id.split("_")[2]
                 self.redact_regex.append(zappi_sn)
                 self.rlog(f"  {entity_id}")
+            self.zappi_plug_entity = self.zappi_plug_entity[0] # If multiple, select the first by default. 
+            if len(self.zappi_plug_entities) > 1:
+                self.log(f"Multiple Zappis found, setting {self.zappi_plug_entity} to trigger car charge planning updates. Update config.yaml to map a different sensor" )
         else:
-            self.log("No Zappi Plug Status sensors found")
+            self.log("No Zappi Plug Status sensors autodetected")
+
+        # Insert code here to lookup "_id" value from config.yaml if it exists and use that value instead. 
+        # This needs to read a specific id_ value and replace it with what has been autodetected. 
+        
 
         self.log("")
 
     def _get_zappi(self, start, end, log=False):
         df = pd.DataFrame()
-        for entity_id in self.zappi_entities:
+
+        ### We need to return consumption data from all sensors. At the moment this routine will only return data from the last for loop.
+        # What we need to do here is to sum the consumption values together from all Zappis. 
+
+
+        for entity_id in self.zappi_consumption_entities:
             df = self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end, log=log)
             if log and (self.debug and "E" in self.debug_cat):
                 self.rlog(f">>> Zappi entity {entity_id}")
                 self.log(f">>>\n{df.to_string()}")
 
-        ### We need to return consumption data from all sensors. At the moment this routine will only return data from the last for loop.
-        # Just add extra columns to df? 
+
         return df
     
     def calculate_agile_car_slots(self):
@@ -3628,12 +3662,9 @@ class PVOpt(hass.Hass):
 
             self.log(f"  - {days} days was expected. {str_days}")
 
-            ### Need to modify the below to read the consumption from more than one Zappi. 
-            # This may be best done by passing the entity_id to _get_zappi so it only returns one df. 
-            # ie, use the line "for entity_id in self.zappi_entities:"
 
-            if (len(self.zappi_entities) > 0) and self.ev:
-                self.log("Getting consumption in kWh from Zappi Charger")
+            if (len(self.zappi_consumption_entities) > 0) and self.ev:
+                self.log("Getting consumption in kWh from Zappi Charger(s)")
                 ev_power = self._get_zappi(start=df.index[0], end=df.index[-1], log=True)
                 if len(ev_power) > 0:
                     self.log("")
@@ -3643,11 +3674,10 @@ class PVOpt(hass.Hass):
                     self.log(
                         f"    Total consumption from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)} is {(df.sum()/2000):0.1f} kWh"
                     )
-                    # self.log(f"   EV consumption is    : {(ev_power.sum()/2000):0.1f} kWh")
-                    # self.log(f"   Total consumption is : {(df.sum()/2000):0.1f} kWh")
+
                 else:
                     self.log("")
-                    self.log("  No power returned from Zappi")
+                    self.log("  No power returned from Zappi(s)")
 
             if (start < time_now) and (end < time_now):
                 consumption["consumption"] = df.loc[start:end]

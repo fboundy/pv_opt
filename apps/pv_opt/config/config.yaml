@@ -175,13 +175,22 @@ pv_opt:
   #
   ev_charger: Zappi   # Default = None
   #
+  # zappi_auto: True  # Autodetect Zappi entities. For multiple Zappis (or entity names changed from the MyEnergi Integration defaults), set to False and set the ids below. 
+  #
+  # The following can be omitted if Zappi auto detect is working correctly. However if set, they will overide what is autodetected. 
+  #
+  # id_zappi_status: sensor.myenergi_zappi_12027800_plug_status     # Entity for charger that triggers IOG car charge plan generation
+  # id_zappi_1_consumption: sensor.myenergi_zappi_<zappi_sn>_charge_added_session  # Consumption sensor for Zappi#1
+  # id_zappi_2_consumption: sensor.myenergi_zappi_<zappi_sn>_charge_added_session  # Consumption sensor for Zappi#2 (leave commented out if no 2nd Zappi)
+  #
+  #
   # By default, Zappi is set to seen as part of the house load to prevent house battery discharge during car charging and allow discounting of EV consumption
   # from house charging calculations. 
   #
   # If your Zappi is not seen as part of the house load, uncomment next line to set to False. 
   #
   # ev_part_of_house_load = False     # Default = True
-  
+  #
   # ===============================================================================================================
   # Brand / Integration Specific Config: SOLIS_SOLAX_MODBUS: https://github.com/wills106/homeassistant-solax-modbus
   # ===============================================================================================================
