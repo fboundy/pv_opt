@@ -204,6 +204,22 @@ INVERTER_DEFS = {
             "id_backup_mode_soc": "sensor.{device_name}_backup_mode_soc",
         },
     },
+    "SOLIS_CLOUD": {
+        "online": "sensor.{device_name}_temperature",
+        "default_config": {
+            "maximum_dod_percent": "sensor.{device_name}_force_discharge_soc",
+            "id_consumption_today": "sensor.{device_name}_daily_grid_energy_used",
+            "id_grid_import_today": "sensor.{device_name}_daily_grid_energy_purchased",
+            "id_grid_export_today": "sensor.{device_name}_daily_on_grid_energy",
+            "id_battery_soc": "sensor.{device_name}_remaining_battery_capacity",
+            "supports_hold_soc": False,
+            "supports_forced_discharge": True,
+            "update_cycle_seconds": 300,
+        },
+        "brand_config": {
+            "battery_voltage": "sensor.{device_name}_battery_voltage",
+        },
+    },
 }
 
 
@@ -239,6 +255,8 @@ class InverterController:
     def enable_timed_mode(self):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True, Backup=False)
+        elif self.type == "SOLIS_CLOUD":
+            pass
         else:
             self._unknown_inverter()
 
@@ -263,6 +281,8 @@ class InverterController:
                 end=end,
                 power=0,
             )
+        elif self.type == "SOLIS_CLOUD":
+            pass
         else:
             self._unknown_inverter()
 
@@ -297,7 +317,8 @@ class InverterController:
                     value=soc,
                     entity_id=entity_id,
                 )
-
+        elif self.type == "SOLIS_CLOUD":
+            pass
         else:
             self._unknown_inverter()
 
@@ -306,7 +327,8 @@ class InverterController:
         status = None
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             status = self._solis_state()
-
+        elif self.type == "SOLIS_CLOUD":
+            status = self._solis_state()
         return status
 
     def _monitor_target_soc(self, target_soc, mode="charge"):
@@ -315,6 +337,8 @@ class InverterController:
     def _control_charge_discharge(self, direction, enable, **kwargs):
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             self._solis_control_charge_discharge(direction, enable, **kwargs)
+        elif self.type == "SOLIS_CLOUD":
+            pass
 
     def _solis_control_charge_discharge(self, direction, enable, **kwargs):
         status = self._solis_state()
@@ -433,44 +457,54 @@ class InverterController:
                 self.log("Inverter already at correct current")
 
     def _solis_set_mode_switch(self, **kwargs):
-        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN":
-            status = self._solis_solax_solarman_mode_switch()
+        # Read the mode switch
+        if self.type in ["SOLIS_SOLAX_MODBUS", "SOLIS_SOLARMAN", "SOLIS_CORE_MODBUS"]:
+            if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN":
+                status = self._solis_solax_solarman_mode_switch()
 
-        elif self.type == "SOLIS_CORE_MODBUS":
-            status = self._solis_core_mode_switch()
+            elif self.type == "SOLIS_CORE_MODBUS":
+                status = self._solis_core_mode_switch()
 
-        switches = status["switches"]
-        if self.host.debug:
-            self.log(f">>> kwargs: {kwargs}")
-            self.log(">>> Solis switch status:")
-
-        for switch in switches:
-            if switch in kwargs:
-                if self.host.debug:
-                    self.log(f">>> {switch}: {kwargs[switch]}")
-                switches[switch] = kwargs[switch]
-
-        bits = INVERTER_DEFS[self.type]["bits"]
-        bin_list = [2**i * switches[bit] for i, bit in enumerate(bits)]
-        code = sum(bin_list)
-        entity_id = self.host.config["id_inverter_mode"]
-
-        if self.type == "SOLIS_SOLAX_MODBUS":
-            entity_modes = self.host.get_state_retry(entity_id, attribute="options")
-            modes = {INVERTER_DEFS[self.type]["codes"].get(mode): mode for mode in entity_modes}
-            # mode = INVERTER_DEFS[self.type]["modes"].get(code)
-            mode = modes.get(code)
+            switches = status["switches"]
             if self.host.debug:
-                self.log(f">>> Inverter Code: {code}")
-                self.log(f">>> Entity modes: {entity_modes}")
-                self.log(f">>> Modes: {modes}")
-                self.log(f">>> Inverter Mode: {mode}")
+                self.log(f">>> kwargs: {kwargs}")
+                self.log(">>> Solis switch status:")
 
-            self.host.set_select("inverter_mode", mode)
+            for switch in switches:
+                if switch in kwargs:
+                    if self.host.debug:
+                        self.log(f">>> {switch}: {kwargs[switch]}")
+                    switches[switch] = kwargs[switch]
 
-        elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
-            address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
-            self._solis_write_holding_register(address=address, value=code, entity_id=entity_id)
+        elif self.type == "SOLIS_CLOUD":
+            pass
+
+        # Set the mode switch
+        if self.type in ["SOLIS_SOLAX_MODBUS", "SOLIS_SOLARMAN", "SOLIS_CORE_MODBUS"]:
+            bits = INVERTER_DEFS[self.type]["bits"]
+            bin_list = [2**i * switches[bit] for i, bit in enumerate(bits)]
+            code = sum(bin_list)
+            entity_id = self.host.config["id_inverter_mode"]
+
+            if self.type == "SOLIS_SOLAX_MODBUS":
+                entity_modes = self.host.get_state_retry(entity_id, attribute="options")
+                modes = {INVERTER_DEFS[self.type]["codes"].get(mode): mode for mode in entity_modes}
+                # mode = INVERTER_DEFS[self.type]["modes"].get(code)
+                mode = modes.get(code)
+                if self.host.debug:
+                    self.log(f">>> Inverter Code: {code}")
+                    self.log(f">>> Entity modes: {entity_modes}")
+                    self.log(f">>> Modes: {modes}")
+                    self.log(f">>> Inverter Mode: {mode}")
+
+                self.host.set_select("inverter_mode", mode)
+
+            elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+                address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
+                self._solis_write_holding_register(address=address, value=code, entity_id=entity_id)
+
+        elif self.type == "SOLIS_CLOUD":
+            pass
 
     def _solis_solax_solarman_mode_switch(self):
         inverter_mode = self.host.get_state_retry(entity_id=self.host.config["id_inverter_mode"])
@@ -497,8 +531,10 @@ class InverterController:
         limits = ["start", "end"]
         if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_SOLARMAN":
             status = self._solis_solax_solarman_mode_switch()
-        else:
+        elif self.type == "SOLIS_CORE_MODBUS":
             status = self._solis_core_mode_switch()
+        else:
+            status = {}
 
         for direction in ["charge", "discharge"]:
             status[direction] = {}
