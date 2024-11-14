@@ -897,7 +897,8 @@ class PVsystemModel:
         prices = prices.set_axis([t for t in contract.tariffs.keys() if contract.tariffs[t] is not None], axis=1)
         
         if not use_export:
-            self.log(f"Ignoring export pricing because Use Export is turned off")
+            if log:
+                self.log(f"Ignoring export pricing because Use Export is turned off")
             discharge = False
             prices["export"] = 0
 
