@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.18.0"
+VERSION = "3.18.1"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -1568,7 +1568,9 @@ class PVOpt(hass.Hass):
     def status(self, status):
         entity_id = f"sensor.{self.prefix.lower()}status"
         attributes = {"last_updated": pd.Timestamp.now().strftime(DATE_TIME_FORMAT_LONG)}
-        self.set_state(state=status, entity_id=entity_id, attributes=attributes)
+        self.log(f">>> {status}")
+        self.log(f">>> {entity_id}")
+        self.log(f">>> {self.set_state(state=status, entity_id=entity_id, attributes=attributes)}")
 
     @ad.app_lock
     def optimise_state_change(self, entity_id, attribute, old, new, kwargs):
@@ -2587,7 +2589,7 @@ class PVOpt(hass.Hass):
                         self.log(f">>> dow : {len(consumption_dow)}")
                         self.log(f">>> mean: {len(consumption_mean)}")
                         idx = consumption_dow.index.intersection(consumption_mean.index)
-                        self.log(f"Clipping the consumption to the overlap ({len(idx)/24:0.1f} days)", level="WARN")
+                        self.log(f"Clipping the consumption to the overlap ({len(idx)/24:0.1f} days)", level="WARNING")
                         consumption_mean = consumption_mean.loc[idx]
                         consumption_dow = consumption_dow.loc[idx]
 

@@ -547,7 +547,7 @@ class InverterController:
             "start": kwargs.get("start", None),
             "end": kwargs.get("end", None),
         }
-        power = kwargs.get("power")
+        power = kwargs.get("power", 0)
 
         if times["start"] is not None:
             times["start"] = times["start"].floor("1min")
