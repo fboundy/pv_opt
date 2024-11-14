@@ -464,7 +464,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
-
+        self.io = False
         self.debug = DEBUG
         self.redact_regex = REDACT_REGEX
 

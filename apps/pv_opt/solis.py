@@ -258,6 +258,8 @@ class SolisCloud:
         "atRead": "/v2/api/atRead",
     }
 
+    MAX_RETRIES = 5
+
     def __init__(self, username, password, key_id, key_secret, plant_id, **kwargs):
         self.username = username
         self.key_id = key_id
@@ -331,14 +333,25 @@ class SolisCloud:
         return pd.to_datetime(int(self.inverter_details["dataTimestamp"]), unit="ms")
 
     def read_code(self, cid):
-        if self.token == "":
-            self.login()
-        body = self.get_body(inverterSn=self.inverter_sn, cid=cid)
-        headers = self.header(body, self.URLS["atRead"])
-        headers["token"] = self.token
-        response = requests.post(self.URLS["root"] + self.URLS["atRead"], data=body, headers=headers)
-        if response.status_code == HTTPStatus.OK:
-            return response.json()["data"]["msg"]
+        retries = 0
+        data = "ERROR"
+        while (data == "ERROR") and (retries < self.MAX_RETRIES):
+            if self.token == "":
+                self.login()
+            body = self.get_body(inverterSn=self.inverter_sn, cid=cid)
+            headers = self.header(body, self.URLS["atRead"])
+            headers["token"] = self.token
+            response = requests.post(self.URLS["root"] + self.URLS["atRead"], data=body, headers=headers)
+            if response.status_code == HTTPStatus.OK:
+                data = response.json()["data"]["msg"]
+            else:
+                data = "ERROR"
+
+            if data == "ERROR":
+                self.token = ""
+                retries += 1
+            else:
+                return data
 
     def set_code(self, cid, value):
         if self.token == "":
