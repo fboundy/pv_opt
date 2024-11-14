@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.17.2"
+VERSION = "3.18.0"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -459,6 +459,8 @@ class PVOpt(hass.Hass):
     @ad.app_lock
     def initialize(self):
         self.config = {}
+        self.change_items = {}
+        self.config_state = {}
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
@@ -509,8 +511,6 @@ class PVOpt(hass.Hass):
         if self.debug or self.args.get("list_entities", True):
             self._list_entities()
 
-        self.change_items = {}
-        self.config_state = {}
         self.timer_handle = None
         self.handles = {}
         self.mqtt_handles = {}
