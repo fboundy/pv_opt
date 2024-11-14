@@ -43,6 +43,7 @@ MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
 WRITE_POLL_SLEEP = 0.5
+WRITE_POLL_TIME_SLEEP = 2
 WRITE_POLL_RETRIES = 5
 GET_STATE_RETRIES = 5
 GET_STATE_WAIT = 0.5
@@ -54,10 +55,12 @@ BOTTLECAP_DAVE = {
 }
 
 
+
 INVERTER_TYPES = [
     "SOLIS_SOLAX_MODBUS",
     "SOLIS_CORE_MODBUS",
     "SOLIS_SOLARMAN",
+    "SOLIS_SOLARMAN_V2", 
     "SUNSYNK_SOLARSYNK2",
     "SOLAX_X1",
     "SOLIS_CLOUD",
@@ -1041,6 +1044,7 @@ class PVOpt(hass.Hass):
                 self.log(
                     f"  {direction.title()}: {tariff.name:40s} Start: {tariff.start().strftime(DATE_TIME_FORMAT_LONG)} End: {z} "
                 )
+
                 if "AGILE" in tariff.name:
                     self.agile = True
                 if "INTELLI" in tariff.name:
@@ -2031,9 +2035,9 @@ class PVOpt(hass.Hass):
                         did_something = True
 
                     elif status["discharge"]["start"] != status["discharge"]["end"]:
-                        str_log += " but charge start and end times are different."
+                        str_log += " but discharge start and end times are different."
                         self.log(str_log)
-                        self.inverter.control_charge(enable=False)
+                        self.inverter.control_discharge(enable=False)
                         did_something = True
 
                     if len(self.windows) > 0:
@@ -2422,6 +2426,11 @@ class PVOpt(hass.Hass):
         )
 
         if df is not None:
+
+            if self.debug and "P" in self.debug_cat:
+                self.log(f"kWh data from {entity_id} is")
+                self.log(f"\n{df.to_string()}")
+
             df.index = pd.to_datetime(df.index)
             x = df.diff().clip(0).fillna(0).cumsum() + df.iloc[0]
             x.index = x.index.round("1s")
@@ -2945,6 +2954,53 @@ class PVOpt(hass.Hass):
                 self.log(str_log)
 
         return (changed, written)
+
+    def write_and_poll_time(self, entity_id, value):
+        changed = False
+        written = False
+
+        # Set consistent date for all comparisons
+        value = value.replace(year=2024, month=1, day=1)
+        
+        old_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
+        new_time = None
+
+        #self.log(f"Write_and_poll_time: time = {value}, old_time = {old_time}")
+        
+        #Convert time to string of HH:MM:SS for call_service routine
+        value_str = value.strftime('%X')
+
+        if old_time != value:
+            changed = True
+            #self.log(f"Write_and_poll_time: Changed = true")
+
+            try:
+                #self.call_service("number/set_value", entity_id=entity_id, value=value)
+                self.call_service("time/set_value", entity_id=entity_id, time=value_str)
+
+                written = False
+                retries = 0
+                while not written and retries < WRITE_POLL_RETRIES:
+                    #self.log("Write_and_poll_time: Entered while loop")
+                    retries += 1
+                    time.sleep(WRITE_POLL_TIME_SLEEP)
+
+                    new_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
+                    
+                    #self.log(f"Write_and_poll_time:  while loop, new_time = {new_time}")
+
+                    written = new_time == value
+
+            except:
+                written = False
+                #self.log("Write_and_poll_time: Exception logged")
+
+            str_log = f"Entity: {entity_id} Time: {value}  Value_str: {value_str}  Old Time: {old_time} New time: {(new_time)} "
+            self.log(str_log)
+
+        return (changed, written)
+
+
 
     def set_select(self, item, state):
         if state is not None:
