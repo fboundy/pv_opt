@@ -2304,9 +2304,16 @@ class PVOpt(hass.Hass):
             attributes={"Summary": self.summary_costs},
         )
 
+        if len(self.windows) > 0:
+            hass_start = self.charge_start_datetime
+            hass_end = self.charge_end_datetime
+        else:
+            hass_start = pd.Timestamp.now().floor("1D")
+            hass_end = hass_start
+
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_charge_start",
-            state=self.charge_start_datetime,
+            state=hass_start,
             attributes={
                 "friendly_name": "PV Opt Next Charge Period Start",
                 "device_class": "timestamp",
@@ -2329,7 +2336,7 @@ class PVOpt(hass.Hass):
 
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_charge_end",
-            state=self.charge_end_datetime,
+            state=hass_end,
             attributes={
                 "friendly_name": "PV Opt Next Charge Period End",
             },
