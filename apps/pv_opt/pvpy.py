@@ -695,7 +695,8 @@ class PVsystemModel:
 
         prices = prices.set_axis([t for t in contract.tariffs.keys() if contract.tariffs[t] is not None], axis=1)
         if not use_export:
-            self.log(f"Ignoring export pricing because Use Export is turned off")
+            if log:
+                self.log(f"Ignoring export pricing because Use Export is turned off")
             discharge = False
             prices["export"] = 0
 
@@ -744,7 +745,6 @@ class PVsystemModel:
             self.log("---------------------")
             self.log("")
 
-        self.log(slots)
         net_cost = []
         net_cost_opt = base_cost
 
@@ -844,7 +844,7 @@ class PVsystemModel:
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
                                     )
-                                    if log:
+                                    if log and self.host.debug:
                                         str_log_x = (
                                             f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
                                             + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
