@@ -96,25 +96,25 @@ pv_opt:
   # use_consumption_history: false
   # # consumption_history_days: 6
   # #
-  # daily_consumption_kwh: 17
-  # shape_consumption_profile: true
-  # consumption_shape:
-  #   - hour: 0
-  #     consumption: 300
-  #   - hour: 0.5
-  #     consumption: 200
-  #   - hour: 6
-  #     consumption: 150
-  #   - hour: 8
-  #     consumption: 500
-  #   - hour: 15.5
-  #     consumption: 500
-  #   - hour: 17
-  #     consumption: 750
-  #   - hour: 22
-  #     consumption: 750
-  #   - hour: 24
-  #     consumption: 300
+  daily_consumption_kwh: 17
+  shape_consumption_profile: true
+  consumption_shape:
+    - hour: 0
+      consumption: 300
+    - hour: 0.5
+      consumption: 200
+    - hour: 6
+      consumption: 150
+    - hour: 8
+      consumption: 500
+    - hour: 15.5
+      consumption: 500
+    - hour: 17
+      consumption: 750
+    - hour: 22
+      consumption: 750
+    - hour: 24
+      consumption: 300
   
   # ========================================
   # Octopus account parameters
@@ -197,8 +197,8 @@ pv_opt:
   
   # id_consumption_today: sensor.{device_name}_consumption_today
   # id_consumption:
-  #  - sensor.{device_name}_house_load
-  #  - sensor.{device_name}_bypass_load
+  #   - sensor.{device_name}_house_load
+  #   - sensor.{device_name}_bypass_load
 
   # id_grid_import_today: sensor.{device_name}_grid_import_today
   # id_grid_export_today: sensor.{device_name}_grid_export_today
@@ -310,12 +310,43 @@ pv_opt:
   # update_cycle_seconds: 300
 
 
+ # ===============================================================================================================
+  # Brand / Integration Specific Config: SOLIS_CLOUD: https://github.com/hultenvp/solis-sensor
+  # ===============================================================================================================
+  #
+  # These are the default entities used with the Solis Solax Modbus integration. You can change them here and over-ride the defaults
+
+  inverter_type: SOLIS_CLOUD
+  device_name: soliscloud
+
+  soliscloud_username: !secret soliscloud_username
+  soliscloud_password: !secret soliscloud_password
+  soliscloud_key_id: !secret soliscloud_key_id
+  soliscloud_key_secret: !secret soliscloud_key_secret
+  soliscloud_plant_id: !secret soliscloud_plant_id
+  
+  battery_voltage: sensor.{device_name}_battery_voltage
+  update_cycle_seconds: 0
+  maximum_dod_percent: sensor.{device_name}_force_discharge_soc
+  
+  id_consumption_today: sensor.{device_name}_daily_grid_energy_used
+  # id_consumption:
+  #   - sensor.{device_name}_total_consumption_power
+
+  id_grid_import_today: sensor.{device_name}_daily_grid_energy_purchased
+  id_grid_export_today: sensor.{device_name}_daily_on_grid_energy
+
+  id_battery_soc: sensor.{device_name}_remaining_battery_capacity
+
+
 # Tariff comparison
   # id_daily_solar: sensor.{device_name}_power_generation_today
   # id_solar_power: 
   # #   - sensor.{device_name}_pv_power_1
   # #   - sensor.{device_name}_pv_power_2
-  id_solar_power: sensor.{device_name}_pv_total_power
+  id_solar_power: 
+  - sensor.{device_name}_dc_power_pv1
+  - sensor.{device_name}_dc_power_pv2
     
   # alt_tariffs:
   #   - name: Agile_Fix
