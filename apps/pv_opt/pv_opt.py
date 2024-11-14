@@ -599,6 +599,7 @@ class PVOpt(hass.Hass):
         self._log_inverterstatus(self.inverter.status)
 
     def _check_for_io(self):
+        self.io = False
         self.ulog("Checking for Intelligent Octopus")
         entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
         io_dispatches = self.get_state(entity_id)
@@ -725,7 +726,7 @@ class PVOpt(hass.Hass):
 
         self.battery_model = pv.BatteryModel(
             capacity=self.get_config("battery_capacity_wh"),
-            max_dod=self.get_config("maximum_dod_percent") / 100,
+            max_dod=self.get_config("maximum_dod_percent", 15) / 100,
             current_limit_amps=self.get_config("battery_current_limit_amps", default=100),
             voltage=self.get_config("battery_voltage", default=50),
         )
@@ -989,6 +990,7 @@ class PVOpt(hass.Hass):
 
             self.rlog("")
             self._load_saving_events()
+
             self._check_for_io()
 
         self.rlog("Finished loading contract")
@@ -2582,8 +2584,12 @@ class PVOpt(hass.Hass):
                     consumption_dow = self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
                     if len(consumption_dow) != len(consumption_mean):
                         self.log(">>> Inconsistent lengths in consumption arrays")
-                        self.log(f">>> dow : {consumption_dow}")
-                        self.log(f">>> mean: {consumption_mean}")
+                        self.log(f">>> dow : {len(consumption_dow)}")
+                        self.log(f">>> mean: {len(consumption_mean)}")
+                        idx = consumption_dow.index.intersection(consumption_mean.index)
+                        self.log(f"Clipping the consumption to the overlap ({len(idx)/24:0.1f} days)", level="WARN")
+                        consumption_mean = consumption_mean.loc[idx]
+                        consumption_dow = consumption_dow.loc[idx]
 
                     consumption["consumption"] += pd.Series(
                         consumption_dow.to_numpy()
