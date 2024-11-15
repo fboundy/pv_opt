@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.18.0"
+VERSION = "3.18.1"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -464,7 +464,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
-
+        self.io = False
         self.debug = DEBUG
         self.redact_regex = REDACT_REGEX
 
@@ -599,6 +599,7 @@ class PVOpt(hass.Hass):
         self._log_inverterstatus(self.inverter.status)
 
     def _check_for_io(self):
+        self.io = False
         self.ulog("Checking for Intelligent Octopus")
         entity_id = f"binary_sensor.octopus_energy_{self.get_config('octopus_account').lower().replace('-', '_')}_intelligent_dispatching"
         io_dispatches = self.get_state(entity_id)
@@ -725,7 +726,7 @@ class PVOpt(hass.Hass):
 
         self.battery_model = pv.BatteryModel(
             capacity=self.get_config("battery_capacity_wh"),
-            max_dod=self.get_config("maximum_dod_percent") / 100,
+            max_dod=self.get_config("maximum_dod_percent", 15) / 100,
             current_limit_amps=self.get_config("battery_current_limit_amps", default=100),
             voltage=self.get_config("battery_voltage", default=50),
         )
@@ -989,6 +990,7 @@ class PVOpt(hass.Hass):
 
             self.rlog("")
             self._load_saving_events()
+
             self._check_for_io()
 
         self.rlog("Finished loading contract")
@@ -1564,8 +1566,10 @@ class PVOpt(hass.Hass):
         )
 
     def status(self, status):
-        entity_id = f"sensor.{self.prefix.lower()}status"
+        entity_id = f"sensor.{self.prefix.lower()}_status"
         attributes = {"last_updated": pd.Timestamp.now().strftime(DATE_TIME_FORMAT_LONG)}
+        # self.log(f">>> {status}")
+        # self.log(f">>> {entity_id}")
         self.set_state(state=status, entity_id=entity_id, attributes=attributes)
 
     @ad.app_lock
@@ -2300,9 +2304,16 @@ class PVOpt(hass.Hass):
             attributes={"Summary": self.summary_costs},
         )
 
+        if len(self.windows) > 0:
+            hass_start = self.charge_start_datetime
+            hass_end = self.charge_end_datetime
+        else:
+            hass_start = pd.Timestamp.now().floor("1D")
+            hass_end = hass_start
+
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_charge_start",
-            state=self.charge_start_datetime,
+            state=hass_start,
             attributes={
                 "friendly_name": "PV Opt Next Charge Period Start",
                 "device_class": "timestamp",
@@ -2325,7 +2336,7 @@ class PVOpt(hass.Hass):
 
         self.write_to_hass(
             entity=f"sensor.{self.prefix}_charge_end",
-            state=self.charge_end_datetime,
+            state=hass_end,
             attributes={
                 "friendly_name": "PV Opt Next Charge Period End",
             },
@@ -2582,8 +2593,12 @@ class PVOpt(hass.Hass):
                     consumption_dow = self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
                     if len(consumption_dow) != len(consumption_mean):
                         self.log(">>> Inconsistent lengths in consumption arrays")
-                        self.log(f">>> dow : {consumption_dow}")
-                        self.log(f">>> mean: {consumption_mean}")
+                        self.log(f">>> dow : {len(consumption_dow)}")
+                        self.log(f">>> mean: {len(consumption_mean)}")
+                        idx = consumption_dow.index.intersection(consumption_mean.index)
+                        self.log(f"Clipping the consumption to the overlap ({len(idx)/24:0.1f} days)", level="WARNING")
+                        consumption_mean = consumption_mean.loc[idx]
+                        consumption_dow = consumption_dow.loc[idx]
 
                     consumption["consumption"] += pd.Series(
                         consumption_dow.to_numpy()
