@@ -1566,11 +1566,11 @@ class PVOpt(hass.Hass):
         )
 
     def status(self, status):
-        entity_id = f"sensor.{self.prefix.lower()}status"
+        entity_id = f"sensor.{self.prefix.lower()}_status"
         attributes = {"last_updated": pd.Timestamp.now().strftime(DATE_TIME_FORMAT_LONG)}
-        self.log(f">>> {status}")
-        self.log(f">>> {entity_id}")
-        self.log(f">>> {self.set_state(state=status, entity_id=entity_id, attributes=attributes)}")
+        # self.log(f">>> {status}")
+        # self.log(f">>> {entity_id}")
+        self.set_state(state=status, entity_id=entity_id, attributes=attributes)
 
     @ad.app_lock
     def optimise_state_change(self, entity_id, attribute, old, new, kwargs):

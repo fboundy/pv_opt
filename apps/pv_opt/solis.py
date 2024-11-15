@@ -323,6 +323,8 @@ class SolisCloud:
 
         if response.status_code == HTTPStatus.OK:
             return response.json()["data"]
+        else:
+            return {"state": 0}
 
     @property
     def is_online(self):
