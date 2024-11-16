@@ -990,13 +990,33 @@ class PVOpt(hass.Hass):
         ### We need to return consumption data from all sensors. At the moment this routine will only return data from the last for loop.
         # What we need to do here is to sum the consumption values together from all Zappis. 
 
-
+        i = 0
         for entity_id in self.zappi_consumption_entities:
+            i += 1
             df = self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end, log=log)
+            df.columns = [i] # Name the column 1, 2, 3 etc
+
+            if i == 1:
+                df_all = df.copy()
+            if i > 1: #If more than one charger, add data as extra column
+                df_all = pd.concat([df_all, df])
+
             if log and (self.debug and "E" in self.debug_cat):
                 self.rlog(f">>> Zappi entity {entity_id}")
                 self.log(f">>>\n{df.to_string()}")
+                self.log(f">>> Value of i = {i}")
+                self.rlog(">>> df_all")
+                self.log(f">>>\n{df_all.to_string()}")
 
+              
+        df_all = df_all.fillna(0)  # fill any missing values with 0
+        if i == 1:
+            df = df_all
+        if i > 1:
+            df = df_all.sum(axis = 1)      # sum across columns
+
+        self.rlog("Final result of get_zappi......")
+        self.log(f">>>\n{df.to_string()}")
 
         return df
     
