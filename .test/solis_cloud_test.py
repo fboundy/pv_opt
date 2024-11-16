@@ -225,3 +225,9 @@ if __name__ == "__main__":
 # %%
 sc.set_timer("charge", pd.Timestamp("00:50"), pd.Timestamp("01:00"), 3000)
 # %%
+sc.set_mode_switch(35)
+# %%
+r=sc.set_code(696, 3600)
+# %%
+
+# %%
