@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.18.1"
+VERSION = "3.18.2"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -465,9 +465,10 @@ class PVOpt(hass.Hass):
         self.log(f"******************* PV Opt v{VERSION} *******************")
         self.log("")
         self.io = False
+        self.agile = False
         self.debug = DEBUG
         self.redact_regex = REDACT_REGEX
-
+        self.contract_last_loaded = pd.Timestamp("1970-01-01", tz="UTC")
         try:
             subver = int(VERSION.split(".")[2])
         except:
