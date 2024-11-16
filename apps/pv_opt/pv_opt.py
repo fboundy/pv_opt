@@ -69,6 +69,11 @@ VERSION = "3.19.0-Beta-15"
 # Roll minor version to 18 to reflect latest production release
 # Change search string on Intelligent Charge Limit/Target to suit new Octopus Energy Integration
 # Minor bugfixes and logging fixes
+# 3.19.0 Beta-16
+# Roll minor version to 19 to reflect latest production release
+# Incorporated Sols Cloud changes made in solis.py
+# Added Prevent_Discharge functionality
+
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
