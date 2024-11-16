@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.19.0-Beta-15"
+VERSION = "3.19.0-Beta-16"
 
 
 # Change history
