@@ -16,6 +16,7 @@ import re
 
 VERSION = "3.19.0-Beta-15"
 
+
 # Change history
 # -------
 # 3.16.0:
@@ -966,7 +967,7 @@ class PVOpt(hass.Hass):
                 zappi_sn = entity_id.split("_")[2]
                 self.redact_regex.append(zappi_sn)
                 self.rlog(f"  {entity_id}")
-            self.zappi_plug_entity = self.zappi_plug_entity[0] # If multiple, select the first by default. 
+            self.zappi_plug_entity = self.zappi_plug_entities[0] # If multiple, select the first by default. 
             if len(self.zappi_plug_entities) > 1:
                 self.log(f"Multiple Zappis found, setting {self.zappi_plug_entity} to trigger car charge planning updates. Update config.yaml to map a different sensor" )
         else:
@@ -2110,7 +2111,7 @@ class PVOpt(hass.Hass):
         )
 
     def status(self, status):
-        entity_id = f"sensor.{self.prefix.lower()}status"
+        entity_id = f"sensor.{self.prefix.lower()}_status"
         attributes = {"last_updated": pd.Timestamp.now().strftime(DATE_TIME_FORMAT_LONG)}
         self.set_state(state=status, entity_id=entity_id, attributes=attributes)
 
@@ -2420,9 +2421,24 @@ class PVOpt(hass.Hass):
         # create a df with an index value the same as self.opt (just copy it from self.opt)
         # Copy two columns to force y to be a dataframe
 
-        y = self.opt[["import", "forced"]]
-        y["start"] = y.index.tz_convert(self.tz)
-        y["end"] = y.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+        #y = self.opt[["import", "forced"]]
+        #y = self.opt[["import", "forced"]]
+        y = self.opt.loc[:, ["import", "forced"]].copy()
+        #y.is_copy = None    
+        #y["start"] = y.index.tz_convert(self.tz)
+        #y["end"] = y.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+
+        #y["start"] = self.opt.index.tz_convert(self.tz)
+        #y["end"] = self.opt.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+
+        y["start"] = self.opt.index.tz_convert(self.tz).copy()
+        y["end"] = self.opt.index.tz_convert(self.tz).copy() + pd.Timedelta(30, "minutes")
+
+
+        self.log("")
+        self.log("Y is........")
+        self.log(f"\n{y.to_string()}")
+       
 
         # Create a Pd series to store any 1/2 hour car charge slots  (1 = car charge slot, 0 = not a car charge slot)
         # Note: self.opt will now include attribute "carslot" regardless of actual tariff, but be set 
@@ -2462,6 +2478,7 @@ class PVOpt(hass.Hass):
         if not self.car_slots.empty and self.ev:
             for h in range(len(self.car_slots)):
                 for i in range(len(y)):
+                    #self.log(f"i is {i}")
                     if (y["start"].iloc[i] >= self.car_slots["start_dt"].iloc[h]) and (
                         y["start"].iloc[i] < self.car_slots["end_dt"].iloc[h]
                     ):
@@ -2473,10 +2490,11 @@ class PVOpt(hass.Hass):
                     ):
                         car_on.iat[i] = 1
 
-        ### Read "prevent_discharge" switch to set a car slot in the current slot
+        ### Read "prevent_discharge" switch to set a car slot in the current slot and next slot
 
         if self.get_config("prevent_discharge"):
             car_on.iat[0] = 1
+            car_on.iat[1] = 1
 
         self.opt = pd.concat([self.opt, car_on], axis=1)  # Add car charge slot flags to self.opt
 
@@ -2684,7 +2702,7 @@ class PVOpt(hass.Hass):
                         )
                     # For IOG hold slots, so they don't write to the inverter all night
                     # This however will not pickup normal hold slots "<=", they are dealt with below when actually within a hold period.
-                    # We probably don't need the "<=IOG" gate anymore, now that we've set Forced = 1 for IOG slots.
+                    
                     elif (self.charge_power == 1) & (self.windows["hold_soc"].iloc[0] == "<=Car"):
                         self.log("Car slot")
                         self.inverter.control_discharge(enable=False)
@@ -3021,9 +3039,12 @@ class PVOpt(hass.Hass):
             # Delete any entries where charging is already scheduled (Forced > 1)
             x = x.drop(x[x["forced"] > 1].index)
 
-            # Then set "forced" to 1 on the remainder (but only if Zappi is seen as part of house load)
-            
+            # Set "forced" to 1 on the remainder, if Zappi is seen as part of house load)
             if self.get_config("ev_part_of_house_load"):
+                x["forced"] = 1
+
+            # Set "forced" to 1 on the remainder, if Prevent_Discharge is set)
+            if self.get_config("prevent_discharge"):
                 x["forced"] = 1
 
             if self.debug and "W" in self.debug_cat:
@@ -3049,13 +3070,7 @@ class PVOpt(hass.Hass):
                 self.log("Printing Window_car for Car slots")
                 self.log(f"\n{windows_car.to_string()}")
 
-            # for Car slots, set 'soc_end' to equal 'soc', as the slot is now a hold slot.
-            # Problem : If Zappi is not seen as house load, doing this will generate a needless hold slot
-            # We probably need to do this later on to avoid this.
-            # We did this originally for display purposes only
-            # Do it later based on Forced = 1
-            # windows_car["soc_end"] = windows_car["soc"]
-
+ 
             if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing Combined Window for Charge and Discharge Slots")
@@ -3110,23 +3125,21 @@ class PVOpt(hass.Hass):
             ### Need to add Agile tariff into this, but only if car charging is enabled (EV Charger = Zappi?) 
             #   DONE needs verifying
             
-            if self.intelligent or (self.agile and self.ev) :
+            #if self.intelligent or (self.agile and self.ev) :  # gate removed******
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
-                
-                if self.debug and "W" in self.debug_cat:
-                    self.log("Setting Car slots (Forced = 1) to hold")  
+                self.log("Setting Car slots (Forced = 1) to hold")  
 
-                # If forced = 1 then the window is an Car Slot. It will already have a "<=" set as we made start SOC = end SOC, but we
-                # possibly want to differentiate the two for later processing.
-                self.windows.loc[
-                    (self.windows["forced"] == 1),
-                    "hold_soc",
-                ] = "<=Car"
+            # If forced = 1 then the window is an Car Slot. It will already have a "<=" set as we made start SOC = end SOC, but we
+            # possibly want to differentiate the two for later processing.
+            self.windows.loc[
+                (self.windows["forced"] == 1),
+                "hold_soc",
+            ] = "<=Car"
 
-                # Set soc end to equal start soc for any car slots (Forced = 1) (purely for dashboard display purposes)
-                self.windows["soc_end"] = self.windows["soc_end"].where(self.windows["forced"] != 1, self.windows["soc"])
-
-               
+            # Set soc end to equal start soc for any car slots (Forced = 1) (purely for dashboard display purposes)
+            self.windows["soc_end"] = self.windows["soc_end"].where(self.windows["forced"] != 1, self.windows["soc"])
+            #end of gate removed******
 
             if self.debug and "W" in self.debug_cat:
 
@@ -3231,7 +3244,7 @@ class PVOpt(hass.Hass):
                     f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}"
                 )
 
-    def _log_inverter_status(self, status):
+    def _log_inverterstatus(self, status):
         self.log("")
         self.log(f"Current inverter status:")
         self.log("------------------------")

@@ -449,18 +449,18 @@ class Tariff:
                 # Add IO slot prices as a column to dataframe.
                 df = pd.concat([df, self.io_prices], axis=1).set_axis(["unit", "io_unit"], axis=1)
 
-                # self.log("To_df, Printing concat")
-                # self.log(t.to_string())
+                #self.log("To_df, Printing concat")
+                #self.log(df.to_string())
 
                 df = df.dropna(subset=["unit"])  # Drop Nans
                 mask = df["io_unit"] < df["unit"]  # Mask is true if an IOslot
-                df["unit"][mask] = df[
-                    "io_unit"
-                ]  # Overwrite unit (prices from website) with io_unit (prices from OE integration) if in an IOslot.
+                #df["unit"][mask] = df["io_unit"]  # Overwrite unit (prices from website) with io_unit (prices from OE integration) if in an IOslot.
+                df.loc[mask, "unit"] = df["io_unit"]
+
                 df = df.drop(["io_unit"], axis=1)  # remove IO prices column
 
-            # self.log("To_df, Printing result")
-            # self.log(t.to_string())
+                #self.log("To_df, Printing result")
+                #self.log(df.to_string())
 
         # Add a column "fixed" for the standing charge.
         if not self.export:

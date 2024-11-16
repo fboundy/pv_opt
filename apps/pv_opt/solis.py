@@ -769,9 +769,10 @@ class InverterController:
                     status[direction][limit] = pd.Timestamp(
                         f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                     )
-
-            status[direction]["current"] = float(
-                self.host.get_state_retry(entity_id)
+                time_now = pd.Timestamp.now(tz=self.tz)
+                entity_id = self.host.config[f"id_timed_{direction}_current"]
+                status[direction]["current"] = float(
+                    self.host.get_state_retry(entity_id)
 
 
             #status[direction]["current"] = float(
