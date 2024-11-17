@@ -718,7 +718,7 @@ class InverterController:
                 self.log(f">>> Inverter Mode: {mode}")
 
             self.host.set_select("inverter_mode", mode)
-            self.log("Set select inverter mode called")
+            #self.log("Set select inverter mode called")
 
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
@@ -769,9 +769,10 @@ class InverterController:
                     status[direction][limit] = pd.Timestamp(
                         f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                     )
-
-            status[direction]["current"] = float(
-                self.host.get_state_retry(entity_id)
+                time_now = pd.Timestamp.now(tz=self.tz)
+                entity_id = self.host.config[f"id_timed_{direction}_current"]
+                status[direction]["current"] = float(
+                    self.host.get_state_retry(entity_id)
 
 
             #status[direction]["current"] = float(
