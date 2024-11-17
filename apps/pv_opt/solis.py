@@ -718,7 +718,7 @@ class InverterController:
                 self.log(f">>> Inverter Mode: {mode}")
 
             self.host.set_select("inverter_mode", mode)
-            self.log("Set select inverter mode called")
+            #self.log("Set select inverter mode called")
 
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]

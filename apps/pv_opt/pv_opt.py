@@ -73,12 +73,11 @@ VERSION = "3.19.0-Beta-16"
 # Roll minor version to 19 to reflect latest production release
 # Incorporated Sols Cloud changes made in solis.py
 # Added Prevent_Discharge functionality
-
+# Added Zappi multiple charger support
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
 DEBUG = False
-
 
 # Filter Logging when debug = true.
 # Valid values for "Debug_categories" are:
@@ -925,63 +924,58 @@ class PVOpt(hass.Hass):
                 self.car_plugged_in = False
 
     def _check_for_zappi(self):
-        # Check for Zappi sensors for power consumption and car connected/charging status.
-        # Note: this requires the myEnergi integration https://github.com/cjne/ha-myenergi
-
-        # For charge added entities
-        # 1) Store all the entity names (as currently done)
-        # 2) Check for any manual overrides via "_id" setting in config.yaml and if they exist, use those instead
-     
-
-        # For plug entities
-        # 1) If zappi_plug_entities is greater than one then choose the first one (deals with all the single Zappis automatically)
-        # 2) Check to see if there is an "_id" setting in config.yaml, if so then overwrite it with that (allows users with multiple Zappis to select which one is tied to IOG)
-
-
-
-
-        # if self.get_config("zappi_auto") and self.ev:
-                #1) do autodetects
-
-        #  if len(self.zappi_consumption entities) = 0 or not self.get_config("zappi_auto"):
-                 #do manual overides
-        
-        # do we really need to ever override the consumption sensor autodetect? Yes, as the entity names might not have "zappi" in them.
-
-
-        self.log("Attempting to autodetect Zappi consumption sensor")
+        self.ulog("Reading Zappi(s)")
+        self.log("Attempting to autodetect Zappi consumption sensor(s)")
         sensor_entities = self.get_state("sensor")
 
         self.zappi_consumption_entities = [k for k in sensor_entities if "zappi" in k for x in ["charge_added_session"] if x in k]
+
+        #force two Zappis for test purposes
+        #self.zappi_consumption_entities = ["sensor.myenergi_zappi_12345679_charge_added_session", "sensor.myenergi_zappi_12345678_charge_added_session" ]
+
         if len(self.zappi_consumption_entities) > 0:
             for entity_id in self.zappi_consumption_entities:
                 zappi_sn = entity_id.split("_")[2]
                 self.redact_regex.append(zappi_sn)
-                self.log("Zappi consumption sensor(s) found")
+                self.log("Zappi consumption sensor(s) found:")
                 self.rlog(f"  {entity_id}")
+                self.log("")
         else:
             self.log("No Zappi Consumption sensors autodetected")
 
-        # Insert code here to lookup "_id" values from config.yaml if it exists and use those entries instead.
-        # This needs to clear "self.zappi_consumption_entities" and replace with however many id_ values are present in config.yaml.  
 
-        self.log("Attempting to Autodetect Zappi Plugin status sensor")
+        self.log("Attempting to autodetect Zappi Plugin status sensor(s)")
         self.zappi_plug_entities = [k for k in sensor_entities if "zappi" in k for x in ["plug_status"] if x in k]
+
         if len(self.zappi_plug_entities) > 0:
             for entity_id in self.zappi_plug_entities:
                 zappi_sn = entity_id.split("_")[2]
                 self.redact_regex.append(zappi_sn)
+                self.log("Zappi plug_status sensor(s) found:")
                 self.rlog(f"  {entity_id}")
+
             self.zappi_plug_entity = self.zappi_plug_entities[0] # If multiple, select the first by default. 
             if len(self.zappi_plug_entities) > 1:
-                self.log(f"Multiple Zappis found, setting {self.zappi_plug_entity} to trigger car charge planning updates. Update config.yaml to map a different sensor" )
+                self.log("")
+                self.log(f"Multiple Zappis found, defaulting to {self.zappi_plug_entity} to trigger car charge planning updates." )
+                self.log("If necessary, map desired sensor using id_zappi_plug_status in config.yaml")
+                self.log("Checking config.yaml for presence of id_zappi_plug_status...")
         else:
             self.log("No Zappi Plug Status sensors autodetected")
+            self.log("Checking config.yaml for presence of id_zappi_plug_status....")
 
-        # Insert code here to lookup "_id" value from config.yaml if it exists and use that value instead. 
-        # This needs to read a specific id_ value and replace it with what has been autodetected. 
+        # Check config.yaml for entry of id_zappi_plug_status, if so, override whats autodetected as first entry. 
         
-
+        if "id_zappi_plug_status" in self.config:
+            entity_id = self.config["id_zappi_plug_status"]
+            self.log("")
+            self.log(f"id_zappi_plug_status value in config.yaml = {entity_id}")
+            self.log(f"Overriding auto detected plug_status sensor ({self.zappi_plug_entity}) to mapping provided in config.yaml ({entity_id})")
+            self.zappi_plug_entity = entity_id
+        else:
+            self.log("")
+            self.log(f"No entry found in config.yaml for plug_status sensor, leaving any autodetected sensor in place.")
+        
         self.log("")
 
     def _get_zappi(self, start, end, log=False):
@@ -994,12 +988,11 @@ class PVOpt(hass.Hass):
         for entity_id in self.zappi_consumption_entities:
             i += 1
             df = self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end, log=log)
-            df.columns = [i] # Name the column 1, 2, 3 etc
-
+            
             if i == 1:
                 df_all = df.copy()
             if i > 1: #If more than one charger, add data as extra column
-                df_all = pd.concat([df_all, df])
+                df_all = pd.concat([df_all, df], axis=1)
 
             if log and (self.debug and "E" in self.debug_cat):
                 self.rlog(f">>> Zappi entity {entity_id}")
@@ -1013,10 +1006,11 @@ class PVOpt(hass.Hass):
         if i == 1:
             df = df_all
         if i > 1:
-            df = df_all.sum(axis = 1)      # sum across columns
+            df = df_all.sum(axis=1)      # sum across columns
 
-        self.rlog("Final result of get_zappi......")
-        self.log(f">>>\n{df.to_string()}")
+        if log and (self.debug and "E" in self.debug_cat):
+            self.rlog("Final result of get_zappi......")
+            self.log(f">>>\n{df.to_string()}")
 
         return df
     
@@ -2439,30 +2433,21 @@ class PVOpt(hass.Hass):
         self.opt = self.flows[self.selected_case]
 
         # SVB debug logging
-        self.log("")
-        self.log("Returned from .flows. self.opt is........")
-        self.log(f"\n{self.opt.to_string()}")
+        #self.log("")
+        #self.log("Returned from .flows. self.opt is........")
+        #self.log(f"\n{self.opt.to_string()}")
 
         # create a df with an index value the same as self.opt (just copy it from self.opt)
         # Copy two columns to force y to be a dataframe
 
-        #y = self.opt[["import", "forced"]]
-        #y = self.opt[["import", "forced"]]
         y = self.opt.loc[:, ["import", "forced"]].copy()
-        #y.is_copy = None    
-        #y["start"] = y.index.tz_convert(self.tz)
-        #y["end"] = y.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
-
-        #y["start"] = self.opt.index.tz_convert(self.tz)
-        #y["end"] = self.opt.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
 
         y["start"] = self.opt.index.tz_convert(self.tz).copy()
         y["end"] = self.opt.index.tz_convert(self.tz).copy() + pd.Timedelta(30, "minutes")
 
-
-        self.log("")
-        self.log("Y is........")
-        self.log(f"\n{y.to_string()}")
+        #self.log("")
+        #self.log("Y is........")
+        #self.log(f"\n{y.to_string()}")
        
 
         # Create a Pd series to store any 1/2 hour car charge slots  (1 = car charge slot, 0 = not a car charge slot)
@@ -3823,9 +3808,9 @@ class PVOpt(hass.Hass):
 
         self.log("")
         self.log(
-            f"    Total consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
+            f"    Total consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}:"
         )
-        self.log(f"   Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
+        self.log(f"    Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
 
         if self.debug and "P" in self.debug_cat:
             self.log("Printing final result of routine load_consumption.....")
@@ -4087,8 +4072,8 @@ class PVOpt(hass.Hass):
         for domain in domains:
             states = self.get_state_retry(domain)
 
-            #states = {k: states[k] for k in states if (self.device_name) in k}
-            states = {k: states[k] for k in states if self.device_name in k or "zappi" in k}  ### temporary : print zappi entities as well
+            states = {k: states[k] for k in states if (self.device_name) in k}
+            #states = {k: states[k] for k in states if self.device_name in k or "zappi" in k}  # : print zappi entities as well
             for entity_id in states:
                 x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
                 x = f"  {x:60s}"
