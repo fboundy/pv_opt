@@ -345,7 +345,7 @@ class SolisCloud:
             headers["token"] = self.token
             response = requests.post(self.URLS["root"] + self.URLS["atRead"], data=body, headers=headers)
             if response.status_code == HTTPStatus.OK:
-                data = response.json()["data"]["msg"]
+                data = response.json()["data"].get("msg", "ERROR")
             else:
                 data = "ERROR"
 
