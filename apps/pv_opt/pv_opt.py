@@ -466,6 +466,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self.io = False
         self.agile = False
+        self.intelligent = False
         self.debug = DEBUG
         self.redact_regex = REDACT_REGEX
         self.contract_last_loaded = pd.Timestamp("1970-01-01", tz="UTC")
