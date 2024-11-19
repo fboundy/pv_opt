@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.18.2"
+VERSION = "3.19.0"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -60,7 +60,7 @@ INVERTER_TYPES = [
     "SOLIS_SOLARMAN",
     "SUNSYNK_SOLARSYNK2",
     "SOLAX_X1",
-    "SOLIS_CLOUD",
+    # "SOLIS_CLOUD",
 ]
 
 SYSTEM_ARGS = [
