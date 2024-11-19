@@ -2981,15 +2981,15 @@ class PVOpt(hass.Hass):
             | ((self.opt["carslot"].diff() > 0) & (self.opt["forced"] == 0))
         ).cumsum()
 
-        if self.debug and "W" in self.debug_cat:
-            self.log("")
-            self.ulog("Debugging - Charge/Discharge/Hold Windows")
-            self.log("")
-            
         if self.debug and "O" in self.debug_cat:
             self.log("")                
             self.ulog("1/2 Hour Optimsation summary")
             self.log(f"\n{self.opt.to_string()}")
+
+        if self.debug and "W" in self.debug_cat:
+            self.log("")
+            self.ulog("Debugging - Charge/Discharge/Hold Windows")
+            self.log("")
 
         # If there is either a charge/discharge plan or a car charging plan, create windows.
         if ((self.opt["forced"] != 0).sum() > 0) or ((self.opt["carslot"] != 0).sum() > 0):
@@ -2999,7 +2999,7 @@ class PVOpt(hass.Hass):
             x["soc"] = x["soc"].round(0).astype(int)
             x["soc_end"] = x["soc_end"].round(0).astype(int)
 
-            if self.debug and "C" in self.debug_cat:
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing X for charge slots.....")
                 # self.log(x.to_string())
@@ -3015,7 +3015,7 @@ class PVOpt(hass.Hass):
                 axis=1,
             )
 
-            if self.debug and "C" in self.debug_cat:
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing Window_C for charge")
                 self.log(f"\n{windows_c.to_string()}")
@@ -3025,7 +3025,7 @@ class PVOpt(hass.Hass):
             x["start"] = x.index.tz_convert(self.tz)
             x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
 
-            if self.debug and "D" in self.debug_cat:
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing X for discharge slots.....")
                 self.log(f"\n{x.to_string()}")
@@ -3039,7 +3039,7 @@ class PVOpt(hass.Hass):
                 axis=1,
             )
 
-            if self.debug and "D" in self.debug_cat:
+            if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing Window_D for discharge")
                 self.log(f"\n{windows_d.to_string()}")

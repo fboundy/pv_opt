@@ -1311,7 +1311,8 @@ class PVsystemModel:
                 self.log(f"{available.sum()} slots have an import price less than the max export price")
             done = available.sum() == 0
 
-            self.log(f"\n{df.to_string()}")
+            if (self.host.debug and "C" in self.host.debug_cat):
+                self.log(f"\n{df.to_string()}")
 
 
             while not done:
@@ -1484,9 +1485,10 @@ class PVsystemModel:
                 # Create a multiplier that is the inverse of slot_amount_left
                 slot_left_multiplier_discharge = 1 / slot_amount_left   
 
-                if log:
-                    self.log("")
-                    self.log(f"Slot left = {slot_amount_left}, Time now = {pd.Timestamp.now(self.tz)}, Charge_start_datetime = {discharge_start_datetime}")
+                if (self.host.debug and "D" in self.host.debug_cat):
+                    if log:
+                        self.log("")
+                        self.log(f"Slot left = {slot_amount_left}, Time now = {pd.Timestamp.now(self.tz)}, Charge_start_datetime = {discharge_start_datetime}")
 
                 while not done:
                     x = df[available].copy()
