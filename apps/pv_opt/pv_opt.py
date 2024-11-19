@@ -3747,7 +3747,7 @@ class PVOpt(hass.Hass):
                             self.log(df.to_string())
 
                         if (df < 0).any().any():  # Are there any negative values in the subtraction?
-                            self.log("Unexpected Negative values after substraction found, setting to zero")
+                            self.log("    Unexpected Negative values after substraction found, setting to zero")
                             df[df < 0] = 0
 
                 # Add consumption margin
