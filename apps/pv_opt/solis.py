@@ -923,9 +923,8 @@ class InverterController:
                             f"{states['hours']:02d}:{states['minutes']:02d}", tz=self.host.tz
                         )
                         ### SVB debugging
-
-                        self.log("Status of status is....")
-                        self.log(status[direction][limit])
+                        #self.log("Status of status is....")
+                        #self.log(status[direction][limit])
 
                     else:   # for SOLARMAN_V2
 

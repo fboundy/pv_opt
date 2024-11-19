@@ -1554,7 +1554,7 @@ class PVOpt(hass.Hass):
             ##### SVB debugging - Override Export Tariff
             if self.contract.tariffs["export"] is None:
                 self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
-                # self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)
+                #self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)
             self.rlog("")
             self._load_saving_events()
 
