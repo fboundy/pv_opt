@@ -1176,6 +1176,7 @@ class PVOpt(hass.Hass):
                 "friendly_name": "Car Charging Slot",
             },
         )
+    
 
     def rlog(self, str, **kwargs):
         if self.redact:
@@ -2647,6 +2648,7 @@ class PVOpt(hass.Hass):
         self.status("Writing to HA")
         self._write_output()
 
+
         if self.get_config("read_only"):
             self.log("Read only mode enabled. Not querying inverter.")
             self.status("Idle (Read Only)")
@@ -2654,6 +2656,7 @@ class PVOpt(hass.Hass):
             # Set the EV charger entity, even if in ReadOnly
             ### For code development only - allows test of EV charger whilst not interferring with inverter. Remove when code development complete.
             self._control_EV_charger()
+            self.log("")
 
         else:
 
@@ -2697,6 +2700,7 @@ class PVOpt(hass.Hass):
                     if self.charge_power > 1:
                         self.log("Charge Power >1")
                         self.inverter.control_discharge(enable=False)
+
                         self.inverter.control_charge(
                             enable=True,
                             start=self.charge_start_datetime,
@@ -2929,6 +2933,7 @@ class PVOpt(hass.Hass):
 
             # Inverter updates complete. Now command EV charger on/off. 
             self._control_EV_charger()
+            self.log("")
 
     def _create_windows(self):
 

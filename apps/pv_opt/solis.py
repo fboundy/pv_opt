@@ -780,8 +780,9 @@ class InverterController:
                 elif self.type == "SOLIS_SOLARMAN_V2":
                     self.log("")
                     self.log(f">>> Solarman V2 current writes: about to write {current} to entity {entity_id}")
-                    ###
-                    changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)      
+
+                    value=round(current, 1)
+                    changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=value, tolerance=1)      
 
                 else:
                     e = "Unknown inverter type"

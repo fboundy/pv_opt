@@ -405,9 +405,13 @@ class Tariff:
                 # Otherwise download the latest forecast from AgilePredict
                 if self.agile_predict is None:
                     self.agile_predict = self._get_agile_predict()
+                    #self.log("Agile_predict is")
+                    #self.log(f"\n{self.agile_predict}")
 
                 if self.agile_predict is not None:
                     df = pd.concat([df, self.agile_predict.loc[df.index[-1] + pd.Timedelta("30min") : end]])
+                    #self.log("Df concat with agile predict is")
+                    #self.log(f"\n{df}")
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (len(df) > 1 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30) or len(df) == 1:
