@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.19.0-Beta-16"
+VERSION = "3.19.0-Beta-17"
 
 
 # Change history
@@ -74,6 +74,9 @@ VERSION = "3.19.0-Beta-16"
 # Incorporated Sols Cloud changes made in solis.py
 # Added Prevent_Discharge functionality
 # Added Zappi multiple charger support
+# 3.19.0-Beta-17
+# Tidy up logging
+# round charge current to nearest integer for Solarman_V2 integration
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
