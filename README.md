@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v3.19.0 Beta-16
+# PV Opt: Home Assistant Solar/Battery Optimiser v3.19.0 Beta-17
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
@@ -210,14 +210,16 @@ And add the `client_user` and `client_password` keys to `secrets.yaml` like this
           pv_opt_log:
             name: PV_Opt
             filename: /share/logs/pv_opt.log
+            log_generations: 9
+            log_size: 10000000
             date_format: '%H:%M:%S'      
             format: '{asctime} {levelname:>8s}: {message}'
 
-4. Open the AppDaemon Add-On via Settings: http://homeassistant.local:8123/hassio/addon/a0d7b954_appdaemon/info
+5. Open the AppDaemon Add-On via Settings: http://homeassistant.local:8123/hassio/addon/a0d7b954_appdaemon/info
 
-5. Click on <b>Configuration</b> at the top
+6. Click on <b>Configuration</b> at the top
 
-6. Click the 3 dots and <b>Edit in YAML</b> to add `pandas` and `numpy` as Python packages. Note that `numpy` has to be set to version `1.26.4` due to an unresolved compatability issue between Home Assistant and `2.0.0`:
+7. Click the 3 dots and <b>Edit in YAML</b> to add `pandas` and `numpy` as Python packages. Note that `numpy` has to be set to version `1.26.4` due to an unresolved compatability issue between Home Assistant and `2.0.0`:
 
    ```
    init_commands: []
@@ -228,9 +230,9 @@ And add the `client_user` and `client_password` keys to `secrets.yaml` like this
 
    ```
 
-7. Go back to the <b>Info</b> page and click on <b>Start</b>
+8. Go back to the <b>Info</b> page and click on <b>Start</b>
 
-8. Click on <b>Log</b>. Appdaemon will download and install numpy and pandas. Click on <b>Refresh</b> until you see:
+9. Click on <b>Log</b>. Appdaemon will download and install numpy and pandas. Click on <b>Refresh</b> until you see:
 
    ```
     s6-rc: info: service init-appdaemon successfully started
@@ -241,7 +243,7 @@ And add the `client_user` and `client_password` keys to `secrets.yaml` like this
     s6-rc: info: service legacy-services successfully started
    ```
 
-9. Either click on `Info` followed by `OPEN WEB UI` and then `Logs` or open your `main_log` file from the location specified in step (3) above. You should see:
+10. Either click on `Info` followed by `OPEN WEB UI` and then `Logs` or open your `main_log` file from the location specified in step (3) above. You should see:
 
     ```
     13:16:24 INFO AppDaemon: AppDaemon Version 4.4.2 starting
