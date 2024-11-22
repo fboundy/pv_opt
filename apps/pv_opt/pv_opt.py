@@ -600,6 +600,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self.io = False
         self.agile = False
+        self.ev = False
         self.debug = DEBUG
         self.debug_cat = DEBUG_CATEGORIES
         self.redact_regex = REDACT_REGEX
@@ -681,6 +682,7 @@ class PVOpt(hass.Hass):
         self.ev_total_charge = 0
         self.ev_total_cost = 0
         self.ev_percent_to_add = 0
+        self.car_charging = False
         
         self.bottlecap_entities = {"import": None, "export": None}
 
