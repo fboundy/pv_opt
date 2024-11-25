@@ -77,6 +77,8 @@ VERSION = "3.19.0-Beta-17"
 # 3.19.0-Beta-17
 # Tidy up logging
 # round charge current to nearest integer for Solarman_V2 integration
+# 3.19.0-Beta-18
+# Bugfix: Removed call to setup_schedule if state change includes the word "forced" - resolves multiple optimiser runs every 10 minutes
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -2153,8 +2155,13 @@ class PVOpt(hass.Hass):
 
         self.config_state[item] = new
 
-        if "forced" in item:
-            self._setup_schedule()
+        # SVB 25/11/2024
+        # Commented out call to setup_schedule - it shouldn't be needed to do something special if the Optimised Discharge (forced_discharge) entity is toggled. Having
+        # it appears to generate an addtional optimiser callback every 10 minutes that then persists forever, so removed. 
+        # Believed to be a hangover from when the charging and discharging algorithms had thier own seperate callbacks, long since removed. 
+
+        #if "forced" in item:
+        #    self._setup_schedule()
 
 
         ### SVB: Add additional EV items to this list: Car capacity, charger efficiency, charger power, and add an Ev model to pv_system_model routine
