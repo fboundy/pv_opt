@@ -860,10 +860,11 @@ class PVsystemModel:
         return df
 
     def optimised_force(self, initial_soc, static_flows, contract: Contract, **kwargs):
+        log = kwargs.pop("log", True)
+        
         if log and (self.host.debug and "B" in self.host.debug_cat):
             self.log("Called optimised_force")
-        log = kwargs.pop("log", True)
-
+        
         cols = {k: kwargs.get(k, k) for k in ["consumption", "solar"]}
         consumption = static_flows[cols["consumption"]]
         consumption.name = "consumption"
