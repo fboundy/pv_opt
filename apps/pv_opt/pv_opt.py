@@ -992,9 +992,6 @@ class PVOpt(hass.Hass):
     def _get_zappi(self, start, end, log=False):
         df = pd.DataFrame()
 
-        ### We need to return consumption data from all sensors. At the moment this routine will only return data from the last for loop.
-        # What we need to do here is to sum the consumption values together from all Zappis. 
-
         i = 0
         for entity_id in self.zappi_consumption_entities:
             i += 1
@@ -1051,7 +1048,7 @@ class PVOpt(hass.Hass):
         # self.log(f"Charge time (hours) = {ev_charge_time}")
 
         ### Code will quantise to full slots only - i.e no partial charging in a half hour slot (which is what IOG does)
-        ### LAter versions of code will add this
+        # LAter versions of code will add this
 
         # Convert to number of slots by mutiplying by 2, then rounding up
         ev_slots_required = math.ceil(ev_charge_time*2)
@@ -1559,10 +1556,8 @@ class PVOpt(hass.Hass):
             # self.log(self.contract.tariffs)
             # self.log("")
 
-            ##### SVB debugging - Override Export Tariff
             if self.contract.tariffs["export"] is None:
                 self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
-                #self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)
             self.rlog("")
             self._load_saving_events()
 
@@ -2519,7 +2514,7 @@ class PVOpt(hass.Hass):
                     ):
                         car_on.iat[i] = 1
 
-        ### Read "prevent_discharge" switch to set a car slot in the current slot and next slot
+        # Read "prevent_discharge" switch to set a car slot in the current slot and next slot
 
         if self.get_config("prevent_discharge"):
             car_on.iat[0] = 1
@@ -2970,11 +2965,11 @@ class PVOpt(hass.Hass):
         # We need to remove that factor so the inverter charge power remains unchanged in the slot.
         # If forced = 0 (i.e no charging) the result remains zero so no need to gate with forced > 0.
 
-        ### SVB this needs a "not to exceed" limit to:
+        # SVB this needs a "not to exceed" limit to:
         # 1) Handle large multiplication factors for programme restarts at time values very close to the half hour boundaries. Just limit to 6. DONE
         # 2) To handle slots that even when factored, are still limited by the inverter power - these ones we don't want to multiply.
 
-        ### In 2), is it just a limit of charger power we need to apply? Or do we require something more complex? 
+        # In 2), is it just a limit of charger power we need to apply? Or do we require something more complex? 
 
         #if not slot_left_factor == 0:
         #    if slot_left_factor > 6:
@@ -3260,7 +3255,7 @@ class PVOpt(hass.Hass):
             )
 
             ### SVB to do
-            ### Add a "Average slot price" and a "total kWh" to each window
+            # Add a "Average slot price" and a "total kWh" to each window
 
             if self.debug and "E" in self.debug_cat:
                 self.log("")      
