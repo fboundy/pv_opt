@@ -860,8 +860,8 @@ class PVsystemModel:
         return df
 
     def optimised_force(self, initial_soc, static_flows, contract: Contract, **kwargs):
-        # SVB logging
-        # self.log("Called optimised_force")
+        if log and (self.host.debug and "B" in self.host.debug_cat):
+            self.log("Called optimised_force")
         log = kwargs.pop("log", True)
 
         cols = {k: kwargs.get(k, k) for k in ["consumption", "solar"]}
@@ -873,6 +873,7 @@ class PVsystemModel:
         max_iters = kwargs.pop("max_iters", MAX_ITERS)
 
         prices = pd.DataFrame()
+
         for direction in contract.tariffs:
             if contract.tariffs[direction] is not None:
                 prices = pd.concat(
@@ -884,7 +885,6 @@ class PVsystemModel:
                     ],
                     axis=1,
                 )
-        ### SVB logging
 
         if log and (self.host.debug and "B" in self.host.debug_cat):
 

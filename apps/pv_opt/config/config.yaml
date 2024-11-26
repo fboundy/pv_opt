@@ -45,9 +45,11 @@ pv_opt:
   # S = Startup/Initialisation Logging
   # T = Tariff loading Logging
   # P = Power consumption history Logging
+  # B = Optimisation Start summary
   # C = Charge algorithm Logging
   # D = Discharge algorithm Logging
   # W = Charge/Discharge Windows Logging
+  # O = Optimsation Summary (1/2 hour slots)
   # F = Power Flows Logging
   # V = Power Flows debugging (extra verbose)
   # I = inverter control/commands Logging
