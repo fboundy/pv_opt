@@ -79,6 +79,10 @@ VERSION = "3.19.0-Beta-19"
 # round charge current to nearest integer for Solarman_V2 integration
 # 3.19.0-Beta-18
 # Bugfix: Removed call to setup_schedule if state change includes the word "forced" - resolves multiple optimiser runs every 10 minutes
+# 3.19.0-Beta-19
+# Tidy up comments, print out version number on each optimiser run
+# 3.19.0-Beta-20
+# Incorporate Pull Request #312 changes from main into dev
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
