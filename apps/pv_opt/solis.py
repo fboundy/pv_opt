@@ -835,7 +835,11 @@ class InverterController:
 
         if self.type in ["SOLIS_SOLAX_MODBUS", "SOLIS_SOLARMAN", "SOLIS_CORE_MODBUS"]:
             for direction in ["charge", "discharge"]:
-                status[direction] = {}
+                status[direction] = {
+                    "current": 0,
+                    "start": pd.Timestamp("00:00", tz=self.tz),
+                    "end": pd.Timestamp("00:00", tz=self.tz),
+                }
                 for limit in limits:
                     states = {}
                     for unit in ["hours", "minutes"]:
@@ -857,9 +861,9 @@ class InverterController:
             status[direction]["active"] = (
                 time_now >= status[direction]["start"]
                 and time_now < status[direction]["end"]
-                and status[direction]["current"] > 0
-                and status["switches"]["Timed"]
-                and status["switches"]["GridCharge"]
+                and status[direction].get("current", 0) > 0
+                and status["switches"].get("Timed", False)
+                and status["switches"].get("GridCharge", False)
             )
 
         status["hold_soc"] = {"active": status["switches"]["Backup"]}
