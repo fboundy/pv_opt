@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.19.0-Beta-18"
+VERSION = "3.19.0-Beta-19"
 
 
 # Change history
@@ -2210,6 +2210,7 @@ class PVOpt(hass.Hass):
     @ad.app_lock
     def optimise_time(self, cb_args):
         self.log(f"Optimiser triggered by Scheduler ")
+        self.log(f"Version: v{VERSION}")
         self.optimise()
 
     @ad.app_lock
@@ -3836,10 +3837,20 @@ class PVOpt(hass.Hass):
             self.log("  - Consumption estimated OK")
 
         self.log("")
+
+
+        ### This next section prints a consumption based on two days worth, as predicted from the last 7 days
+        # What we want is a predicted consumption for the next day, so we can compare it to fixed consumption
+        # problems: 
+        # Not sure where two days is created from  (as df is definitley one day)
+        # Each of the two days has different, so its not a straight double generated from the one day df
+
         self.log(
             f"    Total consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}:"
         )
         self.log(f"    Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
+
+
 
         if self.debug and "P" in self.debug_cat:
             self.log("Printing final result of routine load_consumption.....")

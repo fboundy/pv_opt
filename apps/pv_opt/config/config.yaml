@@ -44,7 +44,8 @@ pv_opt:
   #
   # S = Startup/Initialisation Logging
   # T = Tariff loading Logging
-  # P = Power consumption history Logging
+  # P = Power consumption history logging
+  # Q = Power consumption history logging (verbose)
   # B = Optimisation Start summary
   # C = Charge algorithm Logging
   # D = Discharge algorithm Logging

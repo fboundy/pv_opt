@@ -432,12 +432,12 @@ class Tariff:
                 df = df.loc[start:end]
             df.name = "unit"
 
-            ### SVB logging
+            # SVB logging
             # self.log("")
             # self.log("Printin df just before concat.....")
             # self.log(df.to_string())
 
-            ##### SVB #####
+            # SVB #
             # It is at this point that df now looks like the Dataframe that compare_tariffs loads. This is the point
             # to overwrite the Df with IOG data from the BottlecapDave integration.
             # We need to load both current_day and next_day events.
@@ -482,7 +482,7 @@ class Tariff:
             df.loc[mask, "fixed"] = 0
 
         df = pd.DataFrame(df)
-        ### SVB logging
+        # SVB logging
         # self.log("")
         # self.log("Printing final result of to_df.....")
         # self.log(df.to_string())
@@ -1082,7 +1082,7 @@ class PVsystemModel:
                         #if (pd.Timestamp.utcnow().tz_localize(None) > start_window.tz_localize(None))
 
 
-                        ### SVB debug logging
+                        # SVB debug logging
                         #if log:
                         #    self.log("")
                         #    self.log(f"Slot_amount_left = {slot_amount_left}")
@@ -1173,7 +1173,7 @@ class PVsystemModel:
 
                                     # Note: the factored SCPA is applied in two places - as we allocate power to each slot and also when we decide which slots are full. 
 
-                                    ### Update, starting battery charge is based on self.inital_soc which appears to not be changed (much) during a partial slot. 
+                                    # Update, starting battery charge is based on self.inital_soc which appears to not be changed (much) during a partial slot. 
                                     # So it may be possible just to remove partial slot factoring from SPR after all. 
 
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0) 
@@ -1345,8 +1345,8 @@ class PVsystemModel:
                     #self.log(f"{available.sum():>2d} Min import price {min_price:5.2f}p/kWh at {start_window.strftime(TIME_FORMAT)} {x.loc[start_window]['forced']:4.0f}W ")
 
 
-                    ## SVB changed so all times are in naive UTC
-                    ### I don't think factoring is necessary here, as self.initial_soc doesnt change partway through a slot. 
+                    # SVB changed so all times are in naive UTC
+                    # I don't think factoring is necessary here, as self.initial_soc doesnt change partway through a slot. 
                     #if Timenow_utc_naive > start_window.tz_localize(None) and (
                     #    Timenow_utc_naive < start_window.tz_localize(None) + pd.Timedelta(30, "minutes")
                     #):
