@@ -47,6 +47,7 @@ WRITE_POLL_RETRIES = 5
 GET_STATE_RETRIES = 5
 GET_STATE_WAIT = 0.5
 
+
 BOTTLECAP_DAVE = {
     "domain": "event",
     "tariff_code": "tariff_code",
@@ -56,6 +57,7 @@ BOTTLECAP_DAVE = {
 
 INVERTER_TYPES = [
     "SOLIS_SOLAX_MODBUS",
+    "SOLIS_SOLAX_MODBUS_FB00",
     "SOLIS_CORE_MODBUS",
     "SOLIS_SOLARMAN",
     "SUNSYNK_SOLARSYNK2",

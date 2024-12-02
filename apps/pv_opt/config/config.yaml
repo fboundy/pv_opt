@@ -190,6 +190,7 @@ pv_opt:
 
   # inverter_type: SOLIS_SOLAX_MODBUS
   # device_name: solis
+  hmi_firmware_fb00_plus: True
   
   # battery_voltage: sensor.{device_name}_battery_voltage
   # update_cycle_seconds: 15
@@ -209,13 +210,19 @@ pv_opt:
   # id_timed_charge_end_hours: number.{device_name}_timed_charge_end_hours
   # id_timed_charge_end_minutes: number.{device_name}_timed_charge_end_minutes
   # id_timed_charge_current: number.{device_name}_timed_charge_current
+  # id_timed_charge_soc: number.{device_name}_timed_charge_soc
+  # id_timed_charge_soc: number.{device_name}_timed_charge_volt
 
   # id_timed_discharge_start_hours: number.{device_name}_timed_discharge_start_hours
   # id_timed_discharge_start_minutes: number.{device_name}_timed_discharge_start_minutes
   # id_timed_discharge_end_hours: number.{device_name}_timed_discharge_end_hours
   # id_timed_discharge_end_minutes: number.{device_name}_timed_discharge_end_minutes
   # id_timed_discharge_current: number.{device_name}_timed_discharge_current
+  # id_timed_charge_soc: number.{device_name}_timed_discharge_soc
+  # id_timed_charge_soc: number.{device_name}_timed_discharge_volt
 
+  # id_timed_charge_button: button.{device_name}_update_charge_times
+  # id_timed_discharge_button: button.{device_name}_update_discharge_times
   # id_timed_charge_discharge_button: button.{device_name}_update_charge_discharge_times
   # id_inverter_mode: select.{device_name}_energy_storage_control_switch
 

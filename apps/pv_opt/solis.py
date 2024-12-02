@@ -8,6 +8,7 @@ import re
 import requests
 from http import HTTPStatus
 from datetime import datetime, timezone
+from abc import ABC, abstractmethod
 
 URLS = {
     "root": "https://www.soliscloud.com:13333",
@@ -17,6 +18,25 @@ URLS = {
     "atRead": "/v2/api/atRead",
 }
 
+SOLIS_CODES_FB00_PLUS = {
+    1: "Self-Use - No Grid Charging",
+    5: "Off-Grid Mode",
+    9: "Battery Awaken - No Grid Charging",
+    33: "Self-Use",
+    41: "Battery Awaken",
+    49: "Backup/Reserve",
+    64: "Feed-in priority",
+}
+
+SOLIS_BITS_FB00_PLUS = [
+    "SelfUse",  # Always 1 unless FeedInPriority - Always 0 for PV Opt
+    "Timed",  # Always 0
+    "OffGrid",  # Will always be 0 for PV Opt
+    "BatteryWake",  # Will always be 0 for PV Opt
+    "Backup",  # Used for Hold SOC
+    "GridCharge",  #
+    "FeedInPriority",  # Always 0 for PV Opt
+]
 
 TIMEFORMAT = "%H:%M"
 INVERTER_DEFS = {
@@ -40,18 +60,6 @@ INVERTER_DEFS = {
             "Feed-in priority - No Timed Charge/Discharge": 96,
             "Feed-in priority": 98,
         },
-        # "modes": {
-        #     1: "Self-Use - No Grid Charging",
-        #     3: "Timed Charge/Discharge - No Grid Charging",
-        #     17: "Backup/Reserve - No Grid Charging",
-        #     33: "Self-Use",
-        #     35: "Timed Charge/Discharge",
-        #     37: "Off-Grid Mode",
-        #     41: "Battery Awaken",
-        #     43: "Battery Awaken + Timed Charge/Discharge",
-        #     49: "Backup/Reserve - No Timed Charge/Discharge",
-        #     51: "Backup/Reserve",
-        # },
         "bits": [
             "SelfUse",
             "Timed",
@@ -246,6 +254,65 @@ INVERTER_DEFS = {
         },
     },
 }
+
+
+# This is the Base Class
+class BaseInverterController:
+    def __init__(self, inverter_type: str, host) -> None:
+        self.host = host
+        self.tz = self.host.tz
+        if host is not None:
+            self.log = host.log
+        self.type = inverter_type
+        self.config = {}
+        self.brand_config = {}
+        for defs, conf in zip(
+            [INVERTER_DEFS[self.type][x] for x in ["default_config", "brand_config"]],
+            [self.config, self.brand_config],
+        ):
+            for item in defs:
+                if isinstance(defs[item], str):
+                    conf[item] = defs[item].replace("{device_name}", self.host.device_name)
+                elif isinstance(defs[item], list):
+                    conf[item] = [z.replace("{device_name}", self.host.device_name) for z in defs[item]]
+                else:
+                    conf[item] = defs[item]
+
+    @property
+    @abstractmethod
+    def is_online(self):
+        pass
+
+    @abstractmethod
+    def enable_timed_mode(self):
+        pass
+
+    @abstractmethod
+    def control_charge(self, enable, **kwargs):
+        pass
+
+    @abstractmethod
+    def control_discharge(self, enable, **kwargs):
+        pass
+
+    @abstractmethod
+    def hold_soc(self, enable, soc=None, **kwargs):
+        pass
+
+    @property
+    @abstractmethod
+    def status(self):
+        pass
+
+
+class SolisSolaxModbusInverter(BaseInverterController):
+    def __init__(self, inverter_type: str, host):
+        super().__init__(inverter_type, host)
+
+
+class SolisCloudInverter(BaseInverterController):
+    def __init__(self, inverter_type: str, host):
+        super().__init__(inverter_type, host)
 
 
 class SolisCloud:
