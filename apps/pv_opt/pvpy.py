@@ -452,7 +452,15 @@ class BatteryModel:
     @property
     def max_charge_power(self) -> int:
         """returns the maximum watts at which the battery can charge."""
-        return self.current_limit_amps * self.voltage
+        try:
+            max_charge_power = self.current_limit_amps * self.voltage
+        except:
+            self.log(
+                f"Unable to calculate max_charge_power from current limit {self.current_limit_amps} x voltage {self.voltage}",
+                level="WARINING",
+            )
+            max_charge_power = 100000
+        return max_charge_power
 
     @property
     def max_discharge_power(self) -> int:
