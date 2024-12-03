@@ -9,6 +9,10 @@ import requests
 from http import HTTPStatus
 from datetime import datetime, timezone
 from abc import ABC, abstractmethod
+from typing import final
+
+LIMITS = ["start", "end"]
+DIRECTIONS = ["charge", "discharge"]
 
 URLS = {
     "root": "https://www.soliscloud.com:13333",
@@ -18,25 +22,63 @@ URLS = {
     "atRead": "/v2/api/atRead",
 }
 
-SOLIS_CODES_FB00_PLUS = {
-    1: "Self-Use - No Grid Charging",
-    5: "Off-Grid Mode",
-    9: "Battery Awaken - No Grid Charging",
-    33: "Self-Use",
-    41: "Battery Awaken",
-    49: "Backup/Reserve",
-    64: "Feed-in priority",
+SOLIS_CODES = {
+    True: {
+        "Self-Use - No Grid Charging": 1,
+        "Off-Grid Mode": 5,
+        "Battery Awaken - No Grid Charging": 9,
+        "Self-Use": 33,
+        "Battery Awaken": 41,
+        "Backup/Reserve": 49,
+        "Feed-in priority": 64,
+    },
+    False: {
+        "SelfUse - No Grid Charging": 1,
+        "Self-Use - No Grid Charging": 1,
+        "Timed Charge/Discharge - No Grid Charging": 3,
+        "Backup/Reserve - No Grid Charging": 17,
+        "SelfUse": 33,
+        "Self-Use - No Timed Charge/Discharge": 33,
+        "Self-Use": 35,
+        "Timed Charge/Discharge": 35,
+        "Off-Grid Mode": 37,
+        "Battery Awaken": 41,
+        "Battery Awaken + Timed Charge/Discharge": 43,
+        "Backup/Reserve - No Timed Charge/Discharge": 49,
+        "Backup/Reserve": 51,
+        "Feed-in priority - No Grid Charging": 64,
+        "Feed-in priority - No Timed Charge/Discharge": 96,
+        "Feed-in priority": 98,
+    },
 }
 
-SOLIS_BITS_FB00_PLUS = [
-    "SelfUse",  # Always 1 unless FeedInPriority - Always 0 for PV Opt
-    "Timed",  # Always 0
-    "OffGrid",  # Will always be 0 for PV Opt
-    "BatteryWake",  # Will always be 0 for PV Opt
+REGISTERS = {
+    False: {
+        "timed_charge_current": 43141,
+        "timed_charge_start_hours": 43143,
+        "timed_charge_start_minutes": 43144,
+        "timed_charge_end_hours": 43145,
+        "timed_charge_end_minutes": 43146,
+        "timed_discharge_current": 43142,
+        "timed_discharge_start_hours": 43147,
+        "timed_discharge_start_minutes": 43148,
+        "timed_discharge_end_hours": 43149,
+        "timed_discharge_end_minutes": 43150,
+        "storage_control_switch": 43110,
+        "backup_mode_soc": 43024,
+    }
+}
+
+SOLIS_BITS = [
+    "SelfUse",
+    "Timed",
+    "OffGrid",
+    "BatteryWake",
     "Backup",  # Used for Hold SOC
-    "GridCharge",  #
-    "FeedInPriority",  # Always 0 for PV Opt
+    "GridCharge",
+    "FeedInPriority",
 ]
+
 
 TIMEFORMAT = "%H:%M"
 INVERTER_DEFS = {
@@ -83,8 +125,6 @@ INVERTER_DEFS = {
             ],
             "id_grid_import_today": "sensor.{device_name}_grid_import_today",
             "id_grid_export_today": "sensor.{device_name}_grid_export_today",
-            # "id_grid_import_power": "sensor.{device_name}_grid_import_power",
-            # "id_grid_export_power": "sensor.{device_name}_grid_export_power",
             "id_battery_charge_power": "sensor.{device_name}_battery_input_energy",
             "id_inverter_ac_power": "sensor.{device_name}_active_power",
             "supports_hold_soc": True,
@@ -112,29 +152,6 @@ INVERTER_DEFS = {
     },
     "SOLIS_CORE_MODBUS": {
         "online": "sensor.{device_name}_overdischarge_soc",
-        "bits": [
-            "SelfUse",
-            "Timed",
-            "OffGrid",
-            "BatteryWake",
-            "Backup",
-            "GridCharge",
-            "FeedInPriority",
-        ],
-        "registers": {
-            "timed_charge_current": 43141,
-            "timed_charge_start_hours": 43143,
-            "timed_charge_start_minutes": 43144,
-            "timed_charge_end_hours": 43145,
-            "timed_charge_end_minutes": 43146,
-            "timed_discharge_current": 43142,
-            "timed_discharge_start_hours": 43147,
-            "timed_discharge_start_minutes": 43148,
-            "timed_discharge_end_hours": 43149,
-            "timed_discharge_end_minutes": 43150,
-            "storage_control_switch": 43110,
-            "backup_mode_soc": 43024,
-        },
         "default_config": {
             "maximum_dod_percent": "sensor.{device_name}_overdischarge_soc",
             "id_battery_soc": "sensor.{device_name}_battery_soc",
@@ -168,45 +185,10 @@ INVERTER_DEFS = {
         },
     },
     "SOLIS_SOLARMAN": {
-        "modes": {
-            0x21: "Self Use",
-            0x22: "Optimized Revenue",
-            0x23: "Time of Use",
-            0x24: "Off-Grid Storage",
-            0x28: "Battery Wake-Up",
-            0x60: "Feed-In Priority",
-        },
-        "bits": [
-            "SelfUse",
-            "Timed",
-            "OffGrid",
-            "BatteryWake",
-            "Backup",
-            "GridCharge",
-            "FeedInPriority",
-        ],
-        "registers": {
-            "timed_charge_current": 43141,
-            "timed_charge_start_hours": 43143,
-            "timed_charge_start_minutes": 43144,
-            "timed_charge_end_hours": 43145,
-            "timed_charge_end_minutes": 43146,
-            "timed_discharge_current": 43142,
-            "timed_discharge_start_hours": 43147,
-            "timed_discharge_start_minutes": 43148,
-            "timed_discharge_end_hours": 43149,
-            "timed_discharge_end_minutes": 43150,
-            "storage_control_switch": 43110,
-            "backup_mode_soc": 43024,
-        },
         "default_config": {
             "maximum_dod_percent": 15,
             "id_battery_soc": "sensor.{device_name}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_daily_house_backup_consumption",
-            # "id_consumption": [
-            #     "sensor.{device_name}_house_load_power",
-            #     "sensor.{device_name}_backup_load_power",
-            # ],
             "id_grid_power": "sensor.{device_name}_meter_active_power",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
@@ -230,15 +212,7 @@ INVERTER_DEFS = {
         },
     },
     "SOLIS_CLOUD": {
-        "bits": [
-            "SelfUse",
-            "Timed",
-            "OffGrid",
-            "BatteryWake",
-            "Backup",
-            "GridCharge",
-            "FeedInPriority",
-        ],
+        "online": "sensor.{device_name}_state",
         "default_config": {
             "maximum_dod_percent": "sensor.{device_name}_force_discharge_soc",
             "id_consumption_today": "sensor.{device_name}_daily_grid_energy_used",
@@ -256,27 +230,59 @@ INVERTER_DEFS = {
 }
 
 
+def create_inverter_controller(inverter_type: str, host):
+    if inverter_type == "SOLIS_CORE_MODBUS":
+        return SolisCoreModbusInverter(
+            inverter_type=inverter_type,
+        )
+
+    elif inverter_type == "SOLIS_CLOUD":
+        return SolisCloudInverter(
+            inverter_type=inverter_type,
+            host=host,
+        )
+
+    elif inverter_type == "SOLIS_SOLAX_MODBUS":
+        return SolisSolaxModbusInverter(
+            inverter_type=inverter_type,
+            host=host,
+        )
+
+    elif inverter_type == "SOLIS_SOLARMAN_MODBUS":
+        return SolisSolarmanModbusInverter(
+            inverter_type=inverter_type,
+            host=host,
+        )
+
+    else:
+        host.log(f"Unknown inverter type {inverter_type}")
+        return False
+
+
 # This is the Base Class
-class BaseInverterController:
+class BaseInverterController(ABC):
     def __init__(self, inverter_type: str, host) -> None:
-        self.host = host
-        self.tz = self.host.tz
+        self._host = host
+        self._tz = self._host.tz
         if host is not None:
             self.log = host.log
-        self.type = inverter_type
-        self.config = {}
-        self.brand_config = {}
+        self._type = inverter_type
+        self._device_name = self._host.device_name
+        self._config = {}
+        self._brand_config = {}
+        self._online = INVERTER_DEFS[self._type]["online"].replace("{device_name}", self._device_name)
         for defs, conf in zip(
-            [INVERTER_DEFS[self.type][x] for x in ["default_config", "brand_config"]],
-            [self.config, self.brand_config],
+            [INVERTER_DEFS[self._type][x] for x in ["default_config", "brand_config"]],
+            [self._config, self._brand_config],
         ):
             for item in defs:
                 if isinstance(defs[item], str):
-                    conf[item] = defs[item].replace("{device_name}", self.host.device_name)
+                    conf[item] = defs[item].replace("{device_name}", self._device_name)
                 elif isinstance(defs[item], list):
-                    conf[item] = [z.replace("{device_name}", self.host.device_name) for z in defs[item]]
+                    conf[item] = [z.replace("{device_name}", self._device_name) for z in defs[item]]
                 else:
                     conf[item] = defs[item]
+        self.log(f"Loading controller for inverter type {self._type}")
 
     @property
     @abstractmethod
@@ -299,20 +305,270 @@ class BaseInverterController:
     def hold_soc(self, enable, soc=None, **kwargs):
         pass
 
+    def get_config(self, config_variable, default=None):
+        return self._host.get_config(config_variable, default)
+
     @property
     @abstractmethod
     def status(self):
         pass
 
+    @property
+    def config(self):
+        return self._config
 
-class SolisSolaxModbusInverter(BaseInverterController):
+    @property
+    def brand_config(self):
+        return self._brand_config
+
+    def write_to_hass(self, entity_id, value):
+        return self._host.write_and_poll_value(entity_id=entity_id, value=value)
+
+
+class SolisInverter(BaseInverterController):
+    def __init__(self, inverter_type, host):
+        super().__init__(inverter_type, host)
+        self._hmi_fb00 = host.args.get("hmi_firmware_fb00_plus", False)
+        self.log(f"HMI Firmware Flag set to {self._hmi_fb00}")
+        self._codes = SOLIS_CODES[self._hmi_fb00]
+        self._reverse_codes = {self._codes[code]: code for code in self._codes}
+        self._bits = SOLIS_BITS
+
+    @final
+    def enable_timed_mode(self):
+        # set the energy control switch depending on HMI version
+        if self._hmi_fb00:
+            pass
+        else:
+            pass
+
+    @property
+    @final
+    def status(self):
+        time_now = pd.Timestamp.now(tz=self._tz)
+        code = self._get_energy_control_code()
+        status = {"code": code}
+        status = status | {"switches": self._switches(code)}
+        status = status | {direction: self._get_times_current(direction=direction) for direction in DIRECTIONS}
+        voltage = self._get_voltage()
+        for direction in DIRECTIONS:
+            status[direction]["power"] = status[direction]["current"] * voltage
+            status[direction]["active"] = (
+                time_now >= status[direction]["start"]
+                and time_now < status[direction]["end"]
+                and status[direction].get("current", 0) > 0
+                and (self._hmi_fb00 or status["switches"].get("Timed", False))
+                and status["switches"].get("GridCharge", False)
+            )
+        self.log(status)
+        status["hold_soc"] = {
+            "active": status["switches"].get("GridCharge", False) and status["switches"].get("Backup", False)
+        }
+        return status
+
+    def _switches(self, code):
+        return {bit: (code & 2**i == 2**i) for i, bit in enumerate(self._bits)}
+
+    def is_online(self):
+        entity_id = self._online
+        if entity_id is not None:
+            return self._host.get_state_retry(entity_id) not in ["unknown", "unavailable"]
+        else:
+            return False
+
+    @abstractmethod
+    def enable_timed_mode(self):
+        pass
+
+    @abstractmethod
+    def control_charge(self, enable, **kwargs):
+        pass
+
+    @abstractmethod
+    def control_discharge(self, enable, **kwargs):
+        pass
+
+    @abstractmethod
+    def hold_soc(self, enable, soc=None, **kwargs):
+        pass
+
+    @abstractmethod
+    def _get_times_current(self, direction):
+        pass
+
+    @abstractmethod
+    def _set_time_current(self, direction):
+        pass
+
+    def _get_voltage(self):
+        return self.get_config("battery_voltage")
+
+
+class SolisCloudInverter(SolisInverter):
+    def __init__(self, inverter_type: str, host):
+        super().__init__(inverter_type, host)
+        self.log(self._config)
+        self.log(self._brand_config)
+
+    def enable_timed_mode(self):
+        pass
+
+    def _get_energy_control_code(self):
+        mode = self.get_config("id_inverter_mode")
+        code = self._codes[mode]
+        return code
+
+    def set_energy_control_switch(self, switches: dict):
+        self.log("Setting energy control switch")
+
+    def _control_charge_discharge(self, direction, enable, **kwargs):
+        # >>>> Possibly move this up into SolisInverter
+        if enable:
+            start = kwargs.get("start", None)
+            end = kwargs.get("end", None)
+            current = kwargs.get("current", 0)
+
+        else:
+            # Disable by setting end time = start time:
+            start = self.status["charge"]["start"]
+            end = start
+            current = 0
+
+        changed, written = self._set_time_current(direction, start=start, end=end, current=current)
+        if changed:
+            if written:
+                self.log(f"Current {current}A written to inverter")
+            else:
+                self.log(f"Failed to write {current} to inverter")
+        else:
+            self.log("Inverter already at correct current")
+
+    def control_charge(self, enable, **kwargs):
+        # >>>> Possibly move this up into SolisInverter
+        self._control_charge_discharge("charge", enable, **kwargs)
+
+    def control_discharge(self, enable, **kwargs):
+        # >>>> Possibly move this up into SolisInverter
+        self._control_charge_discharge("discharge", enable, **kwargs)
+
+    def hold_soc(self, enable, soc=None, **kwargs):
+        self.log("Holding SOC")
+
+    def set_reserve_soc(self, soc: int):
+        pass
+
+    def _get_times_current(self, direction):
+        times = {
+            limit: pd.Timestamp(self.get_config(f"id_timed_{direction}_{limit}", "0:00"), tz=self._tz)
+            for limit in LIMITS
+        }
+        current = {"current": self.get_config(f"id_timed_{direction}_current", 0)}
+        return times | current
+
+    def _set_time_current(self, direction, **kwargs):
+        for var in LIMITS + ["current"]:
+            value = kwargs.get(var, None)
+            if value is not None:
+                current_value = self.status[direction][var]
+                entity_id = self._host.config.get(f"id_timed_{direction}_{var}", None)
+                self.log(f">>> {entity_id} {current_value} {value}")
+                if (entity_id is not None) and (current_value != value):
+                    changed, written = self.write_to_hass(entity_id=entity_id, value=value)
+
+        return True
+
+
+class SolisModbusInverter(SolisInverter):
+    def __init__(self, hmi_version):
+        super().__init__(hmi_version)
+
+    @final
+    def control_charge(self, enable, **kwargs):
+        self.control_charge_discharge("charge", enable, **kwargs)
+
+    @final
+    def control_discharge(self, enable, **kwargs):
+        self.control_charge_discharge("discharge", enable, **kwargs)
+
+    @final
+    def control_charge_discharge(self, direction, enable, **kwargs):
+        if enable:
+            times = {limit: kwargs.get(limit, pd.Timestamp("00:00")) for limit in LIMITS}
+        else:
+            # Better to read the start and set end the same
+            times = {limit: pd.Timestamp("00:00") for limit in ["start", "end"]}
+
+        for limit in LIMITS:
+            self.write_time_register(direction, limit, "hour", times[limit].hour)
+            self.write_time_register(direction, limit, "minute", times[limit].minute)
+
+    @abstractmethod
+    def set_energy_control_switch(self, switches: dict):
+        pass
+
+    @abstractmethod
+    def write_backup_soc_register(self, soc):
+        pass
+
+    @abstractmethod
+    def write_time_register(self, direction, limit, unit, value):
+        pass
+
+    @abstractmethod
+    def write_current_register(self, direction, current, tolerance):
+        pass
+
+    def _set_time_current(self, direction):
+        self.log("Setting time and current")
+        return True
+
+
+class SolisSolaxModbusInverter(SolisModbusInverter):
     def __init__(self, inverter_type: str, host):
         super().__init__(inverter_type, host)
 
+    def write_time_register(self, direction, limit, unit, value):
+        return super().write_time_register(direction, limit, unit, value)
 
-class SolisCloudInverter(BaseInverterController):
+    def write_current_register(self, direction, current, tolerance):
+        return super().write_current_register(direction, current, tolerance)
+
+    def set_energy_control_switch(self, switches):
+        return super().set_energy_control_switch(switches)
+
+
+class SolisCoreModbusInverter(SolisModbusInverter):
     def __init__(self, inverter_type: str, host):
         super().__init__(inverter_type, host)
+
+    def write_time_register(self, direction, limit, unit, value):
+        return super().write_time_register(direction, limit, unit, value)
+
+    def write_current_register(self, direction, current, tolerance):
+        return super().write_current_register(direction, current, tolerance)
+
+    def set_energy_control_switch(self, switches):
+        return super().set_energy_control_switch(switches)
+
+    def write_holding_register(self, register, value):
+        return super().write_holding_register(register, value)
+
+
+class SolisSolarmanModbusInverter(SolisModbusInverter):
+    def __init__(self, inverter_type: str, host):
+        super().__init__(inverter_type, host)
+
+    def write_time_register(self, direction, limit, unit, value):
+        return super().write_time_register(direction, limit, unit, value)
+
+    def write_current_register(self, direction, current, tolerance):
+        return super().write_current_register(direction, current, tolerance)
+
+    def set_energy_control_switch(self, switches):
+        return super().set_energy_control_switch(switches)
+
+    def write_holding_register(self, register, value):
+        return super().write_holding_register(register, value)
 
 
 class SolisCloud:

@@ -62,7 +62,7 @@ INVERTER_TYPES = [
     "SOLIS_SOLARMAN",
     "SUNSYNK_SOLARSYNK2",
     "SOLAX_X1",
-    # "SOLIS_CLOUD",
+    "SOLIS_CLOUD",
 ]
 
 SYSTEM_ARGS = [
@@ -706,9 +706,15 @@ class PVOpt(hass.Hass):
     def _load_inverter(self):
         if self.inverter_type in INVERTER_TYPES:
             inverter_brand = self.inverter_type.split("_")[0].lower()
-            InverterController = importName(f"{inverter_brand}", "InverterController")
             self.log(f"Inverter type: {self.inverter_type}: inverter module: {inverter_brand}.py")
-            self.inverter = InverterController(inverter_type=self.inverter_type, host=self)
+            if inverter_brand == "solis":
+                # for now only Solis uses the new setup
+                create_inverter_controller = importName(f"{inverter_brand}", "create_inverter_controller")
+                self.inverter = create_inverter_controller(inverter_type=self.inverter_type, host=self)
+            else:
+                InverterController = importName(f"{inverter_brand}", "InverterController")
+                self.inverter = InverterController(inverter_type=self.inverter_type, host=self)
+
             self.log(f"  Device name:   {self.device_name}")
             self.rlog(f"  Serial number: {self.inverter_sn}")
 
@@ -1963,19 +1969,27 @@ class PVOpt(hass.Hass):
 
                         if self.charge_power > 0:
                             if not status["charge"]["active"]:
-                                start = pd.Timestamp.now(tz=self.tz)
+                                self.log(f"Setting start time to ")
+                                start = pd.Timestamp.now(tz=self.tz).floor("1min")
+                                self.log(f"Setting start time to {start.strftime(DATE_TIME_FORMAT_SHORT)}")
                             else:
                                 start = None
 
                             if status["discharge"]["active"]:
+                                self.log("Disabling discharge")
                                 self.inverter.control_discharge(
                                     enable=False,
                                 )
 
+                            end = self.charge_end_datetime
+                            self.log(f"Setting end time to {end.strftime(DATE_TIME_FORMAT_SHORT)}")
+                            self.log(f"Setting power to {self.charge_power}")
+                            self.log(f"Setting SOC to {self.charge_target_soc}")
+
                             self.inverter.control_charge(
                                 enable=True,
                                 start=start,
-                                end=self.charge_end_datetime,
+                                end=end,
                                 power=self.charge_power,
                                 target_soc=self.charge_target_soc,
                             )

@@ -324,13 +324,7 @@ pv_opt:
   # These are the default entities used with the Solis Solax Modbus integration. You can change them here and over-ride the defaults
 
   inverter_type: SOLIS_CLOUD
-  device_name: soliscloud
-
-  soliscloud_username: !secret soliscloud_username
-  soliscloud_password: !secret soliscloud_password
-  soliscloud_key_id: !secret soliscloud_key_id
-  soliscloud_key_secret: !secret soliscloud_key_secret
-  soliscloud_plant_id: !secret soliscloud_plant_id
+  device_name: soliscolud
   
   battery_voltage: sensor.{device_name}_battery_voltage
   update_cycle_seconds: 0
@@ -344,6 +338,20 @@ pv_opt:
   id_grid_export_today: sensor.{device_name}_daily_on_grid_energy
 
   id_battery_soc: sensor.{device_name}_remaining_battery_capacity
+  id_inverter_mode: select.{device_name}_energy_storage_control_switch
+  id_timed_charge_start: time.{device_name}_timed_charge_start_1
+  id_timed_charge_end: time.{device_name}_timed_charge_end_1
+  id_timed_charge_current: number.{device_name}_timed_charge_current_1
+  id_timed_charge_soc: number.{device_name}_timed_charge_soc_1
+
+  id_timed_discharge_start: time.{device_name}_timed_discharge_start_1
+  id_timed_discharge_end: time.{device_name}_timed_discharge_end_1
+  id_timed_discharge_current: number.{device_name}_timed_discharge_current_1
+  id_timed_discharge_soc: number.{device_name}_timed_discharge_soc_1
+
+  id_timed_charge_button: button.{device_name}_update_timed_charge_1
+  id_timed_discharge_button: button.{device_name}_update_timed_discharge_1
+  # id_timed_charge_discharge_button: button.{device_name}_update_timed_charge_discharge_1
 
 
 # Tariff comparison
