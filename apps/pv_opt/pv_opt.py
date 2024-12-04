@@ -2949,24 +2949,62 @@ class PVOpt(hass.Hass):
 
         return df
 
-    def write_and_poll_value(self, entity_id, value, tolerance=0.0, verbose=False):
+    def write_and_poll_time(self, entity_id, time: str | pd.Timestamp, verbose=False):
         changed = False
         written = False
-        state = float(self.get_state_retry(entity_id=entity_id))
-        new_state = None
-        diff = abs(state - value)
-        if diff > tolerance:
+        if isinstance(time, pd.Timestamp):
+            time = time.strftime("%H:%M")
+        state = self.get_state_retry(entity_id=entity_id)
+        if state != time:
             changed = True
             try:
-                self.call_service("number/set_value", entity_id=entity_id, value=str(value))
+                self.call_service("time/set_value", entity_id=entity_id, time=time)
 
                 written = False
                 retries = 0
                 while not written and retries < WRITE_POLL_RETRIES:
                     retries += 1
                     time.sleep(WRITE_POLL_SLEEP)
+                    new_state = self.get_state_retry(entity_id=entity_id)
+                    written = new_state == time
+
+            except:
+                written = False
+
+            if verbose:
+                str_log = f"Entity: {entity_id:30s} Time: {time}  Old State: {state} "
+                str_log += f"New state: {new_state}"
+                self.log(str_log)
+
+        return (changed, written)
+
+    def write_and_poll_value(self, entity_id, value: int | float, tolerance=0.0, verbose=False):
+        changed = False
+        written = False
+        if tolerance == -1:
+            state = int(self.get_state_retry(entity_id=entity_id))
+            changed = True
+            if state == int(value):
+                if value == 100:
+                    value = 99
+                else:
+                    value += 1
+        else:
+            state = float(self.get_state_retry(entity_id=entity_id))
+            diff = abs(state - value)
+            changed = diff > tolerance
+
+        new_state = None
+        if changed:
+            try:
+                self.call_service("number/set_value", entity_id=entity_id, value=str(value))
+                written = False
+                retries = 0
+                while not written and retries < WRITE_POLL_RETRIES:
+                    retries += 1
+                    time.sleep(WRITE_POLL_SLEEP)
                     new_state = float(self.get_state_retry(entity_id=entity_id))
-                    written = new_state == value
+                    written = new_state == float(value)
 
             except:
                 written = False

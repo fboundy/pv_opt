@@ -13,6 +13,7 @@ from typing import final
 
 LIMITS = ["start", "end"]
 DIRECTIONS = ["charge", "discharge"]
+TIME_UNITS = ["hours", "minutes"]
 
 URLS = {
     "root": "https://www.soliscloud.com:13333",
@@ -140,11 +141,15 @@ INVERTER_DEFS = {
             "id_timed_charge_end_hours": "number.{device_name}_timed_charge_end_hours",
             "id_timed_charge_end_minutes": "number.{device_name}_timed_charge_end_minutes",
             "id_timed_charge_current": "number.{device_name}_timed_charge_current",
+            "id_timed_charge_soc": "number.{device_name}_timed_charge_soc",
             "id_timed_discharge_start_hours": "number.{device_name}_timed_discharge_start_hours",
             "id_timed_discharge_start_minutes": "number.{device_name}_timed_discharge_start_minutes",
             "id_timed_discharge_end_hours": "number.{device_name}_timed_discharge_end_hours",
             "id_timed_discharge_end_minutes": "number.{device_name}_timed_discharge_end_minutes",
             "id_timed_discharge_current": "number.{device_name}_timed_discharge_current",
+            "id_timed_discharge_soc": "number.{device_name}_timed_discharge_soc",
+            "id_timed_charge_button": "button.{device_name}_update_charge_times",
+            "id_timed_discharge_button": "button.{device_name}_update_discharge_times",
             "id_timed_charge_discharge_button": "button.{device_name}_update_charge_discharge_times",
             "id_inverter_mode": "select.{device_name}_energy_storage_control_switch",
             "id_backup_mode_soc": "number.{device_name}_backup_mode_soc",
@@ -225,6 +230,18 @@ INVERTER_DEFS = {
         },
         "brand_config": {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
+            "id_inverter_mode": "select.{device_name}_energy_storage_control_switch",
+            "id_timed_charge_start": "time.{device_name}_timed_charge_start_1",
+            "id_timed_charge_end": "time.{device_name}_timed_charge_end_1",
+            "id_timed_charge_current": "number.{device_name}_timed_charge_current_1",
+            "id_timed_charge_soc": "number.{device_name}_timed_charge_soc_1",
+            "id_timed_discharge_start": "time.{device_name}_timed_discharge_start_1",
+            "id_timed_discharge_end": "time.{device_name}_timed_discharge_end_1",
+            "id_timed_discharge_current": "number.{device_name}_timed_discharge_current_1",
+            "id_timed_discharge_soc": "number.{device_name}_timed_discharge_soc_1",
+            "id_timed_charge_button": "button.{device_name}_update_timed_charge_1",
+            "id_timed_discharge_button": "button.{device_name}_update_timed_discharge_1",
+            "id_timed_charge_discharge_button": "button.{device_name}_update_timed_charge_discharge_1",
         },
     },
 }
@@ -321,8 +338,30 @@ class BaseInverterController(ABC):
     def brand_config(self):
         return self._brand_config
 
-    def write_to_hass(self, entity_id, value):
-        return self._host.write_and_poll_value(entity_id=entity_id, value=value)
+    def write_to_hass(self, entity_id, value, **kwargs):
+        if isinstance(value, int) or isinstance(value, float):
+            return self._host.write_and_poll_value(entity_id=entity_id, value=value, **kwargs)
+        else:
+            try:
+                return self._host.write_and_poll_time(entity_id=entity_id, time=value)
+            except:
+                self.log(f"Unable to write value {value} to entity {entity_id}", level="ERROR")
+                return True, False
+
+    def _press_button(self, entity_id):
+        self._host.call_service("button/press", entity_id=entity_id)
+        time.sleep(0.5)
+        try:
+            time_pressed = pd.Timestamp(self._host.get_state_retry(entity_id))
+            dt = (pd.Timestamp.now(self._tz) - time_pressed).total_seconds()
+            if dt < 10:
+                self.log(f"Successfully pressed button {entity_id}")
+            else:
+                self.log(
+                    f"Failed to press button {entity_id}. Last pressed at {time_pressed.strftime(TIMEFORMAT)} ({dt:0.2f} seconds ago)"
+                )
+        except:
+            self.log(f"Failed to press button {entity_id}: it appears to never have been pressed.")
 
 
 class SolisInverter(BaseInverterController):
@@ -338,9 +377,12 @@ class SolisInverter(BaseInverterController):
     def enable_timed_mode(self):
         # set the energy control switch depending on HMI version
         if self._hmi_fb00:
-            pass
+            self._set_energy_control_switch(33)
         else:
-            pass
+            self._set_energy_control_switch(35)
+
+    def _set_energy_control_switch(self, code):
+        self.log("Setting energy control switch")
 
     @property
     @final
@@ -350,7 +392,7 @@ class SolisInverter(BaseInverterController):
         status = {"code": code}
         status = status | {"switches": self._switches(code)}
         status = status | {direction: self._get_times_current(direction=direction) for direction in DIRECTIONS}
-        voltage = self._get_voltage()
+        voltage = self.voltage
         for direction in DIRECTIONS:
             status[direction]["power"] = status[direction]["current"] * voltage
             status[direction]["active"] = (
@@ -360,7 +402,6 @@ class SolisInverter(BaseInverterController):
                 and (self._hmi_fb00 or status["switches"].get("Timed", False))
                 and status["switches"].get("GridCharge", False)
             )
-        self.log(status)
         status["hold_soc"] = {
             "active": status["switches"].get("GridCharge", False) and status["switches"].get("Backup", False)
         }
@@ -376,17 +417,56 @@ class SolisInverter(BaseInverterController):
         else:
             return False
 
-    @abstractmethod
-    def enable_timed_mode(self):
-        pass
+    def _get_energy_control_code(self):
+        mode = self.get_config("id_inverter_mode")
+        code = self._codes[mode]
+        return code
 
-    @abstractmethod
     def control_charge(self, enable, **kwargs):
-        pass
+        self._control_charge_discharge("charge", enable, **kwargs)
 
-    @abstractmethod
     def control_discharge(self, enable, **kwargs):
-        pass
+        self._control_charge_discharge("discharge", enable, **kwargs)
+
+    def _control_charge_discharge(self, direction, enable, **kwargs):
+        times = {}
+        if enable:
+            times["start"] = kwargs.get("start", None)
+            times["end"] = kwargs.get("end", None)
+            current = kwargs.get("current", round(kwargs.get("power", 0) / self.voltage, 1))
+            soc = kwargs.get("target_soc", None)
+
+        else:
+            # Disable by setting end time = start time:
+            times["start"] = self.status["charge"]["start"]
+            times["end"] = times["start"]
+            current = 0
+
+        self.log(f">>> direction: {direction}")
+        self.log(f">>> times: {times}")
+        self.log(f">>> current: {current}")
+        changed = self._set_times(direction, **times)
+        self.log(f">>> changed: {changed}")
+        changed = changed or self._set_current(direction, current)
+        self.log(f">>> changed: {changed}")
+
+        if changed and self._requires_button:
+            self.log("Something changed - need to press the appropriate Button")
+            if self._hmi_fb00:
+                entity_id = self.brand_config.get(f"id_timed_{direction}_button", None)
+            else:
+                entity_id = self.brand_config.get(f"id_timed_charge_discharge_button", None)
+
+            self.log(f">>> {entity_id}")
+            if entity_id is not None:
+                self._press_button(entity_id=entity_id)
+
+        if changed and self._hmi_fb00:
+            """
+            There seems to be a bug where with the FB00+ firmware the changes aren't saved unless
+            the target SOC is also set
+            """
+            self._set_target_soc(direction, soc, forced=True)
 
     @abstractmethod
     def hold_soc(self, enable, soc=None, **kwargs):
@@ -397,64 +477,32 @@ class SolisInverter(BaseInverterController):
         pass
 
     @abstractmethod
-    def _set_time_current(self, direction):
+    def _set_times(self, direction, **kwargs) -> bool:
         pass
 
-    def _get_voltage(self):
-        return self.get_config("battery_voltage")
+    @abstractmethod
+    def _set_current(self, direction, current) -> bool:
+        pass
+
+    @property
+    def voltage(self):
+        return self.get_config("battery_voltage", 50)
 
 
 class SolisCloudInverter(SolisInverter):
     def __init__(self, inverter_type: str, host):
         super().__init__(inverter_type, host)
+        self._requires_button = True
         self.log(self._config)
         self.log(self._brand_config)
 
-    def enable_timed_mode(self):
-        pass
-
-    def _get_energy_control_code(self):
-        mode = self.get_config("id_inverter_mode")
-        code = self._codes[mode]
-        return code
-
-    def set_energy_control_switch(self, switches: dict):
-        self.log("Setting energy control switch")
-
-    def _control_charge_discharge(self, direction, enable, **kwargs):
-        # >>>> Possibly move this up into SolisInverter
-        if enable:
-            start = kwargs.get("start", None)
-            end = kwargs.get("end", None)
-            current = kwargs.get("current", 0)
-
-        else:
-            # Disable by setting end time = start time:
-            start = self.status["charge"]["start"]
-            end = start
-            current = 0
-
-        changed, written = self._set_time_current(direction, start=start, end=end, current=current)
-        if changed:
-            if written:
-                self.log(f"Current {current}A written to inverter")
-            else:
-                self.log(f"Failed to write {current} to inverter")
-        else:
-            self.log("Inverter already at correct current")
-
-    def control_charge(self, enable, **kwargs):
-        # >>>> Possibly move this up into SolisInverter
-        self._control_charge_discharge("charge", enable, **kwargs)
-
-    def control_discharge(self, enable, **kwargs):
-        # >>>> Possibly move this up into SolisInverter
-        self._control_charge_discharge("discharge", enable, **kwargs)
+    def set_energy_control_switch(self, code: int):
+        self.log(f"Setting energy control switch to {code}")
 
     def hold_soc(self, enable, soc=None, **kwargs):
         self.log("Holding SOC")
 
-    def set_reserve_soc(self, soc: int):
+    def set_reserve_soc(self, sotrc: int):
         pass
 
     def _get_times_current(self, direction):
@@ -465,46 +513,60 @@ class SolisCloudInverter(SolisInverter):
         current = {"current": self.get_config(f"id_timed_{direction}_current", 0)}
         return times | current
 
-    def _set_time_current(self, direction, **kwargs):
-        for var in LIMITS + ["current"]:
-            value = kwargs.get(var, None)
-            if value is not None:
-                current_value = self.status[direction][var]
-                entity_id = self._host.config.get(f"id_timed_{direction}_{var}", None)
-                self.log(f">>> {entity_id} {current_value} {value}")
-                if (entity_id is not None) and (current_value != value):
-                    changed, written = self.write_to_hass(entity_id=entity_id, value=value)
+    def _set_times(self, direction, **kwargs) -> bool:
+        value_changed = False
+        for limit in [l for l in LIMITS if l in kwargs]:
+            time = kwargs[limit]
+            entity_id = self._host.config.get(f"id_timed_{direction}_{limit}", None)
+            if entity_id is not None:
+                changed, written = self.write_to_hass(entity_id=entity_id, value=time)
+                value_changed = value_changed or written
 
-        return True
+        return value_changed
+
+    def _set_current(self, direction, current: float = 0) -> bool:
+        entity_id = self._host.config.get(f"id_timed_{direction}_current", None)
+        if entity_id is not None:
+            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=0.1)
+
+        if changed:
+            if written:
+                self.log(f"Current {current}A written to inverter")
+            else:
+                self.log(f"Failed to write {current} to inverter")
+        else:
+            self.log("Inverter already at correct current")
+
+        return not (changed and not written)
+
+    def _set_target_soc(self, direction, soc: int = 100, forced=True) -> bool:
+        entity_id = self._host.config.get(f"id_timed_{direction}_soc", None)
+        if forced:
+            tolerance = -1
+        else:
+            tolerance = 0
+
+        if entity_id is not None:
+            changed, written = self.write_to_hass(entity_id=entity_id, value=soc, tolerance=tolerance)
+
+        if changed:
+            if written:
+                self.log(f"Target SOC {soc}% written to inverter")
+            else:
+                self.log(f"Failed to write SOC {soc}% to inverter")
+        else:
+            self.log("Inverter already at correct target SOC")
+
+        return not (changed and not written)
 
 
 class SolisModbusInverter(SolisInverter):
-    def __init__(self, hmi_version):
-        super().__init__(hmi_version)
-
-    @final
-    def control_charge(self, enable, **kwargs):
-        self.control_charge_discharge("charge", enable, **kwargs)
-
-    @final
-    def control_discharge(self, enable, **kwargs):
-        self.control_charge_discharge("discharge", enable, **kwargs)
-
-    @final
-    def control_charge_discharge(self, direction, enable, **kwargs):
-        if enable:
-            times = {limit: kwargs.get(limit, pd.Timestamp("00:00")) for limit in LIMITS}
-        else:
-            # Better to read the start and set end the same
-            times = {limit: pd.Timestamp("00:00") for limit in ["start", "end"]}
-
-        for limit in LIMITS:
-            self.write_time_register(direction, limit, "hour", times[limit].hour)
-            self.write_time_register(direction, limit, "minute", times[limit].minute)
+    def __init__(self, inverter_type, host):
+        super().__init__(inverter_type, host)
 
     @abstractmethod
-    def set_energy_control_switch(self, switches: dict):
-        pass
+    def set_energy_control_switch(self, code):
+        self.log(f"Setting energy control switch to {code}")
 
     @abstractmethod
     def write_backup_soc_register(self, soc):
@@ -518,57 +580,126 @@ class SolisModbusInverter(SolisInverter):
     def write_current_register(self, direction, current, tolerance):
         pass
 
-    def _set_time_current(self, direction):
-        self.log("Setting time and current")
-        return True
+    def _get_times_current(self, direction):
+        times = {}
+        for limit in LIMITS:
+            x = {unit: self.get_config(f"id_timed_{direction}_{limit}_{unit}", 0) for unit in TIME_UNITS}
+            times[limit] = pd.Timestamp(pd.Timestamp.today().date(), tz=self._tz) + pd.Timedelta(**x)
+
+        current = {"current": self.get_config(f"id_timed_{direction}_current", 0)}
+        return times | current
+
+    @abstractmethod
+    def hold_soc(self, enable, soc=None, **kwargs):
+        pass
+
+    def _set_times(self, direction, **times) -> bool:
+        value_changed = False
+        for limit in LIMITS:
+            changed, written = self.write_time_register(direction, limit, "hours", times[limit].hour)
+            value_changed = value_changed or (changed and written)
+            changed, written = self.write_time_register(direction, limit, "minutes", times[limit].minute)
+            value_changed = value_changed or (changed and written)
+        return value_changed
+
+    def _set_current(self, direction, current):
+        changed, written = self.write_current_register(direction, current, tolerance=0.1)
+        return changed and written
 
 
 class SolisSolaxModbusInverter(SolisModbusInverter):
     def __init__(self, inverter_type: str, host):
         super().__init__(inverter_type, host)
+        self._requires_button = True
+
+    def set_energy_control_switch(self, code: int):
+        self.log(f"Setting energy control switch to {code}")
+
+    def write_backup_soc_register(self, soc):
+        pass
 
     def write_time_register(self, direction, limit, unit, value):
-        return super().write_time_register(direction, limit, unit, value)
+        param = f"id_timed_{direction}_{limit}_{unit}"
+        self.log(f">>> param: {param}")
+        entity_id = self._host.config.get(param, None)
+        self.log(f">>> entity_id: {entity_id}")
+        self.log(f">>> value: {value}")
+        if entity_id is not None:
+            return self.write_to_hass(entity_id=entity_id, value=value)
+        else:
+            return False, False
 
     def write_current_register(self, direction, current, tolerance):
-        return super().write_current_register(direction, current, tolerance)
+        entity_id = self._host.config.get(f"id_timed_{direction}_current", None)
+        if entity_id is not None:
+            return self.write_to_hass(entity_id=entity_id, value=current, tolerance=tolerance)
+        else:
+            return False, False
 
-    def set_energy_control_switch(self, switches):
-        return super().set_energy_control_switch(switches)
+    def hold_soc(self, enable, soc=None, **kwargs):
+        pass
+
+    def _set_target_soc(self, direction, soc: int = 100, forced=True) -> bool:
+        entity_id = self._host.config.get(f"id_timed_{direction}_soc", None)
+        if forced:
+            tolerance = -1
+        else:
+            tolerance = 0
+
+        if entity_id is not None:
+            changed, written = self.write_to_hass(entity_id=entity_id, value=soc, tolerance=tolerance)
+
+        if changed:
+            if written:
+                self.log(f"Target SOC {soc}% written to inverter")
+            else:
+                self.log(f"Failed to write SOC {soc}% to inverter")
+        else:
+            self.log("Inverter already at correct target SOC")
+
+        return not (changed and not written)
 
 
 class SolisCoreModbusInverter(SolisModbusInverter):
-    def __init__(self, inverter_type: str, host):
+    def __init__(self, inverter_type, host):
         super().__init__(inverter_type, host)
+        self._requires_button = False
+
+    def set_energy_control_switch(self, code: int):
+        self.log(f"Setting energy control switch to {code}")
+
+    def write_backup_soc_register(self, soc):
+        pass
 
     def write_time_register(self, direction, limit, unit, value):
-        return super().write_time_register(direction, limit, unit, value)
+        pass
 
     def write_current_register(self, direction, current, tolerance):
-        return super().write_current_register(direction, current, tolerance)
+        pass
 
-    def set_energy_control_switch(self, switches):
-        return super().set_energy_control_switch(switches)
-
-    def write_holding_register(self, register, value):
-        return super().write_holding_register(register, value)
+    def hold_soc(self, enable, soc=None, **kwargs):
+        pass
 
 
 class SolisSolarmanModbusInverter(SolisModbusInverter):
-    def __init__(self, inverter_type: str, host):
+    def __init__(self, inverter_type, host):
         super().__init__(inverter_type, host)
+        self._requires_button = False
+
+    def set_energy_control_switch(self, code: int):
+        self.log(f"Setting energy control switch to {code}")
+
+    def write_backup_soc_register(self, soc):
+        pass
 
     def write_time_register(self, direction, limit, unit, value):
-        return super().write_time_register(direction, limit, unit, value)
+        pass
 
     def write_current_register(self, direction, current, tolerance):
-        return super().write_current_register(direction, current, tolerance)
+        pass
 
-    def set_energy_control_switch(self, switches):
-        return super().set_energy_control_switch(switches)
-
-    def write_holding_register(self, register, value):
-        return super().write_holding_register(register, value)
+    def hold_soc(self, enable, soc=None, **kwargs):
+        pass
 
 
 class SolisCloud:
