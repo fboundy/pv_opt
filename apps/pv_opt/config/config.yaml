@@ -231,7 +231,7 @@ pv_opt:
   # These are the default entities used with the Solis Core Modbus integration. You can change them here and over-ride the defaults
 
   # inverter_type: SOLIS_CORE_MODBUS
-  # device_name: solis
+  # device_name: solmod
 
   # modbus_hub: "{device_name}"
   # modbus_slave: 1
@@ -246,6 +246,9 @@ pv_opt:
   # id_grid_power: sensor.{device_name}_grid_active_power
   # id_inverter_ac_power: sensor.{device_name}_inverter_ac_power
   # id_battery_soc: sensor.{device_name}_battery_soc
+
+  # id_grid_import_today: sensor.{device_name}_daily_energy_imported
+  # id_grid_export_today: sensor.{device_name}_daily_energy_exported
 
   # id_timed_charge_start_hours: sensor.{device_name}_timed_charge_start_hour
   # id_timed_charge_start_minutes: sensor.{device_name}_timed_charge_start_minute

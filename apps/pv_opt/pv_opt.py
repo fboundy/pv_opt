@@ -13,7 +13,10 @@ from numpy import nan
 import re
 
 VERSION = "3.19.0"
-
+UNITS = {
+    "current": "A",
+    "power": "W",
+}
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -498,12 +501,12 @@ class PVOpt(hass.Hass):
         self._load_inverter()
 
         retry_count = 0
-        while (not self.inverter.is_online()) and (retry_count < ONLINE_RETRIES):
+        while (not self.inverter.is_online) and (retry_count < ONLINE_RETRIES):
             self.log("Inverter controller appears not to be running. Waiting 5 secomds to re-try")
             time.sleep(5)
             retry_count += 1
 
-        if not self.inverter.is_online():
+        if not self.inverter.is_online:
             e = "Unable to get expected response from Inverter Controller for {self.inverter_type}"
             self.status(e)
             self.log(e, level="ERROR")
@@ -1729,11 +1732,11 @@ class PVOpt(hass.Hass):
         self.static = self.static[self.time_now.floor("30min") :].fillna(0)
 
         self.soc_now = self.get_config("id_battery_soc")
-        x = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
+        soc_last_day = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
         if self.debug:
             self.log(f">>> soc_now: {self.soc_now}")
-            self.log(f">>> x: {x}")
-            self.log(f">>> Original: {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
+            self.log(f">>> soc_last_day: {soc_last_day}")
+            self.log(f">>> Original: {soc_last_day.loc[soc_last_day.loc[: self.static.index[0]].index[-1] :]}")
 
         try:
             self.soc_now = float(self.soc_now)
@@ -1741,26 +1744,30 @@ class PVOpt(hass.Hass):
         except:
             self.log("")
             self.log("Unable to get current SOC from HASS. Using last value from History.", level="WARNING")
-            self.soc_now = x.iloc[-1]
+            self.soc_now = soc_last_day.iloc[-1]
 
         # x = x.astype(float)
 
-        x = pd.to_numeric(x, errors="coerce").interpolate()
+        try:
+            soc_last_day = pd.to_numeric(soc_last_day, errors="coerce").interpolate()
 
-        x = x.loc[x.loc[: self.static.index[0]].index[-1] :]
-        if self.debug:
-            self.log(f">>> Fixed   : {x.loc[x.loc[: self.static.index[0]].index[-1] :]}")
+            soc_last_day = soc_last_day.loc[soc_last_day.loc[: self.static.index[0]].index[-1] :]
+            if self.debug:
+                self.log(f">>> Fixed   : {soc_last_day.loc[soc_last_day.loc[: self.static.index[0]].index[-1] :]}")
 
-        x = pd.concat(
-            [
-                x,
-                pd.Series(
-                    data=[self.soc_now, nan],
-                    index=[self.time_now, self.static.index[0]],
-                ),
-            ]
-        ).sort_index()
-        self.initial_soc = x.interpolate().loc[self.static.index[0]]
+            soc_last_day = pd.concat(
+                [
+                    soc_last_day,
+                    pd.Series(
+                        data=[self.soc_now, nan],
+                        index=[self.time_now, self.static.index[0]],
+                    ),
+                ]
+            ).sort_index()
+            self.initial_soc = soc_last_day.interpolate().loc[self.static.index[0]]
+        except:
+            self.initial_soc = None
+
         if not isinstance(self.initial_soc, float):
             self.log("")
             self.log("Unable to optimise without initial SOC", level="ERROR")
@@ -1900,6 +1907,11 @@ class PVOpt(hass.Hass):
                 status = self.inverter.status
                 self._log_inverterstatus(status)
 
+                retries = 0
+                while not self.inverter.timed_mode and retries < WRITE_POLL_RETRIES:
+                    retries += 1
+                    self.inverter.enable_timed_mode()
+
                 time_to_slot_start = (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60
                 time_to_slot_end = (self.charge_end_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60
 
@@ -1953,7 +1965,7 @@ class PVOpt(hass.Hass):
                     # If the current slot is a Hold SOC slot and we aren't holding then we need to
                     # enable Hold SOC
                     if self.hold and self.hold[0]["active"]:
-                        if not status["hold_soc"]["active"] or status["hold_soc"]["soc"] != self.hold[0]["soc"]:
+                        if not status.get("hold_soc",{}).get("active",False) or status.get("hold_soc",{}).get("soc",0) != self.hold[0]["soc"]:
                             self.log(f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%")
                             self.inverter.hold_soc(
                                 enable=True,
@@ -2078,7 +2090,7 @@ class PVOpt(hass.Hass):
                             self.inverter.control_charge(enable=False)
                             did_something = True
 
-                    if status["hold_soc"]["active"]:
+                    if status.get("hold_soc", {}).get("active", False):
                         self.inverter.hold_soc(enable=False)
                         str_log += " but inverter is holding SOC. Disabling."
                         self.log(str_log)
@@ -2106,7 +2118,7 @@ class PVOpt(hass.Hass):
                 "hold_soc": "off",
             }
 
-            if status["hold_soc"]["active"]:
+            if status.get("hold_soc", {}).get("active", False):
                 self.status(f"Holding SOC at {status['hold_soc']['soc']:0.0f}%")
                 status_switches["hold_soc"] = "on"
 
@@ -2217,10 +2229,13 @@ class PVOpt(hass.Hass):
             else:
                 self.log(f"  {s:18s}:")
                 for x in status[s]:
+                    units = UNITS.get(x, "")
                     if isinstance(status[s][x], pd.Timestamp):
                         self.log(f"    {x:16s}: {status[s][x].strftime(DATE_TIME_FORMAT_SHORT)}")
+                    elif isinstance(status[s][x], float):
+                        self.log(f"    {x:16s}: {status[s][x]:0.1f} {units}")
                     else:
-                        self.log(f"    {x:16s}: {status[s][x]}")
+                        self.log(f"    {x:16s}: {status[s][x]} {units}")
         self.log("")
 
     def write_to_hass(self, entity, state, attributes={}):
@@ -2523,12 +2538,15 @@ class PVOpt(hass.Hass):
                 self.status("ERROR: No consumption history.")
                 return
 
-            actual_days = int(
-                round(
-                    (df.index[-1] - df.index[0]).total_seconds() / 3600 / 24,
-                    0,
+            if len(df) > 0:
+                actual_days = int(
+                    round(
+                        (df.index[-1] - df.index[0]).total_seconds() / 3600 / 24,
+                        0,
+                    )
                 )
-            )
+            else:
+                actual_days = 0
 
             self.log(
                 f"  - Got {actual_days} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
@@ -2978,7 +2996,7 @@ class PVOpt(hass.Hass):
 
         return (changed, written)
 
-    def write_and_poll_value(self, entity_id, value: int | float, tolerance=0.0, verbose=False):
+    def write_and_poll_value(self, entity_id, value: int | float, tolerance=0.0, verbose=True):
         changed = False
         written = False
         if tolerance == -1:
@@ -2989,6 +3007,7 @@ class PVOpt(hass.Hass):
                     value = 99
                 else:
                     value += 1
+            diff = -1
         else:
             state = float(self.get_state_retry(entity_id=entity_id))
             diff = abs(state - value)
@@ -3009,10 +3028,10 @@ class PVOpt(hass.Hass):
             except:
                 written = False
 
-            if verbose:
-                str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
-                str_log += f"New state: {float(new_state):4.1f} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
-                self.log(str_log)
+        if verbose:
+            str_log = f"Entity: {entity_id:30s} Value: {float(value):4.1f}  Old State: {float(state):4.1f} "
+            str_log += f"New state: {new_state} Diff: {diff:4.1f} Tol: {tolerance:4.1f}"
+            self.log(str_log)
 
         return (changed, written)
 
