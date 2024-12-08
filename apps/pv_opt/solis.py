@@ -703,6 +703,18 @@ class InverterController:
                             entity_id=entity_id, value=z
                         )
 
+                        if changed:
+                            if written:
+                                self.log(f"Wrote {direction} {limit} {unit} of {value} to inverter")
+                                value_changed = True
+                            else:
+                                self.log(
+                                    f"Failed to write {direction} {limit} {unit} to inverter",
+                                    level="ERROR",
+                                )
+                                write_flag = False
+
+
                     elif self.type == "SOLIS_SOLAX_MODBUS":
                         for unit in ["hours", "minutes"]:
                             # entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"] 
@@ -716,6 +728,17 @@ class InverterController:
                                 entity_id=entity_id, value=value, verbose=True
                             )
 
+                            if changed:
+                                if written:
+                                    self.log(f"Wrote {direction} {limit} {unit} of {value} to inverter")
+                                    value_changed = True
+                                else:
+                                    self.log(
+                                        f"Failed to write {direction} {limit} {unit} to inverter",
+                                        level="ERROR",
+                                    )
+                                    write_flag = False
+
                     elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                         for unit in ["hours", "minutes"]:
                             if unit == "hours":
@@ -724,21 +747,21 @@ class InverterController:
                                 value = times[limit].minute
                             changed, written = self._solis_write_time_register(direction, limit, unit, value)
 
+                            if changed:
+                                if written:
+                                    self.log(f"Wrote {direction} {limit} {unit} of {value} to inverter")
+                                    value_changed = True
+                                else:
+                                    self.log(
+                                        f"Failed to write {direction} {limit} {unit} to inverter",
+                                        level="ERROR",
+                                    )
+                                    write_flag = False
+
                     else:
                         e = "Unknown inverter type"
                         self.log(e, level="ERROR")
                         raise Exception(e)
-
-                    if changed:
-                        if written:
-                            self.log(f"Wrote {direction} {limit} {unit} of {value} to inverter")
-                            value_changed = True
-                        else:
-                            self.log(
-                                f"Failed to write {direction} {limit} {unit} to inverter",
-                                level="ERROR",
-                            )
-                            write_flag = False
 
             if value_changed:
                 if self.type == "SOLIS_SOLAX_MODBUS" and write_flag:

@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.19.0-Beta-20"
+VERSION = "3.19.0-Beta-21"
 
 
 # Change history
@@ -83,6 +83,13 @@ VERSION = "3.19.0-Beta-20"
 # Tidy up comments, print out version number on each optimiser run
 # 3.19.0-Beta-20
 # Incorporate Pull Request #312 changes from main into dev
+# 3.19.0-Beta-21
+# Reload IOG pricing on every optimiser run from BottlecapDave Octopus Energy Integration
+# moved get_io_tariffs from pypy.py to pv_opt.py (to enable the above)
+# Changed Solax holding current from 1W to 1A (to prevent Sleep SOC)
+# Made self.io_prices a global variable (workaround/hack - needs fixing properly via variable passing between classes)
+# Corrected error in "value_changed" logic that meant if the end minutes werent changed, the inverter would not be updated
+#  for the Solax_modbus integration
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
@@ -133,7 +140,8 @@ MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
 WRITE_POLL_SLEEP = 0.5
-WRITE_POLL_TIME_SLEEP = 2
+WRITE_POLL_TIME_SLEEP = 2  #added for Solarman_V2 integration that writes to HA entities of type time. 
+                           #Using WRITE_POLL_SLEEP value of 0.5 is not sufficient)
 WRITE_POLL_RETRIES = 5
 GET_STATE_RETRIES = 5
 GET_STATE_WAIT = 0.5
@@ -691,6 +699,7 @@ class PVOpt(hass.Hass):
         self.car_charging = False
         
         self.bottlecap_entities = {"import": None, "export": None}
+        self.octopus_import_entity = []
 
         # Load arguments from the YAML file
         # If there are none then use the defaults in DEFAULT_CONFIG and DEFAULT_CONFIG_BY_BRAND
@@ -808,6 +817,71 @@ class PVOpt(hass.Hass):
         else:  # No access to Octopus for loading charge to add
             self.io_charge_to_add = 0  # Set default value of 0
             self.old_io_charge_to_add = 0
+
+
+    def get_io_tariffs(self, entity_id1):
+
+        x = {}
+        y = {}
+
+        # Load tariffs from bottlecapdave .event sensors
+        self.log("")
+        self.log("    Downloading IOG pricing information from Octopus Energy Integration")
+
+        x = pd.DataFrame(self.get_state_retry(entity_id1, attribute=("rates")))
+        # self.log("")
+        # self.log("Read of Bottlecap current day rate entity simplfied is.....")
+        # self.log(x.to_string())
+
+        if not x.empty:
+            x = x.set_index("start")["value_inc_vat"]
+            x.index = pd.to_datetime(x.index)
+            x.index = x.index.tz_convert("UTC")
+            x *= 100
+            # SVB logging
+            self.rlog(f"      Reading current day IOG prices from  {entity_id1}")
+
+            if (self.debug and "T" in self.debug_cat):
+                self.log(f"\n{x.to_string()}")
+        else:
+            self.log("      No data found in current day rate")
+
+        # current_day_rates loaded, change the entity name to next_day_rates
+        entity_id1 = entity_id1.replace("_current_day_rates", "_next_day_rates")
+
+        y = pd.DataFrame(self.get_state_retry(entity_id1, attribute=("rates")))
+
+        if (self.debug and "T" in self.debug_cat):
+            self.log("")
+            self.log("Read of Bottlecap next day rate entity simplfied is.....")
+            self.log(f"\n{y.to_string()}")
+
+
+        if not y.empty:
+            y = y.set_index("start")["value_inc_vat"]
+            y.index = pd.to_datetime(y.index)
+            y.index = y.index.tz_convert("UTC")
+            y *= 100
+            self.rlog(f"      Reading next day IOG prices from  {entity_id1}")
+
+            if (self.debug and "T" in self.debug_cat):
+                self.log(f"\n{y.to_string()}")
+
+        else:
+            self.log("      No data found in next day rate")
+
+        # Concatenate todays and tomorrows tariffs into one DataSeries
+        if not x.empty:
+            z = x.combine_first(y)
+            if (self.debug and "T" in self.debug_cat):
+                self.log("")
+                self.log("IOG prices are")
+                self.log(f"\n{z.to_string()}")
+        else:
+            z = y
+
+        return z
+
 
     def _get_io_car_slots(self):
         # IOG: Get Planned Car dispatches from Intelligent Dispatching sensor
@@ -2274,6 +2348,14 @@ class PVOpt(hass.Hass):
                 )
                 self._load_contract()
                 self.tariff_reloaded = 1
+
+            # reload pricing from bottlecap dave sensors on every optimiser run
+            
+            self.log("")
+            self.ulog("Reload IOG prices from Octopus Energy Integration")
+
+            self.io_prices = self.get_io_tariffs(self.octopus_import_entity[0])
+            
 
         elif self.contract_last_loaded.day != pd.Timestamp.now(tz="UTC").day:
             self._load_contract()

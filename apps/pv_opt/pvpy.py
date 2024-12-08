@@ -103,7 +103,7 @@ class Tariff:
         self.eco7_start = pd.Timestamp(eco7_start, tz="UTC")
         self.manual = manual
 
-        self.io_prices = {}
+        self.host.io_prices = {}
 
         if octopus:
             self.get_octopus_from_website(**kwargs)
@@ -125,7 +125,7 @@ class Tariff:
             if self.host.get_config("octopus_auto"):
                 try:
                     self.log(f"    Trying to find Octopus Intelligent Entities from Octopus Energy Integration:")
-                    octopus_import_entity = [
+                    self.host.octopus_import_entity = [
                         name
                         for name in self.host.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
                         if (
@@ -134,10 +134,10 @@ class Tariff:
                             and not "export" in name
                         )
                     ]
-                    self.rlog(f"      Octopus Intelligent Import Entity found: {octopus_import_entity}")
+                    self.rlog(f"      Octopus Intelligent Import Entity found: {self.host.octopus_import_entity}")
 
-                    self.io_prices = self.get_io_tariffs(octopus_import_entity[0])
-                    # self.io_prices = self._get_io_tariffs(octopus_import_entity)        # Error forcing: failure to load prices
+                    self.host.io_prices = self.host.get_io_tariffs(self.host.octopus_import_entity[0])
+                    # self.host.io_prices = self.host.get_io_tariffs(self.host.octopus_import_entity)        # Error forcing: failure to load prices
 
                 except Exception as e:
                     self.log(f"{e.__traceback__.tb_lineno}: {e}", level="ERROR")
@@ -198,68 +198,6 @@ class Tariff:
             # self.log(self.unit)
             # self.log("")
 
-    def get_io_tariffs(self, entity_id1):
-
-        x = {}
-        y = {}
-
-        # Load tariffs from bottlecapdave .event sensors
-        self.log("")
-        self.log("    Downloading IOG pricing information from Octopus Energy Integration")
-
-        x = pd.DataFrame(self.host.get_state_retry(entity_id1, attribute=("rates")))
-        # self.log("")
-        # self.log("Read of Bottlecap current day rate entity simplfied is.....")
-        # self.log(x.to_string())
-
-        if not x.empty:
-            x = x.set_index("start")["value_inc_vat"]
-            x.index = pd.to_datetime(x.index)
-            x.index = x.index.tz_convert("UTC")
-            x *= 100
-            # SVB logging
-            self.rlog(f"      Reading current day IOG prices from  {entity_id1}")
-
-            if (self.host.debug and "T" in self.host.debug_cat):
-                self.log(f"\n{x.to_string()}")
-        else:
-            self.log("      No data found in current day rate")
-
-        # current_day_rates loaded, change the entity name to next_day_rates
-        entity_id1 = entity_id1.replace("_current_day_rates", "_next_day_rates")
-
-        y = pd.DataFrame(self.host.get_state_retry(entity_id1, attribute=("rates")))
-
-        if (self.host.debug and "T" in self.host.debug_cat):
-            self.log("")
-            self.log("Read of Bottlecap next day rate entity simplfied is.....")
-            self.log(f"\n{y.to_string()}")
-
-
-        if not y.empty:
-            y = y.set_index("start")["value_inc_vat"]
-            y.index = pd.to_datetime(y.index)
-            y.index = y.index.tz_convert("UTC")
-            y *= 100
-            self.rlog(f"      Reading next day IOG prices from  {entity_id1}")
-
-            if (self.host.debug and "T" in self.host.debug_cat):
-                self.log(f"\n{y.to_string()}")
-
-        else:
-            self.log("      No data found in next day rate")
-
-        # Concatenate todays and tomorrows tariffs into one DataSeries
-        if not x.empty:
-            z = x.combine_first(y)
-            if (self.host.debug and "T" in self.host.debug_cat):
-                self.log("")
-                self.log("IOG prices are")
-                self.log(f"\n{z.to_string()}")
-        else:
-            z = y
-
-        return z
 
     def __str__(self):
         if self.export:
@@ -449,9 +387,9 @@ class Tariff:
 
             # We then need to overwrite the df data with the IOG dataframe here.
 
-            if len(self.io_prices) > 0:
+            if len(self.host.io_prices) > 0:
                 # Add IO slot prices as a column to dataframe.
-                df = pd.concat([df, self.io_prices], axis=1).set_axis(["unit", "io_unit"], axis=1)
+                df = pd.concat([df, self.host.io_prices], axis=1).set_axis(["unit", "io_unit"], axis=1)
 
                 #self.log("To_df, Printing concat")
                 #self.log(df.to_string())
