@@ -1770,9 +1770,8 @@ class PVOpt(hass.Hass):
 
         if not isinstance(self.initial_soc, float):
             self.log("")
-            self.log("Unable to optimise without initial SOC", level="ERROR")
-            self.status("ERROR: No initial SOC")
-            return
+            self.log("Unable to retrieve initial SOC - assuming it is the same as current SOC", level="WARNING")
+            self.initial_soc = self.soc_now
 
         self.log("")
         self.log(f"Initial SOC: {self.initial_soc}")
@@ -1965,7 +1964,10 @@ class PVOpt(hass.Hass):
                     # If the current slot is a Hold SOC slot and we aren't holding then we need to
                     # enable Hold SOC
                     if self.hold and self.hold[0]["active"]:
-                        if not status.get("hold_soc",{}).get("active",False) or status.get("hold_soc",{}).get("soc",0) != self.hold[0]["soc"]:
+                        if (
+                            not status.get("hold_soc", {}).get("active", False)
+                            or status.get("hold_soc", {}).get("soc", 0) != self.hold[0]["soc"]
+                        ):
                             self.log(f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%")
                             self.inverter.hold_soc(
                                 enable=True,
@@ -2545,12 +2547,13 @@ class PVOpt(hass.Hass):
                         0,
                     )
                 )
+                self.log(
+                    f"  - Got {actual_days} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
+                )
             else:
                 actual_days = 0
+                self.log(f"  - Got no consumption history")
 
-            self.log(
-                f"  - Got {actual_days} days history from {entity_id} from {df.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {df.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}"
-            )
             if int(actual_days) == days:
                 str_days = "OK"
             else:

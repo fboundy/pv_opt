@@ -323,8 +323,8 @@ pv_opt:
   #
   # These are the default entities used with the Solis Solax Modbus integration. You can change them here and over-ride the defaults
 
-  # inverter_type: SOLIS_CLOUD
-  # device_name: soliscolud
+  inverter_type: SOLIS_CLOUD
+  device_name: soliscloud
 
   # battery_voltage: sensor.{device_name}_battery_voltage
   # update_cycle_seconds: 0
