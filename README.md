@@ -54,7 +54,7 @@ This app is not stand-alone it requires the following:
 
 <h3>3. Install the Solcast PV Solar Integration (v4.0.x)</h3>
 
-1. Install the integation via HACS: https://github.com/oziee/ha-solcast-solar
+1. Install the integation via HACS: https://github.com/BJReplay/ha-solcast-solar
 2. Add the Integration via Settings: http://homeassistant.local:8123/config/integrations/dashboard
 3. Once installed configure using your Solcast API Key from (1) . 
 4. Set up an automation to update according to your desired schedule. Once every 3 hours will work.
