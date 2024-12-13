@@ -710,32 +710,6 @@ class PVsystemModel:
 
         slots = []
 
-        # if self.host.agile:
-        # --------------------------------------------------------------------------------------------
-        #  Plunge Pricing
-        # --------------------------------------------------------------------------------------------
-        # if log:
-        #     self.log("")
-        #     self.log("Agile Plunge Pricing")
-        #     self.log("--------------------")
-        #     self.log("")
-        #     # self.log((f">>>{static_flows.columns}"))
-
-        # plunge_threshold = self.host.get_config("plunge_threshold_p_kwh")
-        # plunge = (self.inverter.charger_power - static_flows[kwargs["solar"]])[df["import"] < plunge_threshold]
-        # if log:
-        #     self.log(f">>>{plunge.to_string()}")
-
-        # slots = [(p, max(plunge.loc[p], 0)) for p in plunge.index.to_list()]
-        # df = pd.concat(
-        #     [prices, consumption, self.flows(initial_soc, static_flows, slots=slots, **kwargs)],
-        #     axis=1,
-        # )
-        # plunge_cost = round(contract.net_cost(df).sum(), 1)
-        # if log:
-        #     self.log(f"Plunge cost: {plunge_cost}")
-        # base_cost = plunge_cost
-
         # --------------------------------------------------------------------------------------------
         #  Charging 1st Pass
         # --------------------------------------------------------------------------------------------
@@ -786,6 +760,7 @@ class PVsystemModel:
 
                         # potential windows end at the max_slot
                         x = df.loc[:max_slot].copy()
+                        x = x[available.loc[:max_slot]]
 
                         # count back to find the slots where soc_end < 100
                         x["countback"] = (x["soc_end"] >= 97).sum() - (x["soc_end"] >= 97).cumsum()
@@ -798,7 +773,7 @@ class PVsystemModel:
                         x = x[x["soc_end"] <= 97]
 
                         search_window = x.index
-                        str_log = f"{max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
+                        str_log = f"{i:3d} {available.sum():3d} {max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}: {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
                         if len(search_window) > 0:
                             # str_log += f"Window: [{search_window[0].strftime(TIME_FORMAT)}-{search_window[-1].strftime(TIME_FORMAT)}] "
                             pass
@@ -844,13 +819,22 @@ class PVsystemModel:
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
                                     )
+                                    remaining_slot_capacity = slot_charger_power_available - min_power
+
+                                    if remaining_slot_capacity < 10:
+                                        available[slot] = False
+
                                     if log and self.host.debug:
                                         str_log_x = (
-                                            f">>> Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
+                                            f">>> {i:3d} Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
                                             + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
-                                            + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W"
+                                            + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W "
+                                            + f"RSC: {remaining_slot_capacity:6.0f}W"
                                         )
+                                        if not available[slot]:
+                                            str_log_x += " <== FULL"
                                         self.log(str_log_x)
+
                                     slots.append(
                                         (
                                             slot,
