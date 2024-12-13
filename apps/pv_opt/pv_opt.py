@@ -66,6 +66,7 @@ INVERTER_TYPES = [
     "SUNSYNK_SOLARSYNK2",
     "SOLAX_X1",
     "SOLIS_CLOUD",
+    "SOLIS_SOLARMAN_V2",
 ]
 
 SYSTEM_ARGS = [
@@ -3003,7 +3004,7 @@ class PVOpt(hass.Hass):
         changed = False
         written = False
         if tolerance == -1:
-            state = int(self.get_state_retry(entity_id=entity_id))
+            state = int(float(self.get_state_retry(entity_id=entity_id)))
             changed = True
             if state == int(value):
                 if value == 100:
