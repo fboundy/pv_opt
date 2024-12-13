@@ -174,7 +174,7 @@ pv_opt:
   # If you have a Zappi Charger, uncomment next line to allow Pv_opt to detect car plugin status
   # for use with the Octopus Intelligent Tariff and to allow EV consumption data to be read (if needed).
   #
-  ev_charger: Zappi   # Default = None
+  # ev_charger: Zappi   # Default = None
   #
   #  
   # Required Zappi entities are autodeted. For multiple Zappis (or entity names changed from the MyEnergi Integration defaults), it may be necessary to manually set
@@ -381,9 +381,9 @@ pv_opt:
   # The following do not have defaults stored within Pv_opt so require uncommenting if used:
 
   # Required for Tariff Comparison, see end of file. Can be commented out if not using. 
-  id_solar_power:
-    - sensor.{device_name}_power_pv1
-    - sensor.{device_name}_power_pv2
+  # id_solar_power:
+  #   - sensor.{device_name}_power_pv1
+  #   - sensor.{device_name}_power_pv2
 
 
   # ===============================================================================================================

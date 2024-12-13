@@ -1141,7 +1141,6 @@ class PVsystemModel:
                                 str_log += f"Net: {net_cost_opt:6.1f}"
                                 if log:
                                     self.log(str_log)
-                                    self.log("")
                                     if self.host.debug and "F" in self.host.debug_cat:
                                         xx = pd.concat(
                                             [old_cost, old_soc, contract.net_cost(df), df["soc_end"], df["import"]],

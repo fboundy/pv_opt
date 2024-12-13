@@ -560,6 +560,7 @@ class PVOpt(hass.Hass):
             self.debug = True
 
         self.debug = self.args.get("debug", self.debug)
+        self.prefix = self.args.get("prefix", "solis")
         self.debug_cat = self.args.get("debug_categories", self.debug_cat)
 
         self.log(f"Debug Categories selected = {self.debug_cat}")
@@ -3237,6 +3238,11 @@ class PVOpt(hass.Hass):
 
             self.charge_power = self.windows["forced"].iloc[0]
             voltage = self.get_config("battery_voltage", default=50)
+            try:
+                voltage = float(voltage)
+            except:
+                voltage = 50
+
             if voltage > 0 and not self.charge_power == 1:
                 self.charge_current = self.charge_power / voltage
             elif voltage > 0 and self.charge_power == 1:
@@ -4158,7 +4164,7 @@ class PVOpt(hass.Hass):
         for domain in domains:
             states = self.get_state_retry(domain)
 
-            states = {k: states[k] for k in states if (self.device_name) in k}
+            states = {k: states[k] for k in states if (f"{self.device_name}_") in k}
             # states = {k: states[k] for k in states if self.device_name in k or "zappi" in k}  # : print zappi entities as well
             for entity_id in states:
                 x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
