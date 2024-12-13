@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.19.0"
+VERSION = "3.19.0-beta-1"
 UNITS = {
     "current": "A",
     "power": "W",
