@@ -12,7 +12,7 @@ import numpy as np
 from numpy import nan
 import re
 
-VERSION = "3.18.4"
+VERSION = "3.18.5"
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
