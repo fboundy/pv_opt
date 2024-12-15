@@ -2815,8 +2815,10 @@ class PVOpt(hass.Hass):
                         self.log("")
                         self.log(self.hold)  # Two elements, active (true/false) and SOC (value)
                         self.log(self.hold[0]["soc"])  # SOC value stored in first row of self.hold
-                        self.log(status["hold_soc"]["active"])  # What the inverter thinks its doing
-                        self.log(status["hold_soc"]["soc"])  # The value of backup_soc last read from the inverter.
+                        self.log(status.get("hold_soc", {}).get("active", False))  # What the inverter thinks its doing
+                        self.log(
+                            status.get("hold_soc", {}).get("soc", 0)
+                        )  # The value of backup_soc last read from the inverter.
 
                         # If status is not hold OR the inverter SOC value isnt matching the required SOC hold value
                         if (
@@ -2824,8 +2826,8 @@ class PVOpt(hass.Hass):
                         ):  #  not sure what this line will report
                             self.log("....but status is not hold")
                             self.log(f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%")
-                            self.inverter.hold_soc_old(enable=True, soc=self.hold[0]["soc"])
-
+                            # self.inverter.hold_soc_old(enable=True, soc=self.hold[0]["soc"])
+                            self.inverter.hold_soc(enable=True, soc=self.hold[0]["soc"])
                         else:
                             self.log(f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%")
 

@@ -437,6 +437,7 @@ class SolisInverter(BaseInverterController):
         self._modes = {self._codes[code]: code for code in self._codes}
         self._bits = SOLIS_BITS
         self._requires_button_press = True
+        self._hold_soc = {"active": False, "soc": 0}
 
     @property
     def timed_mode(self):
@@ -482,9 +483,7 @@ class SolisInverter(BaseInverterController):
                 and (self._hmi_fb00 or status["switches"].get("Timed", False))
                 and status["switches"].get("GridCharge", False)
             )
-        # status["hold_soc"] = {
-        #     "active": status["switches"].get("GridCharge", False) and status["switches"].get("Backup", False)
-        # }
+        status["hold_soc"] = self._hold_soc
         return status
 
     def _switches(self, code):
@@ -516,7 +515,7 @@ class SolisInverter(BaseInverterController):
         if enable:
             times["start"] = kwargs.get("start", None)
             times["end"] = kwargs.get("end", None)
-            current = kwargs.get("current", round(kwargs.get("power", 0) / self.voltage, 1))
+            current = kwargs.get("current", abs(round(kwargs.get("power", 0) / self.voltage, 1)))
             soc = kwargs.get("target_soc", None)
 
         else:
@@ -558,9 +557,10 @@ class SolisInverter(BaseInverterController):
             """
             self._set_target_soc(direction, soc, forced=True)
 
-    def hold_soc(self, enable, soc=None, **kwargs):
+    def hold_soc(self, enable, soc=0, **kwargs):
         start = kwargs.get("start", pd.Timestamp.now(tz=self._tz).floor("1min"))
         end = kwargs.get("end", pd.Timestamp.now(tz=self._tz).ceil("30min"))
+        self._hold_soc = {"active": enable, "soc": soc}
         if self._hmi_fb00:
             self._control_charge_discharge(
                 "charge",
@@ -571,6 +571,7 @@ class SolisInverter(BaseInverterController):
                 soc=soc,
             )
         else:
+
             self._control_charge_discharge(
                 "charge",
                 enable=enable,
