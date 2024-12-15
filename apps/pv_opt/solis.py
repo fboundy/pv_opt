@@ -513,7 +513,7 @@ class SolisInverter(BaseInverterController):
         if enable:
             times["start"] = kwargs.get("start", None)
             times["end"] = kwargs.get("end", None)
-            current = kwargs.get("current", round(kwargs.get("power", 0) / self.voltage, 1))
+            current = kwargs.get("current", abs(round(kwargs.get("power", 0) / self.voltage, 1)))
             soc = kwargs.get("target_soc", None)
 
         else:
