@@ -376,15 +376,9 @@ class Tariff:
 
             # SVB #
             # It is at this point that df now looks like the Dataframe that compare_tariffs loads. This is the point
-            # to overwrite the Df with IOG data from the BottlecapDave integration.
-            # We need to load both current_day and next_day events.
-            #
-            # To avoid reading HA every time, this should not be called every optimiser run. Therefore
-            # the bottlecap dave entity should be stored in an IOG dataframe when _load_contract is run, as this is already called at
-            # certain times and when the car is plugged in. This will save HA data delays. Only import needs to be loaded.
-            # DONE, (in _load_contract)
-
-            # We then need to overwrite the df data with the IOG dataframe here.
+            # to overwrite the Df with IOG data from the BottlecapDave integration, loaded in pv_opt.py and passed in here via self.host.io_prices.
+            # (SVB Note: io_prices should be passed in via Class, but I cannot figure out the structure of Tariff and Contract Classes to do this)
+            
 
             if len(self.host.io_prices) > 0:
                 # Add IO slot prices as a column to dataframe.
@@ -395,9 +389,7 @@ class Tariff:
 
                 df = df.dropna(subset=["unit"])  # Drop Nans
                 mask = df["io_unit"] < df["unit"]  # Mask is true if an IOslot
-                # df["unit"][mask] = df["io_unit"]  # Overwrite unit (prices from website) with io_unit (prices from OE integration) if in an IOslot.
-                df.loc[mask, "unit"] = df["io_unit"]
-
+                df.loc[mask, "unit"] = df["io_unit"] # Overwrite unit (prices from website) with io_unit (prices from OE integration) if in an IOslot.
                 df = df.drop(["io_unit"], axis=1)  # remove IO prices column
 
                 # self.log("To_df, Printing result")
