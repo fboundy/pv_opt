@@ -857,7 +857,7 @@ class PVsystemModel:
 
             if log and (self.host.debug and "C" in self.host.debug_cat):
                 self.log(
-                    "SPR = Slot Power Required, SCPA = Slot Charger Power Available, SAC = Slot Available Capacity"
+                    "SPR = Slot Power Required, SCPA = Slot Charger Power Available, SAC = Slot Available Capacity, RSC = Remaining Slot Capacity"
                 )
                 self.log("")
 
