@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.19.0-Beta-21"
+VERSION = "3.19.0-Beta-22"
 UNITS = {
     "current": "A",
     "power": "W",
@@ -648,8 +648,12 @@ class PVOpt(hass.Hass):
         self.ev = (
             self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]
         )  # Is set true only for Zappi at this point
+
         self.car_charging = self.get_config("control_car_charging")
-        self._check_for_zappi()
+
+        if self.ev:
+            self._check_for_zappi()
+
 
         if self.get_config("alt_tariffs") is not None:
             self._compare_tariffs()
