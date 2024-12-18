@@ -1350,7 +1350,7 @@ class PVOpt(hass.Hass):
         grid = grid.set_axis(cols, axis=1).fillna(0)
         grid["grid_export"] *= -1
 
-        cost_today = self.contract.net_cost(grid_flow=grid, log=self.debug, day_ahead=False)
+        cost_today = self.contract.net_cost(grid_flow=grid, log=self.debug, day_ahead=False, sum=False)
 
         return cost_today
 
@@ -2419,7 +2419,7 @@ class PVOpt(hass.Hass):
             self.status("ERROR: Baseline performance")
             return
 
-        self.optimised_cost = {"Base": self.contract.net_cost(self.flows["Base"])}
+        self.optimised_cost = {"Base": self.contract.net_cost(self.flows["Base"], sum=False)}
 
         self.log("")
         if self.get_config("use_solar", True):
@@ -2472,7 +2472,7 @@ class PVOpt(hass.Hass):
                 max_iters=MAX_ITERS,
             )
 
-            self.optimised_cost[case] = self.contract.net_cost(self.flows[case])
+            self.optimised_cost[case] = self.contract.net_cost(self.flows[case], sum=False)
 
         self.ulog("Optimisation Summary")
         self.log(f"  {'Base cost:':40s} {self.optimised_cost['Base'].sum():6.1f}p")
@@ -4028,7 +4028,7 @@ class PVOpt(hass.Hass):
         ]
 
         for contract in contracts:
-            net_base = contract.net_cost(base, day_ahead=False)
+            net_base = contract.net_cost(base, day_ahead=False, sum=False)
             opt = self.pv_system.optimised_force(
                 initial_soc,
                 static,
@@ -4050,7 +4050,7 @@ class PVOpt(hass.Hass):
                 "net_base": round(net_base.sum() / 100, 2),
             } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
 
-            net_opt = contract.net_cost(opt, day_ahead=False)
+            net_opt = contract.net_cost(opt, day_ahead=False, sum=False)
             self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
             entity_id = f"sensor.{self.prefix}_opt_cost_{contract.name}"
             self.set_state(
