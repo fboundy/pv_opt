@@ -14,7 +14,7 @@ from numpy import nan
 from datetime import datetime, timedelta
 import re
 
-VERSION = "3.19.0-Beta-22"
+VERSION = "3.20.0-Beta-22"
 UNITS = {
     "current": "A",
     "power": "W",
