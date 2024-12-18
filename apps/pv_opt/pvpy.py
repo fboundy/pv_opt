@@ -723,18 +723,17 @@ class PVsystemModel:
         else:
             self.log = print
             self.tz = "GB"
-        self._slots = []
         self._net_cost = 0
 
     def __str__(self):
         pass
 
-    def flows(self, initial_soc, static_flows, slots=[], soc_now=None, merge=False, prices=None, **kwargs):
+    def flows(self, slots=[], merge=False, prices=None, **kwargs):
         cols = {k: kwargs.get(k, k) for k in ["solar", "consumption"]}
-        solar = static_flows[cols["solar"]]
-        consumption = static_flows[cols["consumption"]]
+        solar = self.static_flows[cols["solar"]]
+        consumption = self.static_flows[cols["consumption"]]
 
-        df = static_flows.copy()
+        df = self.static_flows.copy()
 
         battery_flows = solar - consumption
         forced_charge = pd.Series(index=df.index, data=0)
@@ -750,13 +749,13 @@ class PVsystemModel:
             battery_flows[chg_mask] = timed_slot_flows[chg_mask]
             forced_charge[chg_mask] = timed_slot_flows[chg_mask]
 
-        if soc_now is None:
-            chg = [initial_soc / 100 * self.battery.capacity]
-            freq = pd.infer_freq(static_flows.index) / pd.Timedelta(60, "minutes")
+        if self.soc_now is None:
+            chg = [self.initial_soc / 100 * self.battery.capacity]
+            freq = pd.infer_freq(self.static_flows.index) / pd.Timedelta(60, "minutes")
 
         else:
-            chg = [soc_now[1] / 100 * self.battery.capacity]
-            freq = (soc_now[0] - df.index[0]) / pd.Timedelta(60, "minutes")
+            chg = [self.soc_now[1] / 100 * self.battery.capacity]
+            freq = (self.soc_now[0] - df.index[0]) / pd.Timedelta(60, "minutes")
 
         for i, flow in enumerate(battery_flows):
             if flow < 0:
@@ -780,11 +779,11 @@ class PVsystemModel:
                     1,
                 )
             )
-            if (soc_now is not None) and (i == 0):
-                freq = pd.infer_freq(static_flows.index) / pd.Timedelta(60, "minutes")
+            if (self.soc_now is not None) and (i == 0):
+                freq = pd.infer_freq(self.static_flows.index) / pd.Timedelta(60, "minutes")
 
-        if soc_now is not None:
-            chg[0] = [initial_soc / 100 * self.battery.capacity]
+        if self.soc_now is not None:
+            chg[0] = [self.initial_soc / 100 * self.battery.capacity]
 
         df["chg"] = chg[:-1]
         df["chg"] = df["chg"].ffill()
@@ -805,14 +804,14 @@ class PVsystemModel:
             )
         return df
 
-    def optimised_force(self, initial_soc, static_flows, contract: Contract, **kwargs):
+    def optimised_force(self, contract: Contract, **kwargs):
         log = kwargs.pop("log", True)
 
         if log and (self.host.debug and "B" in self.host.debug_cat):
             self.log("Called optimised_force")
 
         cols = {k: kwargs.get(k, k) for k in ["consumption", "solar"]}
-        consumption = static_flows[cols["consumption"]]
+        consumption = self.static_flows[cols["consumption"]]
         consumption.name = "consumption"
 
         discharge = kwargs.pop("discharge", False)
@@ -833,8 +832,8 @@ class PVsystemModel:
         #             axis=1,
         #         )
 
-        start = static_flows.index[0]
-        end = static_flows.index[-1]
+        start = self.static_flows.index[0]
+        end = self.static_flows.index[-1]
 
         prices = contract.prices(start=start, end=end)
 
@@ -859,8 +858,6 @@ class PVsystemModel:
             prices["export"] = 0
 
         df = self.flows(
-            initial_soc,
-            static_flows,
             merge=True,
             prices=prices,
             **kwargs,
@@ -895,8 +892,6 @@ class PVsystemModel:
         # self.log("Resetting i to 0")
         i = 0
         df = self.flows(
-            initial_soc,
-            static_flows,
             slots=slots,
             merge=True,
             prices=prices,
@@ -995,8 +990,6 @@ class PVsystemModel:
                                     )
 
                                 df = self.flows(
-                                    initial_soc,
-                                    static_flows,
                                     slots=slots,
                                     merge=True,
                                     prices=prices,
@@ -1032,8 +1025,6 @@ class PVsystemModel:
                 done = True
 
         df = self.flows(
-            initial_soc,
-            static_flows,
             slots=slots,
             merge=True,
             prices=prices,
@@ -1049,8 +1040,6 @@ class PVsystemModel:
             slots = plunge_slots
             net_cost_opt = base_cost
             df = self.flows(
-                initial_soc,
-                static_flows,
                 slots=slots,
                 merge=True,
                 prices=prices,
@@ -1151,8 +1140,6 @@ class PVsystemModel:
                     slots.append(slot)
 
                     df = self.flows(
-                        initial_soc,
-                        static_flows,
                         slots=slots,
                         merge=True,
                         prices=prices,
@@ -1179,8 +1166,6 @@ class PVsystemModel:
                         # done = True
                         slots = slots[:-1]
                         df = self.flows(
-                            initial_soc,
-                            static_flows,
                             slots=slots,
                             merge=True,
                             prices=prices,
@@ -1259,8 +1244,6 @@ class PVsystemModel:
                         slots.append(slot)
 
                         df = self.flows(
-                            initial_soc,
-                            static_flows,
                             slots=slots,
                             merge=True,
                             prices=prices,
@@ -1286,8 +1269,6 @@ class PVsystemModel:
                             # done = True
                             slots = slots[:-1]
                             df = self.flows(
-                                initial_soc,
-                                static_flows,
                                 slots=slots,
                                 merge=True,
                                 prices=prices,
@@ -1317,8 +1298,6 @@ class PVsystemModel:
                 self.log(f"Iteration {j:2d}: Slots added: {slots_added:3d}")
 
         df = self.flows(
-            initial_soc,
-            static_flows,
             slots=slots,
             merge=True,
             prices=prices,
@@ -1356,8 +1335,6 @@ class PVsystemModel:
                         revised_slots.append(x[1])
 
             df = self.flows(
-                initial_soc,
-                static_flows,
                 slots=revised_slots,
                 merge=True,
                 prices=prices,
