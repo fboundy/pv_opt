@@ -935,16 +935,16 @@ class PVsystemModel:
                         if len(search_window) == 0:
                             done = True
 
-                        if len(x) > 0:
-                            min_price = x["import"].min()
+                        if len(search_window) > 0:
+                            min_price = search_window["import"].min()
 
-                            window = x[x["import"] == min_price].index
+                            window = search_window[search_window["import"] == min_price].index
                             start_window = window[0]
 
                             cost_at_min_price = round_trip_energy_required * min_price
 
                             str_log += f"<==> {start_window.tz_convert(self.tz).strftime(TIME_FORMAT)}: {min_price:5.2f}p/kWh {cost_at_min_price:5.2f}p "
-                            str_log += f" SOC: {x.loc[window[0]]['soc']:5.1f}%->{x.loc[window[-1]]['soc_end']:5.1f}% "
+                            str_log += f" SOC: {search_window.loc[window[0]]['soc']:5.1f}%->{search_window.loc[window[-1]]['soc_end']:5.1f}% "
 
                             factors = [1 / len(window) for slot in window]
 
@@ -958,12 +958,15 @@ class PVsystemModel:
                                     slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
                                     slot_charger_power_available = max(
                                         self.inverter.charger_power
-                                        - x["forced"].loc[slot]
-                                        - x[cols["solar"]].loc[slot],
+                                        - search_window["forced"].loc[slot]
+                                        - search_window[cols["solar"]].loc[slot],
                                         0,
                                     )
                                     slot_available_capacity = max(
-                                        ((100 - x["soc_end"].loc[slot]) / 100 * self.battery.capacity) * 2 * factor, 0
+                                        ((100 - search_window["soc_end"].loc[slot]) / 100 * self.battery.capacity)
+                                        * 2
+                                        * factor,
+                                        0,
                                     )
                                     min_power = min(
                                         slot_power_required, slot_charger_power_available, slot_available_capacity
@@ -975,8 +978,8 @@ class PVsystemModel:
 
                                     if log and self.host.debug:
                                         str_log_x = (
-                                            f">>> {i:3d} Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {x['forced'].loc[slot]:6.0f}W  "
-                                            + f"End SOC: {x['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
+                                            f">>> {i:3d} Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {search_window['forced'].loc[slot]:6.0f}W  "
+                                            + f"End SOC: {search_window['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
                                             + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W "
                                             + f"RSC: {remaining_slot_capacity:6.0f}W"
                                         )
@@ -1375,6 +1378,7 @@ class PVsystemModel:
         x = x[x["countback"] == 0]
         x = x[x["forced"] < (self.inverter.charger_power)]
         x = x[x["soc_end"] <= 97]
+        return x
 
 
 # %%
