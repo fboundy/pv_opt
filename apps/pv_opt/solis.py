@@ -49,15 +49,7 @@ SOLIS_DEFAULT_CODES = {
 
 REGISTERS = {
     True: {
-        "timed_charge_soc": 43708,
-        "timed_charge_current": 43709,
-        "timed_charge_start_hours": 43711,
-        "timed_charge_start_minutes": 43712,
-        "timed_charge_end_hours": 43713,
-        "timed_charge_end_minutes": 43714,
-        "timed_discharge_soc": 43750,
-        "timed_discharge_current": 43151,
-        "timed_discharge_start_hours": 43153,
+        "timed_charge_soc": 43708,        "timed_charge_current": 43709,        "timed_charge_start_hours": 43711,        "timed_charge_start_minutes": 43712,        "timed_charge_end_hours": 43713,        "timed_charge_end_minutes": 43714,        "timed_discharge_soc": 43750,        "timed_discharge_current": 43151,        "timed_discharge_start_hours": 43153,
         "timed_discharge_start_minutes": 43154,
         "timed_discharge_end_hours": 43155,
         "timed_discharge_end_minutes": 43156,
