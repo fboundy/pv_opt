@@ -34,6 +34,16 @@ jobs:
       - name: Run isort
         run: isort .
 
-      - name: Run Black Formatter
-        run: black --line-length 119 .
+      # - name: Run Black Formatter
+      #   run: black --line-length 119 .
 
+      - name: Check for Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Automatically sorted imports with isort"
+            git push
+          else
+            echo "No changes to commit."
