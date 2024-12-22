@@ -1,14 +1,15 @@
 # %%
+from copy import copy
+# from scipy.stats import linregress
+from datetime import datetime
+
+import numpy as np
 import pandas as pd
 import requests
-from copy import copy
 from numpy import isnan
-import numpy as np
 
 # from scipy.optimize import differential_evolution
 
-# from scipy.stats import linregress
-from datetime import datetime
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 AGILE_PREDICT_URL = r"https://agilepredict.com/api/"
@@ -127,19 +128,27 @@ class Tariff:
         if "INTELLI" in name and not self.export:
             if self.host.get_config("octopus_auto"):
                 try:
-                    self.log(f"    Trying to find Octopus Intelligent Entities from Octopus Energy Integration:")
+                    self.log(
+                        f"    Trying to find Octopus Intelligent Entities from Octopus Energy Integration:"
+                    )
                     self.host.octopus_import_entity = [
                         name
-                        for name in self.host.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
+                        for name in self.host.get_state_retry(
+                            BOTTLECAP_DAVE["domain"]
+                        ).keys()
                         if (
                             "octopus_energy_electricity" in name
                             and BOTTLECAP_DAVE["rates"] in name
                             and not "export" in name
                         )
                     ]
-                    self.rlog(f"      Octopus Intelligent Import Entity found: {self.host.octopus_import_entity}")
+                    self.rlog(
+                        f"      Octopus Intelligent Import Entity found: {self.host.octopus_import_entity}"
+                    )
 
-                    self.host.io_prices = self.host.get_io_tariffs(self.host.octopus_import_entity[0])
+                    self.host.io_prices = self.host.get_io_tariffs(
+                        self.host.octopus_import_entity[0]
+                    )
                     # self.host.io_prices = self.host.get_io_tariffs(self.host.octopus_import_entity)        # Error forcing: failure to load prices
 
                 except Exception as e:
@@ -184,11 +193,15 @@ class Tariff:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/day-unit-rates/"
 
             self.day = [
-                x for x in requests.get(url, params=params).json()["results"] if x["payment_method"] == "DIRECT_DEBIT"
+                x
+                for x in requests.get(url, params=params).json()["results"]
+                if x["payment_method"] == "DIRECT_DEBIT"
             ]
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/night-unit-rates/"
             self.night = [
-                x for x in requests.get(url, params=params).json()["results"] if x["payment_method"] == "DIRECT_DEBIT"
+                x
+                for x in requests.get(url, params=params).json()["results"]
+                if x["payment_method"] == "DIRECT_DEBIT"
             ]
             self.unit = self.day
 
@@ -228,7 +241,9 @@ class Tariff:
 
         if self.host.debug and "V" in self.host.debug_cat:
             self.log(f">>> {self.name}")
-            self.log(f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}")
+            self.log(
+                f">>> Start: {start.strftime(TIME_FORMAT)} End: {end.strftime(TIME_FORMAT)}"
+            )
 
         time_now = pd.Timestamp.now(tz="UTC")
 
@@ -245,11 +260,16 @@ class Tariff:
         if end is None:
             end = pd.Timestamp.now(tz=start.tzinfo).ceil("30min")
 
-        use_day_ahead = kwargs.get("day_ahead", ((start > time_now) or (end > time_now)))
+        use_day_ahead = kwargs.get(
+            "day_ahead", ((start > time_now) or (end > time_now))
+        )
 
         if self.eco7:
             df = pd.concat(
-                [pd.DataFrame(x).set_index("valid_from")["value_inc_vat"] for x in [self.day, self.night]],
+                [
+                    pd.DataFrame(x).set_index("valid_from")["value_inc_vat"]
+                    for x in [self.day, self.night]
+                ],
                 axis=1,
             ).set_axis(["unit", "Night"], axis=1)
             df.index = pd.to_datetime(df.index)
@@ -272,11 +292,16 @@ class Tariff:
                 pd.concat(
                     [
                         pd.DataFrame(
-                            index=[midnight + pd.Timedelta(f"{x['period_start']}:00") for x in self.unit],
+                            index=[
+                                midnight + pd.Timedelta(f"{x['period_start']}:00")
+                                for x in self.unit
+                            ],
                             data=[{"unit": x["price"]} for x in self.unit],
                         ).sort_index()
                         for midnight in pd.date_range(
-                            start.floor("1D") - pd.Timedelta("1D"), end.ceil("1D"), freq="1D"
+                            start.floor("1D") - pd.Timedelta("1D"),
+                            end.ceil("1D"),
+                            freq="1D",
                         )
                     ]
                 )
@@ -349,12 +374,22 @@ class Tariff:
                     # self.log(f"\n{self.agile_predict}")
 
                 if self.agile_predict is not None:
-                    df = pd.concat([df, self.agile_predict.loc[df.index[-1] + pd.Timedelta("30min") : end]])
+                    df = pd.concat(
+                        [
+                            df,
+                            self.agile_predict.loc[
+                                df.index[-1] + pd.Timedelta("30min") : end
+                            ],
+                        ]
+                    )
                     # self.log("Df concat with agile predict is")
                     # self.log(f"\n{df}")
 
             # If the index frequency >30 minutes so we need to just extend it:
-            if (len(df) > 1 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30) or len(df) == 1:
+            if (
+                len(df) > 1
+                and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30
+            ) or len(df) == 1:
                 newindex = pd.date_range(df.index[0], end, freq="30min")
                 df = df.reindex(index=newindex).ffill().loc[start:]
             else:
@@ -366,7 +401,11 @@ class Tariff:
                         df.index[-1] + pd.Timedelta(24, "hours"),
                         freq="30min",
                     )
-                    dfx = pd.concat([df, pd.DataFrame(index=extended_index)]).shift(48).loc[extended_index[0] :]
+                    dfx = (
+                        pd.concat([df, pd.DataFrame(index=extended_index)])
+                        .shift(48)
+                        .loc[extended_index[0] :]
+                    )
                     df = pd.concat([df, dfx])
                     df = df[df.columns[0]]
                 df = df.loc[start:end]
@@ -384,7 +423,9 @@ class Tariff:
 
             if len(self.host.io_prices) > 0:
                 # Add IO slot prices as a column to dataframe.
-                df = pd.concat([df, self.host.io_prices], axis=1).set_axis(["unit", "io_unit"], axis=1)
+                df = pd.concat([df, self.host.io_prices], axis=1).set_axis(
+                    ["unit", "io_unit"], axis=1
+                )
 
                 # self.log("To_df, Printing concat")
                 # self.log(df.to_string())
@@ -402,7 +443,11 @@ class Tariff:
         # Add a column "fixed" for the standing charge.
         if not self.export:
             if not self.manual:
-                x = pd.DataFrame(self.fixed).set_index("valid_from")["value_inc_vat"].sort_index()
+                x = (
+                    pd.DataFrame(self.fixed)
+                    .set_index("valid_from")["value_inc_vat"]
+                    .sort_index()
+                )
                 x.index = pd.to_datetime(x.index)
                 newindex = pd.date_range(x.index[0], df.index[-1], freq="30min")
                 x = x.reindex(newindex).sort_index()
@@ -553,7 +598,13 @@ class BatteryModel:
         voltage: An int describing the voltage of the battery system.
     """
 
-    def __init__(self, capacity: int, max_dod: float = 0.15, current_limit_amps: int = 100, voltage: int = 50) -> None:
+    def __init__(
+        self,
+        capacity: int,
+        max_dod: float = 0.15,
+        current_limit_amps: int = 100,
+        voltage: int = 50,
+    ) -> None:
         self.capacity = capacity
         self.max_dod = max_dod
         self.current_limit_amps = current_limit_amps
@@ -609,7 +660,9 @@ class Contract:
             self.tz = "GB"
 
         if imp is None and octopus_account is None:
-            raise ValueError("Either a named import tariff or Octopus Account details much be provided")
+            raise ValueError(
+                "Either a named import tariff or Octopus Account details much be provided"
+            )
 
         self.tariffs = {}
 
@@ -643,7 +696,9 @@ class Contract:
 
                 self.rlog(f"Retrieved most recent tariff code {tariff_code}")
                 if mpan["is_export"]:
-                    self.tariffs["export"] = Tariff(tariff_code, export=True, host=self.host)
+                    self.tariffs["export"] = Tariff(
+                        tariff_code, export=True, host=self.host
+                    )
                 else:
                     self.tariffs["import"] = Tariff(tariff_code, host=self.host)
 
@@ -685,12 +740,20 @@ class Contract:
         imp_df = self.tariffs["import"].to_df(start, end, **kwargs)
         nc = imp_df["fixed"]
         if kwargs.get("log") and (self.host.debug and "F" in self.host.debug_cat):
-            self.rlog(f">>> Import{self.tariffs['import'].to_df(start,end).to_string()}")
+            self.rlog(
+                f">>> Import{self.tariffs['import'].to_df(start,end).to_string()}"
+            )
         nc += imp_df["unit"] * grid_imp / 2000
         if kwargs.get("log") and (self.host.debug and "F" in self.host.debug_cat):
-            self.rlog(f">>> Export{self.tariffs['export'].to_df(start,end).to_string()}")
+            self.rlog(
+                f">>> Export{self.tariffs['export'].to_df(start,end).to_string()}"
+            )
         if self.tariffs["export"] is not None:
-            nc += self.tariffs["export"].to_df(start, end, **kwargs)["unit"] * grid_exp / 2000
+            nc += (
+                self.tariffs["export"].to_df(start, end, **kwargs)["unit"]
+                * grid_exp
+                / 2000
+            )
 
         if self.host.debug and "V" in self.host.debug_cat:
             self.log("")
@@ -715,7 +778,9 @@ class Contract:
 
 
 class PVsystemModel:
-    def __init__(self, name: str, inverter: InverterModel, battery: BatteryModel, host=None) -> None:
+    def __init__(
+        self, name: str, inverter: InverterModel, battery: BatteryModel, host=None
+    ) -> None:
         self.name = name
         self.inverter = inverter
         self.battery = battery
@@ -736,7 +801,9 @@ class PVsystemModel:
     def __str__(self):
         pass
 
-    def calculate_flows(self, slots=[], solar_id="solar", consumption_id="consumption", **kwargs):
+    def calculate_flows(
+        self, slots=[], solar_id="solar", consumption_id="consumption", **kwargs
+    ):
         solar = self.static_flows[solar_id]
         consumption = self.static_flows[consumption_id]
 
@@ -787,7 +854,9 @@ class PVsystemModel:
                 )
             )
             if (self.soc_now is not None) and (i == 0):
-                freq = pd.infer_freq(self.static_flows.index) / pd.Timedelta(60, "minutes")
+                freq = pd.infer_freq(self.static_flows.index) / pd.Timedelta(
+                    60, "minutes"
+                )
 
         if self.soc_now is not None:
             chg[0] = self.initial_soc / 100 * self.battery.capacity
@@ -800,7 +869,9 @@ class PVsystemModel:
         self.flows.loc[self.flows["battery"] > 0, "battery"] = (
             self.flows["battery"] * self.inverter.inverter_efficiency
         )
-        self.flows.loc[self.flows["battery"] < 0, "battery"] = self.flows["battery"] / self.inverter.charger_efficiency
+        self.flows.loc[self.flows["battery"] < 0, "battery"] = (
+            self.flows["battery"] / self.inverter.charger_efficiency
+        )
         self.flows["grid"] = -(solar - consumption + self.flows["battery"]).round(0)
         self.flows["forced"] = forced_charge
         self.flows["soc"] = (self.flows["chg"] / self.battery.capacity) * 100
@@ -835,7 +906,12 @@ class PVsystemModel:
 
         self.prices = self.contract.prices(start=start, end=end)
         self.prices = self.prices.set_axis(
-            [t for t in self.contract.tariffs.keys() if self.contract.tariffs[t] is not None], axis=1
+            [
+                t
+                for t in self.contract.tariffs.keys()
+                if self.contract.tariffs[t] is not None
+            ],
+            axis=1,
         )
 
         if not use_export:
@@ -892,7 +968,11 @@ class PVsystemModel:
 
         # df.index = pd.to_datetime(df.index)
 
-        if (not self.host.get_config("allow_cyclic")) and (len(self.slots) > 0) and discharge:
+        if (
+            (not self.host.get_config("allow_cyclic"))
+            and (len(self.slots) > 0)
+            and discharge
+        ):
             if log:
                 self.log("")
                 self.log("Removing cyclic charge/discharge")
@@ -924,7 +1004,9 @@ class PVsystemModel:
 
             best_cost_new = self.net_cost
             if log:
-                self.log(f"  Net cost revised from {self.best_cost:0.1f}p to {best_cost_new:0.1f}p")
+                self.log(
+                    f"  Net cost revised from {self.best_cost:0.1f}p to {best_cost_new:0.1f}p"
+                )
             slots = revised_slots
             # self.flows.index = pd.to_datetime(df.index)
         return self.flows
@@ -968,27 +1050,37 @@ class PVsystemModel:
             if (i > 96) or (available.sum() == 0):
                 done = True
 
-            import_cost = ((self.flows["import"] * self.flows["grid"]).clip(0) / 2000)[~tested]
+            import_cost = ((self.flows["import"] * self.flows["grid"]).clip(0) / 2000)[
+                ~tested
+            ]
 
             if len(import_cost[self.flows["forced"] == 0]) > 0:
                 max_import_cost = import_cost[self.flows["forced"] == 0].max()
                 if len(import_cost[import_cost == max_import_cost]) > 0:
                     max_slot = import_cost[import_cost == max_import_cost].index[0]
-                    max_slot_energy = round(self.flows["grid"].loc[max_slot] / 2000, 2)  # kWh
+                    max_slot_energy = round(
+                        self.flows["grid"].loc[max_slot] / 2000, 2
+                    )  # kWh
                     str_log = f"{i:3d} {available.sum():3d} {max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}:"
 
                     if max_slot_energy > 0:
                         round_trip_energy_required = (
-                            max_slot_energy / self.inverter.charger_efficiency / self.inverter.inverter_efficiency
+                            max_slot_energy
+                            / self.inverter.charger_efficiency
+                            / self.inverter.inverter_efficiency
                         )
 
-                        search_window = self._search_window(self.flows, available, max_slot)
+                        search_window = self._search_window(
+                            self.flows, available, max_slot
+                        )
                         str_log += f" {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
 
                         if len(search_window) > 0:
                             min_price = search_window["import"].min()
 
-                            window = search_window[search_window["import"] == min_price].index
+                            window = search_window[
+                                search_window["import"] == min_price
+                            ].index
                             start_window = window[0]
 
                             cost_at_min_price = round_trip_energy_required * min_price
@@ -1000,7 +1092,9 @@ class PVsystemModel:
 
                             if round(cost_at_min_price, 1) < round(max_import_cost, 1):
                                 for slot, factor in zip(window, factors):
-                                    slot_power_required = max(round_trip_energy_required * 2000 * factor, 0)
+                                    slot_power_required = max(
+                                        round_trip_energy_required * 2000 * factor, 0
+                                    )
                                     slot_charger_power_available = max(
                                         self.inverter.charger_power
                                         - search_window["forced"].loc[slot]
@@ -1008,15 +1102,23 @@ class PVsystemModel:
                                         0,
                                     )
                                     slot_available_capacity = max(
-                                        ((100 - search_window["soc_end"].loc[slot]) / 100 * self.battery.capacity)
+                                        (
+                                            (100 - search_window["soc_end"].loc[slot])
+                                            / 100
+                                            * self.battery.capacity
+                                        )
                                         * 2
                                         * factor,
                                         0,
                                     )
                                     min_power = min(
-                                        slot_power_required, slot_charger_power_available, slot_available_capacity
+                                        slot_power_required,
+                                        slot_charger_power_available,
+                                        slot_available_capacity,
                                     )
-                                    remaining_slot_capacity = slot_charger_power_available - min_power
+                                    remaining_slot_capacity = (
+                                        slot_charger_power_available - min_power
+                                    )
 
                                     if remaining_slot_capacity < 10:
                                         available[slot] = False
@@ -1093,7 +1195,9 @@ class PVsystemModel:
         # net_cost_previous = best_cost
 
         if log:
-            self.log(f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh.")
+            self.log(
+                f"Max export price when there is no forced charge: {max_export_price:0.2f}p/kWh."
+            )
 
         i = 0
         available = (
@@ -1104,7 +1208,9 @@ class PVsystemModel:
 
         a0 = available.sum()
         if log:
-            self.log(f"{available.sum()} slots have an import price less than the max export price")
+            self.log(
+                f"{available.sum()} slots have an import price less than the max export price"
+            )
         done = available.sum() == 0
 
         if self.host.debug and "C" in self.host.debug_cat:
@@ -1147,7 +1253,13 @@ class PVsystemModel:
                     min(self.battery.max_charge_power, self.inverter.charger_power)
                     - x["forced"].loc[start_window]
                     - x["solar"].loc[start_window],
-                    ((100 - x["soc_end"].loc[start_window]) / 100 * self.battery.capacity) * 2 * factor,
+                    (
+                        (100 - x["soc_end"].loc[start_window])
+                        / 100
+                        * self.battery.capacity
+                    )
+                    * 2
+                    * factor,
                 )
                 if self.host.debug and "C" in self.host.debug_cat:
                     self.log(f"Forced Charge = {forced_charge}")
@@ -1216,10 +1328,14 @@ class PVsystemModel:
             self.log("")
 
         i = 0
-        available = (self.flows["export"] > min_import_price) & (self.flows["forced"] == 0)
+        available = (self.flows["export"] > min_import_price) & (
+            self.flows["forced"] == 0
+        )
         a0 = available.sum()
         if log:
-            self.log(f"{available.sum()} slots have an export price greater than the min import price")
+            self.log(
+                f"{available.sum()} slots have an export price greater than the min import price"
+            )
         done = available.sum() == 0
 
         while not done:
@@ -1241,9 +1357,16 @@ class PVsystemModel:
                 slot = (
                     start_window,
                     -min(
-                        min(self.battery.max_discharge_power, self.inverter.charger_power)
+                        min(
+                            self.battery.max_discharge_power,
+                            self.inverter.charger_power,
+                        )
                         - x["solar"].loc[start_window],
-                        ((x["soc_end"].loc[start_window] - self.battery.max_dod) / 100 * self.battery.capacity)
+                        (
+                            (x["soc_end"].loc[start_window] - self.battery.max_dod)
+                            / 100
+                            * self.battery.capacity
+                        )
                         * 2
                         * factor,
                     ),
@@ -1276,13 +1399,9 @@ class PVsystemModel:
         cost_delta = best_cost - self.best_cost
         str_log = f"Discharge net cost delta:{(-cost_delta):5.1f}p"
         if cost_delta > -self.host.get_config("discharge_threshold_p"):
-            str_log += (
-                f": < Discharge threshold ({self.host.get_config('discharge_threshold_p'):0.1f}p) => Slots excluded"
-            )
+            str_log += f": < Discharge threshold ({self.host.get_config('discharge_threshold_p'):0.1f}p) => Slots excluded"
         else:
-            str_log += (
-                f": > Discharge Threshold ({self.host.get_config('discharge_threshold_p'):0.1f}p) => Slots included"
-            )
+            str_log += f": > Discharge Threshold ({self.host.get_config('discharge_threshold_p'):0.1f}p) => Slots included"
             self.slots = slots
             self.slots_added = slots_added
             self.best_cost = best_cost
