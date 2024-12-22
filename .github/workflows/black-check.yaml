@@ -41,10 +41,15 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          echo "Checking for changes..."
+          git status
           if [ -n "$(git status --porcelain)" ]; then
+            echo "Changes detected. Adding and committing."
             git add .
             git commit -m "Automatically formatted code with Black and isort"
             git push
           else
             echo "No changes to commit."
+          fi
+
 
