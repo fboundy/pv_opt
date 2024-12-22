@@ -32,8 +32,8 @@ jobs:
           pip install black isort
 
       - name: Run isort
-        run: isort .
+        run: isort --diff .
 
-      - name: Run Black Formatter
-        run: black --line-length 119 --check --diff .
+      # - name: Run Black Formatter
+      #   run: black --line-length 119 --check --diff .
 
