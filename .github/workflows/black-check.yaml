@@ -4,9 +4,14 @@ on:
   push:
     branches:
       - main  # Specify branches to run on (e.g., `main`)
+      - patch
+      - dev
+
   pull_request:
     branches:
       - main  # Automatically format PRs targeting `main`
+      - patch
+      - dev
 
 jobs:
   autoformat:
