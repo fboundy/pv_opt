@@ -1,20 +1,16 @@
-name: Black Formatter Check
+name: Auto-format with Black
 
 on:
   push:
     branches:
-      - main  # Specify the branches you want to check (e.g., main)
-        patch
-        dev
+      - main  # Specify branches to run on (e.g., `main`)
   pull_request:
     branches:
-      - main  # Run checks for pull requests targeting main
-        patch
-        dev
+      - main  # Automatically format PRs targeting `main`
 
 jobs:
-  black:
-    name: Run Black Formatter
+  autoformat:
+    name: Auto-format Code with Black
     runs-on: ubuntu-latest
 
     steps:
@@ -32,4 +28,15 @@ jobs:
           pip install black
 
       - name: Run Black Formatter
-        run: black --linelength=119
+        run: black --line-length 119 .
+
+      - name: Check for Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Automatically formatted code with Black (line-length=119)"
+            git push
+          else
+            echo "No changes to commit."
