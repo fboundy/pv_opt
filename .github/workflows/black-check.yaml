@@ -1,0 +1,35 @@
+name: Black Formatter Check
+
+on:
+  push:
+    branches:
+      - main  # Specify the branches you want to check (e.g., main)
+        patch
+        dev
+  pull_request:
+    branches:
+      - main  # Run checks for pull requests targeting main
+        patch
+        dev
+
+jobs:
+  black:
+    name: Run Black Formatter
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install Black
+        run: |
+          python -m pip install --upgrade pip
+          pip install black
+
+      - name: Run Black Formatter
+        run: black --linelength=119
