@@ -1,8 +1,8 @@
 name: Auto-format Code with Debugging
 
 on:
-  push:  # Run on any branch push
-  pull_request:  # Run on any branch pull request
+  push:
+  pull_request:
 
 jobs:
   auto-format:
@@ -62,3 +62,4 @@ jobs:
             echo "Push completed successfully."
           else
             echo "No changes detected. Nothing to commit or push."
+          fi
