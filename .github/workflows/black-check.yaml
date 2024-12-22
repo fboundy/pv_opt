@@ -34,8 +34,8 @@ jobs:
       - name: Run isort
         run: isort .
 
-      # - name: Run Black Formatter
-      #   run: black --line-length 119 .
+      - name: Run Black Formatter
+        run: black --line-length 119 .
 
       - name: Check for Changes
         run: |
