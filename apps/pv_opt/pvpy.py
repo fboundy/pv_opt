@@ -843,8 +843,6 @@ class PVsystemModel:
         if log and (self.host.debug and "B" in self.host.debug_cat):
             self.log("Called optimised_force")
 
-        self.log(f">>> {discharge} {use_export}")
-
         start = self.static_flows.index[0]
         end = self.static_flows.index[-1]
 
@@ -890,6 +888,7 @@ class PVsystemModel:
             j = max_iters
 
         self.slots_added = 999
+
         while (self.slots_added > 0) and (j < max_iters):
             j += 1
             # No need to iterate if this is charge only
@@ -1061,25 +1060,14 @@ class PVsystemModel:
                                     )
                                     slots_added += 1
 
-                                self.log(f">>>{slots}")
-
                                 self.calculate_flows(slots=slots)
+                                self.net_costs.append(self.net_cost)
+                                slot_count.append(len(factors))
 
-                                if i < 2:
-                                    self.log(self.flows.to_string)
-                                    self.log(self.contract.net_cost(self.flows))
-                                    self.log(self.net_cost)
+                                str_log += f"New SOC: {self.flows.loc[start_window]['soc']:5.1f}%->{self.flows.loc[start_window]['soc_end']:5.1f}% "
+                                best_cost = self.net_costs[-1]
+                                str_log += f"Net: {best_cost:6.1f}"
 
-                                if self.net_cost < best_cost:
-                                    self.net_costs.append(self.net_cost)
-                                    slot_count.append(len(factors))
-
-                                    str_log += f"New SOC: {self.flows.loc[start_window]['soc']:5.1f}%->{self.flows.loc[start_window]['soc_end']:5.1f}% "
-                                    best_cost = self.net_costs[-1]
-                                    str_log += f"Net: {best_cost:6.1f}"
-                                else:
-                                    str_log += f"Net: {self.net_cost:6.1f} <<< Exclude {slots_added}"
-                                    slots = slots[:-slots_added]
                                 if log:
                                     self.log(str_log)
                             else:
@@ -1111,7 +1099,7 @@ class PVsystemModel:
         self.slots = slots
 
     def _low_cost_charging(self, log=True):
-        slots = self.slots
+        slots = [slot for slot in self.slots]
         best_cost = self.best_cost
         slots_added = 0
 
@@ -1236,7 +1224,7 @@ class PVsystemModel:
         # -----------
         # Discharging
         # -----------
-        slots = self.slots
+        slots = [slot for slot in self.slots]
         best_cost = self.best_cost
         slots_added = self.slots_added
 
