@@ -1,13 +1,14 @@
 # %%
+import base64
 import hashlib
 import hmac
-import base64
 import json
 import re
-import requests
-from http import HTTPStatus
 from datetime import datetime, timezone
+from http import HTTPStatus
+
 import pandas as pd
+import requests
 
 # def getInverterList(config):
 #     body = getBody(stationId=config['plantId'])
@@ -62,7 +63,9 @@ class SolisCloud:
         return body
 
     def digest(self, body: str) -> str:
-        return base64.b64encode(hashlib.md5(body.encode("utf-8")).digest()).decode("utf-8")
+        return base64.b64encode(hashlib.md5(body.encode("utf-8")).digest()).decode(
+            "utf-8"
+        )
 
     def header(self, body: str, canonicalized_resource: str) -> dict[str, str]:
         content_md5 = self.digest(body)
@@ -71,8 +74,22 @@ class SolisCloud:
         now = datetime.now(timezone.utc)
         date = now.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
-        encrypt_str = "POST" + "\n" + content_md5 + "\n" + content_type + "\n" + date + "\n" + canonicalized_resource
-        hmac_obj = hmac.new(self.key_secret.encode("utf-8"), msg=encrypt_str.encode("utf-8"), digestmod=hashlib.sha1)
+        encrypt_str = (
+            "POST"
+            + "\n"
+            + content_md5
+            + "\n"
+            + content_type
+            + "\n"
+            + date
+            + "\n"
+            + canonicalized_resource
+        )
+        hmac_obj = hmac.new(
+            self.key_secret.encode("utf-8"),
+            msg=encrypt_str.encode("utf-8"),
+            digestmod=hashlib.sha1,
+        )
         sign = base64.b64encode(hmac_obj.digest())
         authorization = "API " + self.key_id + ":" + sign.decode("utf-8")
 
@@ -88,7 +105,9 @@ class SolisCloud:
     def inverter_id(self):
         body = self.get_body(stationId=self.plant_id)
         header = self.header(body, self.URLS["inverterList"])
-        response = requests.post(self.URLS["root"] + self.URLS["inverterList"], data=body, headers=header)
+        response = requests.post(
+            self.URLS["root"] + self.URLS["inverterList"], data=body, headers=header
+        )
         if response.status_code == HTTPStatus.OK:
             return response.json()["data"]["page"]["records"][0].get("id", "")
 
@@ -96,7 +115,9 @@ class SolisCloud:
     def inverter_sn(self):
         body = self.get_body(stationId=self.plant_id)
         header = self.header(body, self.URLS["inverterList"])
-        response = requests.post(self.URLS["root"] + self.URLS["inverterList"], data=body, headers=header)
+        response = requests.post(
+            self.URLS["root"] + self.URLS["inverterList"], data=body, headers=header
+        )
         if response.status_code == HTTPStatus.OK:
             return response.json()["data"]["page"]["records"][0].get("sn", "")
 
@@ -104,7 +125,9 @@ class SolisCloud:
     def inverter_details(self):
         body = self.get_body(id=self.inverter_id, sn=self.inverter_sn)
         header = self.header(body, self.URLS["inverterDetail"])
-        response = requests.post(self.URLS["root"] + self.URLS["inverterDetail"], data=body, headers=header)
+        response = requests.post(
+            self.URLS["root"] + self.URLS["inverterDetail"], data=body, headers=header
+        )
 
         if response.status_code == HTTPStatus.OK:
             return response.json()["data"]
@@ -125,7 +148,9 @@ class SolisCloud:
             body = self.get_body(inverterSn=self.inverter_sn, cid=cid, value=value)
             headers = self.header(body, self.URLS["control"])
             headers["token"] = self.token
-            response = requests.post(self.URLS["root"] + self.URLS["control"], data=body, headers=headers)
+            response = requests.post(
+                self.URLS["root"] + self.URLS["control"], data=body, headers=headers
+            )
             if response.status_code == HTTPStatus.OK:
                 return response.json()
 
@@ -137,14 +162,18 @@ class SolisCloud:
             body = self.get_body(inverterSn=self.inverter_sn, cid=cid)
             headers = self.header(body, self.URLS["atRead"])
             headers["token"] = self.token
-            response = requests.post(self.URLS["root"] + self.URLS["atRead"], data=body, headers=headers)
+            response = requests.post(
+                self.URLS["root"] + self.URLS["atRead"], data=body, headers=headers
+            )
             if response.status_code == HTTPStatus.OK:
                 return response.json()["data"]["msg"]
 
     def login(self):
         body = self.get_body(username=self.username, password=self.md5passowrd)
         header = self.header(body, self.URLS["login"])
-        response = requests.post(self.URLS["root"] + self.URLS["login"], data=body, headers=header)
+        response = requests.post(
+            self.URLS["root"] + self.URLS["login"], data=body, headers=header
+        )
         status = response.status_code
         if status == HTTPStatus.OK:
             result = response.json()
@@ -227,7 +256,7 @@ sc.set_timer("charge", pd.Timestamp("00:50"), pd.Timestamp("01:00"), 3000)
 # %%
 sc.set_mode_switch(35)
 # %%
-r=sc.set_code(696, 3600)
+r = sc.set_code(696, 3600)
 # %%
 
 # %%
