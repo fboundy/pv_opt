@@ -68,9 +68,7 @@ MAX_HASS_HISTORY_CALLS = 5
 OVERWRITE_ATTEMPTS = 5
 ONLINE_RETRIES = 12
 WRITE_POLL_SLEEP = 0.5
-WRITE_POLL_TIME_SLEEP = (
-    2  # added for Solarman_V2 integration that writes to HA entities of type time.
-)
+WRITE_POLL_TIME_SLEEP = 2  # added for Solarman_V2 integration that writes to HA entities of type time.
 # Using WRITE_POLL_SLEEP value of 0.5 is not sufficient)
 WRITE_POLL_RETRIES = 5
 GET_STATE_RETRIES = 5
@@ -87,10 +85,7 @@ BOTTLECAP_DAVE = {
 
 # Create an array of times in the day in 30-minute intervals
 BASE_TIME = datetime.strptime("00:00", "%H:%M")
-OPTIONS_TIME = [
-    ((BASE_TIME + timedelta(seconds=minute * 60)).strftime("%H:%M"))
-    for minute in range(0, 24 * 60, 30)
-]
+OPTIONS_TIME = [((BASE_TIME + timedelta(seconds=minute * 60)).strftime("%H:%M")) for minute in range(0, 24 * 60, 30)]
 
 
 INVERTER_TYPES = [
@@ -595,9 +590,7 @@ class PVOpt(hass.Hass):
 
         retry_count = 0
         while (not self.inverter.is_online) and (retry_count < ONLINE_RETRIES):
-            self.log(
-                "Inverter controller appears not to be running. Waiting 5 secomds to re-try"
-            )
+            self.log("Inverter controller appears not to be running. Waiting 5 secomds to re-try")
             time.sleep(5)
             retry_count += 1
 
@@ -609,9 +602,7 @@ class PVOpt(hass.Hass):
         else:
             self.log("Inverter appears to be online")
 
-        if (self.debug and "S" in self.debug_cat) or self.args.get(
-            "list_entities", True
-        ):
+        if (self.debug and "S" in self.debug_cat) or self.args.get("list_entities", True):
             self._list_entities()
 
         self.timer_handle = None
@@ -640,6 +631,7 @@ class PVOpt(hass.Hass):
         self.ev_total_cost = 0
         self.ev_percent_to_add = 0
         self.car_charging = False
+        self.zappi_consumption_entities = []
 
         self.bottlecap_entities = {"import": None, "export": None}
         self.octopus_import_entity = []
@@ -654,8 +646,7 @@ class PVOpt(hass.Hass):
         self._load_pv_system_model()
         self._load_contract()
         self.ev = (
-            self.get_config("ev_charger")
-            in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]
+            self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]
         )  # Is set true only for Zappi at this point
 
         self.car_charging = self.get_config("control_car_charging")
@@ -689,9 +680,7 @@ class PVOpt(hass.Hass):
         if self.debug and "S" in self.debug_cat:
             self.log(f"PV Opt Initialisation complete. Listen_state Handles:")
             for id in self.handles:
-                self.log(
-                    f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}"
-                )
+                self.log(f"  {id} {self.handles[id]}  {self.info_listen_state(self.handles[id])}")
 
     @ad.app_lock
     def _run_test(self):
@@ -734,9 +723,7 @@ class PVOpt(hass.Hass):
         self.ulog("Getting Car Charging Plan")
         if self.get_config("octopus_auto"):
             try:
-                self.log(
-                    f"    Trying to find Octopus Intelligent Dispatching Sensor from Octopus Energy Integration"
-                )
+                self.log(f"    Trying to find Octopus Intelligent Dispatching Sensor from Octopus Energy Integration")
                 io_dispatching_sensor = [
                     name
                     for name in self.get_state_retry(BOTTLECAP_DAVE["domain1"]).keys()
@@ -744,29 +731,21 @@ class PVOpt(hass.Hass):
                 ]
                 self.io_dispatching_sensor = io_dispatching_sensor[0]
 
-                self.rlog(
-                    f"    Found Dispatching Sensor:  {self.io_dispatching_sensor}"
-                )
+                self.rlog(f"    Found Dispatching Sensor:  {self.io_dispatching_sensor}")
                 self.log("")
-                self.log(
-                    f"    Trying to find Car % Charge to add from Octopus Energy Integration"
-                )
+                self.log(f"    Trying to find Car % Charge to add from Octopus Energy Integration")
                 io_charge_to_add_sensor = [
                     name
                     for name in self.get_state_retry(BOTTLECAP_DAVE["domain2"]).keys()
                     if ("octopus_energy_" in name and "intelligent_charge_" in name)
                 ]
                 self.io_charge_to_add_sensor = io_charge_to_add_sensor[0]
-                self.rlog(
-                    f"    Found Charge to Add entity:  {self.io_charge_to_add_sensor}"
-                )
+                self.rlog(f"    Found Charge to Add entity:  {self.io_charge_to_add_sensor}")
 
                 self.io_charge_to_add = self.get_state(
                     self.io_charge_to_add_sensor
                 )  # Load the current charge to add value
-                self.old_io_charge_to_add = (
-                    self.io_charge_to_add
-                )  # And set historic value to be the same
+                self.old_io_charge_to_add = self.io_charge_to_add  # And set historic value to be the same
                 self.rlog(f"    Charge to Add Value = :  {self.io_charge_to_add}")
 
             except Exception as e:
@@ -786,9 +765,7 @@ class PVOpt(hass.Hass):
 
         # Load tariffs from bottlecapdave .event sensors
         self.log("")
-        self.log(
-            "    Downloading IOG pricing information from Octopus Energy Integration"
-        )
+        self.log("    Downloading IOG pricing information from Octopus Energy Integration")
 
         x = pd.DataFrame(self.get_state_retry(entity_id1, attribute=("rates")))
         # self.log("")
@@ -851,18 +828,12 @@ class PVOpt(hass.Hass):
         self.log(f"  Current Dispatch Status (On/off) = : {self.io_dispatch_active}")
 
         if self.debug and "E" in self.debug_cat:
-            self.io_dispatch_attrib = self.get_state(
-                self.io_dispatching_sensor, attribute="all"
-            )
-            for k in [
-                x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x
-            ]:
+            self.io_dispatch_attrib = self.get_state(self.io_dispatching_sensor, attribute="all")
+            for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" not in x]:
                 self.rlog(f" {k:20s} {self.io_dispatch_attrib[k]}")
 
             for k in [x for x in self.io_dispatch_attrib.keys() if "dispatches" in x]:
-                self.log(
-                    f"  {k:20s} {'Start':20s} {'End':20s} {'Charge':12s} {'Source':12s}"
-                )
+                self.log(f"  {k:20s} {'Start':20s} {'End':20s} {'Charge':12s} {'Source':12s}")
                 self.log(f"  {'-'*20} {'-'*20} {'-'*20} {'-'*12} {'-'*12} ")
                 for z in self.io_dispatch_attrib[k]:
                     self.log(
@@ -870,11 +841,7 @@ class PVOpt(hass.Hass):
                     )
 
         # Get Planned dispatches from Intelligent Dispathing sensor
-        df = pd.DataFrame(
-            self.get_state_retry(
-                self.io_dispatching_sensor, attribute=("planned_dispatches")
-            )
-        )
+        df = pd.DataFrame(self.get_state_retry(self.io_dispatching_sensor, attribute=("planned_dispatches")))
 
         # If Charging plan exists, convert dispatch start and end times to datetime format and append to df.
         if not df.empty:
@@ -908,20 +875,16 @@ class PVOpt(hass.Hass):
         if (len(self.zappi_plug_entity) > 0) and self.ev:
             plug_status = self.get_state(self.zappi_plug_entity)
             # self.log(plug_status)
-            if (
-                (plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")
-            ) and (self.tariff_reloaded == 0):
+            if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
+                self.tariff_reloaded == 0
+            ):
                 self.car_plugin_detected = 1
-                self.log(
-                    "EV plug-in event detected, IOG tariff reload scheduled for next optimiser run"
-                )
+                self.log("EV plug-in event detected, IOG tariff reload scheduled for next optimiser run")
 
-            elif (
-                (plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")
-            ) and (self.tariff_reloaded == 1):
-                self.log(
-                    "EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded"
-                )
+            elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
+                self.tariff_reloaded == 1
+            ):
+                self.log("EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded")
                 self.car_plugin_detected = 0
 
             elif (plug_status == "Charging") and (self.tariff_reloaded == 0):
@@ -931,9 +894,7 @@ class PVOpt(hass.Hass):
                 self.car_plugin_detected = 1
 
             elif (plug_status == "Charging") and (self.tariff_reloaded == 1):
-                self.log(
-                    "EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded"
-                )
+                self.log("EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded")
                 self.car_plugin_detected = 0
 
             else:
@@ -943,13 +904,9 @@ class PVOpt(hass.Hass):
             # If EV plugged in, check charge to add hasnt changed
             if self.get_config("octopus_auto"):
                 self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)
-                if (self.old_io_charge_to_add != self.io_charge_to_add) and (
-                    plug_status == "EV Connected"
-                ):
+                if (self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected"):
                     self.car_plugin_detected = 1
-                    self.log(
-                        "Charge to add changed, IOG tariff reload scheduled for next optimiser run"
-                    )
+                    self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
             else:
                 self.log(
                     "Octopus Energy Integration not detected (or disabled): Charge to add is not available, IOG tariff not reloaded"
@@ -964,30 +921,23 @@ class PVOpt(hass.Hass):
         if (len(self.zappi_plug_entity) > 0) and self.ev:
             plug_status = self.get_state(self.zappi_plug_entity)
             # self.log(plug_status)
-            if (
-                (plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")
-            ) and (self.car_plugin_detected_delayed == 0):
+            if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
+                self.car_plugin_detected_delayed == 0
+            ):
                 self.car_plugin_detected = 1
-                self.log(
-                    "EV plug-in event detected, transfer Candidate Agile Car Charging Plan to Active Plan"
-                )
+                self.log("EV plug-in event detected, transfer Candidate Agile Car Charging Plan to Active Plan")
 
             elif (
-                (
-                    (plug_status == "EV Connected")
-                    or (plug_status == "EV Ready to Charge")
-                )
+                ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge"))
                 and (self.car_plugin_detected_delayed == 1)
                 and (self.agile_car_plan_activated == 1)
             ):
-                self.log(
-                    "EV is connected but Candidate Car charging plan previously transfered."
-                )
+                self.log("EV is connected but Candidate Car charging plan previously transfered.")
                 self.car_plugin_detected = 0
 
-            elif (
-                (plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")
-            ) and (self.agile_car_plan_activated == 0):
+            elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
+                self.agile_car_plan_activated == 0
+            ):
                 self.car_plugin_detected = 1
                 self.log(
                     "EV is connected but no Car charging plan exists, transfer Candidate Agile Car Charging Plan to Active Plan"
@@ -996,9 +946,7 @@ class PVOpt(hass.Hass):
             elif (plug_status == "Charging") and (
                 self.agile_car_plan_activated == 0
             ):  # needed for Pv_opt restart during car charging, where active plan will then be empty
-                self.log(
-                    "Car has commenced charging but no plan exists. Transfer Candidate Plan to Active Plan"
-                )
+                self.log("Car has commenced charging but no plan exists. Transfer Candidate Plan to Active Plan")
                 self.car_plugin_detected = 1
 
             elif (plug_status == "Charging") and (self.agile_car_plan_activated == 1):
@@ -1020,11 +968,7 @@ class PVOpt(hass.Hass):
         sensor_entities = self.get_state("sensor")
 
         self.zappi_consumption_entities = [
-            k
-            for k in sensor_entities
-            if "zappi" in k
-            for x in ["charge_added_session"]
-            if x in k
+            k for k in sensor_entities if "zappi" in k for x in ["charge_added_session"] if x in k
         ]
 
         # force two Zappis for test purposes
@@ -1041,13 +985,7 @@ class PVOpt(hass.Hass):
             self.log("No Zappi Consumption sensors autodetected")
 
         self.log("Attempting to autodetect Zappi Plugin status sensor(s)")
-        self.zappi_plug_entities = [
-            k
-            for k in sensor_entities
-            if "zappi" in k
-            for x in ["plug_status"]
-            if x in k
-        ]
+        self.zappi_plug_entities = [k for k in sensor_entities if "zappi" in k for x in ["plug_status"] if x in k]
 
         if len(self.zappi_plug_entities) > 0:
             for entity_id in self.zappi_plug_entities:
@@ -1056,17 +994,13 @@ class PVOpt(hass.Hass):
                 self.log("Zappi plug_status sensor(s) found:")
                 self.rlog(f"  {entity_id}")
 
-            self.zappi_plug_entity = self.zappi_plug_entities[
-                0
-            ]  # If multiple, select the first by default.
+            self.zappi_plug_entity = self.zappi_plug_entities[0]  # If multiple, select the first by default.
             if len(self.zappi_plug_entities) > 1:
                 self.log("")
                 self.log(
                     f"Multiple Zappis found, defaulting to {self.zappi_plug_entity} to trigger car charge planning updates."
                 )
-                self.log(
-                    "If necessary, map desired sensor using id_zappi_plug_status in config.yaml"
-                )
+                self.log("If necessary, map desired sensor using id_zappi_plug_status in config.yaml")
                 self.log("Checking config.yaml for presence of id_zappi_plug_status...")
         else:
             self.log("No Zappi Plug Status sensors autodetected")
@@ -1096,9 +1030,7 @@ class PVOpt(hass.Hass):
         i = 0
         for entity_id in self.zappi_consumption_entities:
             i += 1
-            df = self._get_hass_power_from_daily_kwh(
-                entity_id, start=start, end=end, log=log
-            )
+            df = self._get_hass_power_from_daily_kwh(entity_id, start=start, end=end, log=log)
 
             if i == 1:
                 df_all = df.copy()
@@ -1140,11 +1072,7 @@ class PVOpt(hass.Hass):
             self.log(f"EV Ready by time = {self.ev_ready_by_time}")
 
         # Calculate charge to add in kwh (EV capacity * (SOC target - SOC current) * 1/efficiency)
-        charge_kwh = (
-            self.ev_capacity
-            * (self.ev_charge_target)
-            * (1 / self.ev_charger_efficiency)
-        )
+        charge_kwh = self.ev_capacity * (self.ev_charge_target) * (1 / self.ev_charger_efficiency)
 
         # self.log("")
         # self.log(f"Charge to add (kwh) = {charge_kwh}")
@@ -1159,9 +1087,7 @@ class PVOpt(hass.Hass):
         # Convert to number of slots by mutiplying by 2, then rounding up
         ev_slots_required = math.ceil(ev_charge_time * 2)
 
-        self.log(
-            f"EV Charging Candidate plan requires {ev_slots_required} x 1/2 hour slots"
-        )
+        self.log(f"EV Charging Candidate plan requires {ev_slots_required} x 1/2 hour slots")
         self.log("")
 
         # now = datetime.now()
@@ -1172,9 +1098,7 @@ class PVOpt(hass.Hass):
         # self.log(f"Time Now = {now}")
 
         # Get ready by time, this will also be in local time.
-        ready_by_time = pd.to_datetime(
-            self.ev_ready_by_time, errors="coerce", format="%H:%M"
-        )
+        ready_by_time = pd.to_datetime(self.ev_ready_by_time, errors="coerce", format="%H:%M")
 
         Y = int(now.strftime("%Y"))  # Extract year
         M = int(now.strftime("%-m"))  # Extract month
@@ -1229,9 +1153,7 @@ class PVOpt(hass.Hass):
             car_charge_slots = df
 
         # Add "charge_in_kwh" col, fixed at charger power * efficiency
-        car_charge_slots["charge_in_kwh"] = (self.ev_charger_power / 1000) * (
-            self.ev_charger_efficiency / 100 * 0.5
-        )
+        car_charge_slots["charge_in_kwh"] = (self.ev_charger_power / 1000) * (self.ev_charger_efficiency / 100 * 0.5)
 
         # Reorder dataframe back to date order
         car_charge_slots = car_charge_slots.sort_index()
@@ -1341,24 +1263,14 @@ class PVOpt(hass.Hass):
     def _load_inverter(self):
         if self.inverter_type in INVERTER_TYPES:
             inverter_brand = self.inverter_type.split("_")[0].lower()
-            self.log(
-                f"Inverter type: {self.inverter_type}: inverter module: {inverter_brand}.py"
-            )
+            self.log(f"Inverter type: {self.inverter_type}: inverter module: {inverter_brand}.py")
             if inverter_brand == "solis":
                 # for now only Solis uses the new setup
-                create_inverter_controller = importName(
-                    f"{inverter_brand}", "create_inverter_controller"
-                )
-                self.inverter = create_inverter_controller(
-                    inverter_type=self.inverter_type, host=self
-                )
+                create_inverter_controller = importName(f"{inverter_brand}", "create_inverter_controller")
+                self.inverter = create_inverter_controller(inverter_type=self.inverter_type, host=self)
             else:
-                InverterController = importName(
-                    f"{inverter_brand}", "InverterController"
-                )
-                self.inverter = InverterController(
-                    inverter_type=self.inverter_type, host=self
-                )
+                InverterController = importName(f"{inverter_brand}", "InverterController")
+                self.inverter = InverterController(inverter_type=self.inverter_type, host=self)
 
             self.log(f"  Device name:   {self.device_name}")
             self.rlog(f"  Serial number: {self.inverter_sn}")
@@ -1381,14 +1293,10 @@ class PVOpt(hass.Hass):
         self.battery_model = pv.BatteryModel(
             capacity=self.get_config("battery_capacity_wh"),
             max_dod=self.get_config("maximum_dod_percent", 15) / 100,
-            current_limit_amps=self.get_config(
-                "battery_current_limit_amps", default=100
-            ),
+            current_limit_amps=self.get_config("battery_current_limit_amps", default=100),
             voltage=self.get_config("battery_voltage", default=50),
         )
-        self.pv_system = pv.PVsystemModel(
-            "PV_Opt", self.inverter_model, self.battery_model, host=self
-        )
+        self.pv_system = pv.PVsystemModel("PV_Opt", self.inverter_model, self.battery_model, host=self)
 
         ### SVB: once code is up and running for Agile EV charging, should probably put these parameters in something like pv.EvModel (as they don't change)
         # Needs a gate for systems with no EV? Something like:
@@ -1409,9 +1317,7 @@ class PVOpt(hass.Hass):
     #     )
 
     def _setup_compare_schedule(self):
-        start = (
-            pd.Timestamp.now(tz="UTC").ceil("60min") - pd.Timedelta("2min")
-        ).to_pydatetime()
+        start = (pd.Timestamp.now(tz="UTC").ceil("60min") - pd.Timedelta("2min")).to_pydatetime()
         self.timer_handle = self.run_every(
             self._compare_tariff_cb,
             start=start,
@@ -1443,9 +1349,7 @@ class PVOpt(hass.Hass):
         grid = grid.set_axis(cols, axis=1).fillna(0)
         grid["grid_export"] *= -1
 
-        cost_today = self.contract.net_cost(
-            grid_flow=grid, log=self.debug, day_ahead=False, sum=False
-        )
+        cost_today = self.contract.net_cost(grid_flow=grid, log=self.debug, day_ahead=False, sum=False)
 
         return cost_today
 
@@ -1458,23 +1362,13 @@ class PVOpt(hass.Hass):
             return self._value_from_state(self.config_state[item])
 
         if item in self.config:
-            if isinstance(self.config[item], str) and self.entity_exists(
-                self.config[item]
-            ):
+            if isinstance(self.config[item], str) and self.entity_exists(self.config[item]):
                 x = self.get_ha_value(entity_id=self.config[item])
                 return x
             elif isinstance(self.config[item], list):
                 if min([isinstance(x, str)] for x in self.config[item])[0]:
-                    if min(
-                        [
-                            self.entity_exists(entity_id=entity_id)
-                            for entity_id in self.config[item]
-                        ]
-                    ):
-                        l = [
-                            self.get_ha_value(entity_id=entity_id)
-                            for entity_id in self.config[item]
-                        ]
+                    if min([self.entity_exists(entity_id=entity_id) for entity_id in self.config[item]]):
+                        l = [self.get_ha_value(entity_id=entity_id) for entity_id in self.config[item]]
                         try:
                             return sum(l)
                         except:
@@ -1487,11 +1381,7 @@ class PVOpt(hass.Hass):
             return default
 
     def _setup_schedule(self):
-        start_opt = (
-            pd.Timestamp.now()
-            .ceil(f"{self.get_config('optimise_frequency_minutes')}min")
-            .to_pydatetime()
-        )
+        start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}min").to_pydatetime()
         self.timer_handle = self.run_every(
             self.optimise_time,
             start=start_opt,
@@ -1524,32 +1414,23 @@ class PVOpt(hass.Hass):
 
                     octopus_entities = [
                         name
-                        for name in self.get_state_retry(
-                            BOTTLECAP_DAVE["domain"]
-                        ).keys()
-                        if (
-                            "octopus_energy_electricity" in name
-                            and BOTTLECAP_DAVE["rates"] in name
-                        )
+                        for name in self.get_state_retry(BOTTLECAP_DAVE["domain"]).keys()
+                        if ("octopus_energy_electricity" in name and BOTTLECAP_DAVE["rates"] in name)
                     ]
                     # self.log("Octopus Entities = ")
                     # self.log(octopus_entities)
 
                     entities = {}
-                    entities["import"] = [
-                        x for x in octopus_entities if not "export" in x
-                    ]
+                    entities["import"] = [x for x in octopus_entities if not "export" in x]
                     entities["export"] = [x for x in octopus_entities if "export" in x]
 
                     for imp_exp in IMPEXP:
                         for entity in entities[imp_exp]:
-                            tariff_code = self.get_state_retry(entity, attribute="all")[
-                                "attributes"
-                            ].get(BOTTLECAP_DAVE["tariff_code"], None)
-
-                            self.rlog(
-                                f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code}"
+                            tariff_code = self.get_state_retry(entity, attribute="all")["attributes"].get(
+                                BOTTLECAP_DAVE["tariff_code"], None
                             )
+
+                            self.rlog(f"    Found {imp_exp} entity {entity}: Tariff code: {tariff_code}")
 
                     tariffs = {x: None for x in IMPEXP}
                     for imp_exp in IMPEXP:
@@ -1558,9 +1439,9 @@ class PVOpt(hass.Hass):
 
                         if len(entities[imp_exp]) > 0:
                             for entity in entities[imp_exp]:
-                                tariff_code = self.get_state_retry(
-                                    entity, attribute="all"
-                                )["attributes"].get(BOTTLECAP_DAVE["tariff_code"], None)
+                                tariff_code = self.get_state_retry(entity, attribute="all")["attributes"].get(
+                                    BOTTLECAP_DAVE["tariff_code"], None
+                                )
 
                                 if self.debug and "T" in self.debug_cat:
                                     self.log(f">>>X _load_contract {tariff_code}")
@@ -1576,9 +1457,7 @@ class PVOpt(hass.Hass):
                                     if "AGILE" in tariff_code:
                                         self.agile = True  # Tariff is Octopus Agile
                                     if "INTELLI" in tariff_code:
-                                        self.intelligent = (
-                                            True  # Tariff is Octopus Intelligent
-                                        )
+                                        self.intelligent = True  # Tariff is Octopus Intelligent
                     # self.log("")
                     # self.log("Printing bottlecap entity list")
                     # self.log(self.bottlecap_entities)
@@ -1592,9 +1471,7 @@ class PVOpt(hass.Hass):
 
                     if self.intelligent:
                         self._get_io_sensors()  # Find the Octopus Zappi sensors
-                        car_slots = (
-                            self._get_io_car_slots()
-                        )  # Load the car charging slots
+                        car_slots = self._get_io_car_slots()  # Load the car charging slots
 
                         # Set import import price to 0 for slots (isnt used/displayed if using IOG, but is in Agile)
 
@@ -1619,15 +1496,9 @@ class PVOpt(hass.Hass):
                     )
                     self.contract = None
 
-            if (
-                self.contract is None
-            ):  # Try loading using Octopus Account number and API ket
-                if ("octopus_account" in self.config) and (
-                    "octopus_api_key" in self.config
-                ):
-                    if (self.config["octopus_account"] is not None) and (
-                        self.config["octopus_api_key"] is not None
-                    ):
+            if self.contract is None:  # Try loading using Octopus Account number and API ket
+                if ("octopus_account" in self.config) and ("octopus_api_key" in self.config):
+                    if (self.config["octopus_account"] is not None) and (self.config["octopus_api_key"] is not None):
                         for x in ["octopus_account", "octopus_api_key"]:
                             if self.config[x] not in self.redact_regex:
                                 self.redact_regex.append(x)
@@ -1666,9 +1537,7 @@ class PVOpt(hass.Hass):
                     "octopus_import_tariff_code" in self.config
                     and self.config["octopus_import_tariff_code"] is not None
                 ):
-                    self.rlog(
-                        f"Trying to load tariff codes: Import: {self.config['octopus_import_tariff_code']}"
-                    )
+                    self.rlog(f"Trying to load tariff codes: Import: {self.config['octopus_import_tariff_code']}")
                     # try:
                     # First load the import as we always need that
                     tariffs["import"] = pv.Tariff(
@@ -1681,9 +1550,7 @@ class PVOpt(hass.Hass):
 
                 if tariffs["import"] is not None:
                     if "octopus_export_tariff_code" in self.config:
-                        self.rlog(
-                            f"Trying to load tariff codes: Export: {self.config['octopus_export_tariff_code']}"
-                        )
+                        self.rlog(f"Trying to load tariff codes: Export: {self.config['octopus_export_tariff_code']}")
                         tariffs["export"] = pv.Tariff(
                             self.config[f"octopus_export_tariff_code"],
                             export=False,
@@ -1698,17 +1565,13 @@ class PVOpt(hass.Hass):
                         exp=tariffs["export"],
                         host=self,
                     )
-                    self.rlog(
-                        "Contract tariffs loaded OK from Tariff Codes / Manual Spec"
-                    )
+                    self.rlog("Contract tariffs loaded OK from Tariff Codes / Manual Spec")
                 # except Exception as e:
                 #     self.rlog(f"Unable to load Tariff Codes {e}", level="ERROR")
 
             if self.contract is None:
                 i += 1
-                self.rlog(
-                    f"Failed to load contact - Attempt {i} of {n}. Waiting 2 minutes to re-try"
-                )
+                self.rlog(f"Failed to load contact - Attempt {i} of {n}. Waiting 2 minutes to re-try")
                 time.sleep(12)
 
         if self.contract is None:
@@ -1728,9 +1591,7 @@ class PVOpt(hass.Hass):
             # self.log("")
 
             if self.contract.tariffs["export"] is None:
-                self.contract.tariffs["export"] = pv.Tariff(
-                    "None", export=True, unit=0, octopus=False, host=self
-                )
+                self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
             self.rlog("")
             self._load_saving_events()
 
@@ -1801,34 +1662,24 @@ class PVOpt(hass.Hass):
 
     def _load_saving_events(self):
         if (
-            len(
-                [
-                    name
-                    for name in self.get_state_retry("event").keys()
-                    if ("octoplus_saving_session_events" in name)
-                ]
-            )
+            len([name for name in self.get_state_retry("event").keys() if ("octoplus_saving_session_events" in name)])
             > 0
         ):
             saving_events_entity = [
-                name
-                for name in self.get_state_retry("event").keys()
-                if ("octoplus_saving_session_events" in name)
+                name for name in self.get_state_retry("event").keys() if ("octoplus_saving_session_events" in name)
             ][0]
             self.log("")
             self.rlog(f"Found Octopus Savings Events entity: {saving_events_entity}")
-            octopus_account = self.get_state_retry(
-                entity_id=saving_events_entity, attribute="account_id"
-            )
+            octopus_account = self.get_state_retry(entity_id=saving_events_entity, attribute="account_id")
 
             self.config["octopus_account"] = octopus_account
             if octopus_account not in self.redact_regex:
                 self.redact_regex.append(octopus_account)
                 self.redact_regex.append(octopus_account.lower().replace("-", "_"))
 
-            available_events = self.get_state_retry(
-                saving_events_entity, attribute="all"
-            )["attributes"]["available_events"]
+            available_events = self.get_state_retry(saving_events_entity, attribute="all")["attributes"][
+                "available_events"
+            ]
 
             if len(available_events) > 0:
                 self.log("Joining the following new Octoplus Events:")
@@ -1844,14 +1695,12 @@ class PVOpt(hass.Hass):
                             event_code=event["code"],
                         )
 
-            joined_events = self.get_state_retry(saving_events_entity, attribute="all")[
-                "attributes"
-            ]["joined_events"]
+            joined_events = self.get_state_retry(saving_events_entity, attribute="all")["attributes"]["joined_events"]
 
             for event in joined_events:
-                if event["id"] not in self.saving_events and pd.Timestamp(
-                    event["end"], tz="UTC"
-                ) > pd.Timestamp.now(tz="UTC"):
+                if event["id"] not in self.saving_events and pd.Timestamp(event["end"], tz="UTC") > pd.Timestamp.now(
+                    tz="UTC"
+                ):
                     self.saving_events[event["id"]] = event
 
         self.log("")
@@ -1873,9 +1722,7 @@ class PVOpt(hass.Hass):
 
             # if the state is None return None
             if state is not None:
-                if (state in ["unknown", "unavailable"]) and (
-                    entity_id[:6] != "button"
-                ):
+                if (state in ["unknown", "unavailable"]) and (entity_id[:6] != "button"):
                     e = f"HA returned {state} for state of {entity_id}"
                     self.status(f"ERROR: {e}")
                     self.log(e, level="ERROR")
@@ -1909,9 +1756,7 @@ class PVOpt(hass.Hass):
 
     def same_type(self, a, b):
         if type(a) != type(b):
-            (isinstance(a, int) | isinstance(a, float)) & (
-                isinstance(b, int) | isinstance(b, float)
-            )
+            (isinstance(a, int) | isinstance(a, float)) & (isinstance(b, int) | isinstance(b, float))
         else:
             return True
 
@@ -1943,12 +1788,7 @@ class PVOpt(hass.Hass):
                 self.args[item] = [self.args[item]]
 
             values = [
-                (
-                    v.replace("{device_name}", self.device_name)
-                    if isinstance(v, str)
-                    else v
-                )
-                for v in self.args[item]
+                (v.replace("{device_name}", self.device_name) if isinstance(v, str) else v) for v in self.args[item]
             ]
 
             if values[0] is None:
@@ -1969,12 +1809,8 @@ class PVOpt(hass.Hass):
                         str1 = ""
                         str2 = " "
 
-                    self.rlog(
-                        f"    {str1:34s} {str2} {x['name']:27s} Import: {x['octopus_import_tariff_code']:>36s}"
-                    )
-                    self.rlog(
-                        f"    {'':34s}   {'':27s} Export: {x['octopus_export_tariff_code']:>36s}"
-                    )
+                    self.rlog(f"    {str1:34s} {str2} {x['name']:27s} Import: {x['octopus_import_tariff_code']:>36s}")
+                    self.rlog(f"    {'':34s}   {'':27s} Export: {x['octopus_export_tariff_code']:>36s}")
                 self.yaml_config[item] = self.config[item]
 
             elif item == "consumption_shape":
@@ -1990,9 +1826,7 @@ class PVOpt(hass.Hass):
                         str2 = " "
                         str3 = "     "
                         str4 = "            "
-                    self.rlog(
-                        f"    {str1:34s} {str2} {str3} {x['hour']:5.2f} {str4} {x['consumption']:5.0f} W"
-                    )
+                    self.rlog(f"    {str1:34s} {str2} {str3} {x['hour']:5.2f} {str4} {x['consumption']:5.0f} W")
                 self.yaml_config[item] = self.config[item]
 
             elif re.match("^manual_..port_tariff_unit$", item):
@@ -2015,9 +1849,7 @@ class PVOpt(hass.Hass):
 
             elif "id_" in item:
                 if self.debug:
-                    self.log(
-                        f">>> Test: {self.entity_exists('update.home_assistant_core_update')}"
-                    )
+                    self.log(f">>> Test: {self.entity_exists('update.home_assistant_core_update')}")
                     for v in values:
                         self.log(f">>> {item} {v} {self.entity_exists(v)}")
                 if min([self.entity_exists(v) for v in values]):
@@ -2049,18 +1881,12 @@ class PVOpt(hass.Hass):
                     for value in self.args[item]:
                         self.rlog(f"\t{value}")
 
-                arg_types = {
-                    t: [isinstance(v, t) for v in values]
-                    for t in [str, float, int, bool]
-                }
+                arg_types = {t: [isinstance(v, t) for v in values] for t in [str, float, int, bool]}
 
                 if (
                     len(values) == 1
                     and isinstance(values[0], str)
-                    and (
-                        pd.to_datetime(values[0], errors="coerce", format="%H:%M")
-                        != pd.NaT
-                    )
+                    and (pd.to_datetime(values[0], errors="coerce", format="%H:%M") != pd.NaT)
                 ):
                     self.config[item] = values[0]
                     self.rlog(
@@ -2072,10 +1898,7 @@ class PVOpt(hass.Hass):
                     if self.debug and "S" in self.debug_cat:
                         self.rlog("\tFound a valid list of strings")
 
-                    if (
-                        isinstance(self.get_default_config(item), str)
-                        and len(values) == 1
-                    ):
+                    if isinstance(self.get_default_config(item), str) and len(values) == 1:
                         self.config[item] = values[0]
                         self.rlog(
                             f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: value in YAML"
@@ -2085,16 +1908,13 @@ class PVOpt(hass.Hass):
                     else:
                         ha_values = [self.get_ha_value(entity_id=v) for v in values]
                         val_types = {
-                            t: np.array([isinstance(v, t) for v in ha_values])
-                            for t in [str, float, int, bool]
+                            t: np.array([isinstance(v, t) for v in ha_values]) for t in [str, float, int, bool]
                         }
                         # if they are all float or int
 
                         valid_strings = [
                             j
-                            for j in [
-                                h for h in zip(ha_values[:-1], values[:-1]) if h[0]
-                            ]
+                            for j in [h for h in zip(ha_values[:-1], values[:-1]) if h[0]]
                             if j[0] in DEFAULT_CONFIG[item]["options"]
                         ]
 
@@ -2107,18 +1927,14 @@ class PVOpt(hass.Hass):
                         # try getting values from all the entities
                         elif valid_strings:
                             self.config[item] = valid_strings[0][0]
-                            if (
-                                not "sensor" and not "_active" in valid_strings[0][1]
-                            ):  # SVB trial
+                            if not "sensor" and not "_active" in valid_strings[0][1]:  # SVB trial
                                 self.change_items[valid_strings[0][1]] = item
                             self.rlog(
                                 f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: HA entities listed in YAML"
                             )
 
                         elif len(values) > 1:
-                            if self.same_type(
-                                values[-1], self.get_default_config(item)
-                            ):
+                            if self.same_type(values[-1], self.get_default_config(item)):
                                 self.config[item] = values[-1]
                                 self.rlog(
                                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default. Unable to read from HA entities listed in YAML."
@@ -2138,10 +1954,7 @@ class PVOpt(hass.Hass):
                                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: system default. Unable to read from HA entities listed in YAML. No default in YAML.",
                                     level="WARNING",
                                 )
-                            elif (
-                                item in self.inverter.config
-                                or item in self.inverter.brand_config
-                            ):
+                            elif item in self.inverter.config or item in self.inverter.brand_config:
                                 self.config[item] = self.get_default_config(item)
 
                                 self.rlog(
@@ -2154,9 +1967,7 @@ class PVOpt(hass.Hass):
                                     f"    {item:34s} = {str(self.config[item]):57s} {str(self.get_config(item)):>6s}: YAML default value. No default defined."
                                 )
 
-                elif len(values) == 1 and (
-                    arg_types[bool][0] or arg_types[int][0] or arg_types[float][0]
-                ):
+                elif len(values) == 1 and (arg_types[bool][0] or arg_types[int][0] or arg_types[float][0]):
                     if self.debug and "S" in self.debug_cat:
                         self.rlog("\tFound a single default value")
 
@@ -2169,21 +1980,12 @@ class PVOpt(hass.Hass):
                 elif (
                     len(values) > 1
                     and (min(arg_types[str][:-1]))
-                    and (
-                        arg_types[bool][-1]
-                        or arg_types[int][-1]
-                        or arg_types[float][-1]
-                    )
+                    and (arg_types[bool][-1] or arg_types[int][-1] or arg_types[float][-1])
                 ):
                     if self.debug and "S" in self.debug_cat:
-                        self.rlog(
-                            "\tFound a valid list of strings followed by a single default value"
-                        )
+                        self.rlog("\tFound a valid list of strings followed by a single default value")
                     ha_values = [self.get_ha_value(entity_id=v) for v in values[:-1]]
-                    val_types = {
-                        t: np.array([isinstance(v, t) for v in ha_values])
-                        for t in [str, float, int, bool]
-                    }
+                    val_types = {t: np.array([isinstance(v, t) for v in ha_values]) for t in [str, float, int, bool]}
                     # if they are all float or int
                     if np.min(val_types[int] | val_types[float]):
                         self.config[item] = sum(ha_values)
@@ -2274,9 +2076,7 @@ class PVOpt(hass.Hass):
             state_topic = f"homeassistant/{domain}/{id}/state"
 
             if not self.entity_exists(entity_id=entity_id):
-                self.log(
-                    f"  - Creating HA Entity {entity_id} for {item} using MQTT Discovery"
-                )
+                self.log(f"  - Creating HA Entity {entity_id} for {item} using MQTT Discovery")
                 conf = (
                     {
                         "state_topic": state_topic,
@@ -2304,18 +2104,13 @@ class PVOpt(hass.Hass):
 
             elif (
                 isinstance(self.get_ha_value(entity_id=entity_id), str)
-                and (
-                    self.get_ha_value(entity_id=entity_id)
-                    not in attributes.get("options", {})
-                )
+                and (self.get_ha_value(entity_id=entity_id) not in attributes.get("options", {}))
                 and (domain not in ["text", "button"])
             ) or (self.get_ha_value(entity_id=entity_id) is None):
 
                 state = self._state_from_value(self.get_default_config(item))
 
-                self.log(
-                    f"  - Found unexpected str for {entity_id} reverting to default of {state}"
-                )
+                self.log(f"  - Found unexpected str for {entity_id} reverting to default of {state}")
 
                 self.set_state(state=state, entity_id=entity_id)
 
@@ -2328,21 +2123,13 @@ class PVOpt(hass.Hass):
                         self.log("Over-writing HA from YAML:")
                         self.log("--------------------------")
                         self.log("")
-                        self.log(
-                            f"  {'Config Item':40s}  {'HA Entity':42s}  Old State   New State"
-                        )
-                        self.log(
-                            f"  {'-----------':40s}  {'---------':42s}  ----------  ----------"
-                        )
+                        self.log(f"  {'Config Item':40s}  {'HA Entity':42s}  Old State   New State")
+                        self.log(f"  {'-----------':40s}  {'---------':42s}  ----------  ----------")
                         over_write_log = True
 
-                    str_log = (
-                        f"  {item:40s}  {entity_id:42s}  {state:10s}  {new_state:10s}"
-                    )
+                    str_log = f"  {item:40s}  {entity_id:42s}  {state:10s}  {new_state:10s}"
                     over_write_count = 0
-                    while (state != new_state) and (
-                        over_write_count < OVERWRITE_ATTEMPTS
-                    ):
+                    while (state != new_state) and (over_write_count < OVERWRITE_ATTEMPTS):
                         self.set_state(state=new_state, entity_id=entity_id)
                         time.sleep(0.1)
                         state = self.get_state_retry(entity_id)
@@ -2373,9 +2160,7 @@ class PVOpt(hass.Hass):
             for entity_id in self.change_items:
                 if not not "sensor" and not "_active" in entity_id:
                     item = self.change_items[entity_id]
-                    self.log(
-                        f"  {item:40s}  {entity_id:42s}  {self.config_state[item]}"
-                    )
+                    self.log(f"  {item:40s}  {entity_id:42s}  {self.config_state[item]}")
                     self.handles[entity_id] = self.listen_state(
                         callback=self.optimise_state_change, entity_id=entity_id
                     )
@@ -2387,9 +2172,7 @@ class PVOpt(hass.Hass):
 
     def status(self, status):
         entity_id = f"sensor.{self.prefix.lower()}_status"
-        attributes = {
-            "last_updated": pd.Timestamp.now().strftime(DATE_TIME_FORMAT_LONG)
-        }
+        attributes = {"last_updated": pd.Timestamp.now().strftime(DATE_TIME_FORMAT_LONG)}
         # self.log(f">>> {status}")
         # self.log(f">>> {entity_id}")
         self.set_state(state=status, entity_id=entity_id, attributes=attributes)
@@ -2397,9 +2180,7 @@ class PVOpt(hass.Hass):
     @ad.app_lock
     def optimise_state_change(self, entity_id, attribute, old, new, kwargs):
         item = self.change_items[entity_id]
-        self.log(
-            f"State change detected for {entity_id} [config item: {item}] from {old} to {new}:"
-        )
+        self.log(f"State change detected for {entity_id} [config item: {item}] from {old} to {new}:")
 
         self.config_state[item] = new
 
@@ -2472,9 +2253,7 @@ class PVOpt(hass.Hass):
         self.log("")
         self._load_saving_events()
 
-        if self.get_config("forced_discharge") and (
-            self.get_config("supports_forced_discharge", True)
-        ):
+        if self.get_config("forced_discharge") and (self.get_config("supports_forced_discharge", True)):
             discharge_enable = "enabled"
         else:
             discharge_enable = "disabled"
@@ -2485,23 +2264,20 @@ class PVOpt(hass.Hass):
 
         self.ulog("Checking tariffs:")
 
-        self.log(
-            f"  Contract last loaded at {self.contract_last_loaded.strftime(DATE_TIME_FORMAT_SHORT)}"
-        )
+        self.log(f"  Contract last loaded at {self.contract_last_loaded.strftime(DATE_TIME_FORMAT_SHORT)}")
 
         # Reload Ev selector status
         self.ev = (
-            self.get_config("ev_charger")
-            in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]
+            self.get_config("ev_charger") in DEFAULT_CONFIG["ev_charger"]["attributes"]["options"][1:]
         )  # Is set true only for Zappi at this point
 
         # Reload EV Charge plan control
         self.car_charging = self.get_config("control_car_charging")
 
         if self.agile:
-            if (
-                self.contract.tariffs["import"].end().day == pd.Timestamp.now().day
-            ) and (pd.Timestamp.now(tz=self.tz).hour >= 16):
+            if (self.contract.tariffs["import"].end().day == pd.Timestamp.now().day) and (
+                pd.Timestamp.now(tz=self.tz).hour >= 16
+            ):
                 self.log(
                     f"Contract end day: {self.contract.tariffs['import'].end().day} Today:{pd.Timestamp.now().day}"
                 )
@@ -2511,21 +2287,15 @@ class PVOpt(hass.Hass):
         elif self.intelligent:
             # self.log("Printing time.....")
             # self.log(pd.Timestamp.now(tz=self.tz).hour)
-            if (pd.Timestamp.now(tz=self.tz).hour == 16) and (
-                pd.Timestamp.now(tz=self.tz).minute >= 40
-            ):
+            if (pd.Timestamp.now(tz=self.tz).hour == 16) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
                 self.log("   About to reload Octopus Intelligent Pricing - 16:40")
                 self._load_contract()
 
-            if (pd.Timestamp.now(tz=self.tz).hour == 0) and (
-                pd.Timestamp.now(tz=self.tz).minute <= 20
-            ):
+            if (pd.Timestamp.now(tz=self.tz).hour == 0) and (pd.Timestamp.now(tz=self.tz).minute <= 20):
                 self.log("   About to reload Octopus Intelligent Pricing - 00:20")
                 self._load_contract()
 
-            if (pd.Timestamp.now(tz=self.tz).hour == 5) and (
-                pd.Timestamp.now(tz=self.tz).minute >= 10
-            ):
+            if (pd.Timestamp.now(tz=self.tz).hour == 5) and (pd.Timestamp.now(tz=self.tz).minute >= 10):
                 self.log("   About to reload Octopus Intelligent Pricing - 05:10")
                 self._load_contract()
 
@@ -2586,14 +2356,10 @@ class PVOpt(hass.Hass):
         self.pv_system.static_flows = pd.concat([solcast, consumption], axis=1)
         self.time_now = pd.Timestamp.utcnow()
 
-        self.pv_system.static_flows = self.pv_system.static_flows[
-            self.time_now.floor("30min") :
-        ].fillna(0)
+        self.pv_system.static_flows = self.pv_system.static_flows[self.time_now.floor("30min") :].fillna(0)
 
         soc_now = self.get_config("id_battery_soc")
-        soc_last_day = self.hass2df(
-            self.config["id_battery_soc"], days=1, log=self.debug
-        )
+        soc_last_day = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
         if self.debug and "S" in self.debug_cat:
             self.log(f">>> soc_now: {soc_now}")
             self.log(f">>> soc_last_day: {soc_last_day}")
@@ -2617,9 +2383,7 @@ class PVOpt(hass.Hass):
         try:
             soc_last_day = pd.to_numeric(soc_last_day, errors="coerce").interpolate()
 
-            soc_last_day = soc_last_day.loc[
-                soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :
-            ]
+            soc_last_day = soc_last_day.loc[soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :]
             if self.debug and "S" in self.debug_cat:
                 self.log(
                     f">>> Fixed   : {soc_last_day.loc[soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :]}"
@@ -2634,9 +2398,7 @@ class PVOpt(hass.Hass):
                     ),
                 ]
             ).sort_index()
-            self.pv_system.initial_soc = soc_last_day.interpolate().loc[
-                self.pv_system.static_flows.index[0]
-            ]
+            self.pv_system.initial_soc = soc_last_day.interpolate().loc[self.pv_system.static_flows.index[0]]
         except:
             self.pv_system.initial_soc = None
 
@@ -2663,13 +2425,13 @@ class PVOpt(hass.Hass):
             self.status("ERROR: Baseline performance")
             return
 
-        self.optimised_cost = {
-            "Base": self.contract.net_cost(self.flows["Base"], sum=False)
-        }
+        self.optimised_cost = {"Base": self.contract.net_cost(self.flows["Base"], sum=False)}
 
         self.log("")
         if self.get_config("use_solar", True):
-            str_log = f'Optimising for Solcast {self.get_config("solcast_confidence_level")}% confidence level forecast'
+            str_log = (
+                f'Optimising for Solcast {self.get_config("solcast_confidence_level")}% confidence level forecast'
+            )
         else:
             str_log = "Optimising without Solar"
 
@@ -2712,9 +2474,7 @@ class PVOpt(hass.Hass):
                 discharge=cases[case]["discharge"],
             )
 
-            self.optimised_cost[case] = self.contract.net_cost(
-                self.flows[case], sum=False
-            )
+            self.optimised_cost[case] = self.contract.net_cost(self.flows[case], sum=False)
 
         # test = self.pv_system.optimised_force_de(
         #     self.contract,
@@ -2730,17 +2490,13 @@ class PVOpt(hass.Hass):
         cost_today = self._cost_actual().sum()
         self.summary_costs = {
             "Base": {
-                "cost": ((self.optimised_cost["Base"].sum() + cost_today) / 100).round(
-                    2
-                ),
+                "cost": ((self.optimised_cost["Base"].sum() + cost_today) / 100).round(2),
                 "Selected": "",
             }
         }
         for case in cases:
             str_log = f"  {f'Optimised cost ({case}):':40s} {self.optimised_cost[case].sum():6.1f}p"
-            self.summary_costs[case] = {
-                "cost": ((self.optimised_cost[case].sum() + cost_today) / 100).round(2)
-            }
+            self.summary_costs[case] = {"cost": ((self.optimised_cost[case].sum() + cost_today) / 100).round(2)}
             if case == self.selected_case:
                 self.summary_costs[case]["Selected"] = " <=== Current Setup"
             else:
@@ -2761,9 +2517,7 @@ class PVOpt(hass.Hass):
         y = self.opt.loc[:, ["import", "forced"]].copy()
 
         y["start"] = self.opt.index.tz_convert(self.tz).copy()
-        y["end"] = self.opt.index.tz_convert(self.tz).copy() + pd.Timedelta(
-            30, "minutes"
-        )
+        y["end"] = self.opt.index.tz_convert(self.tz).copy() + pd.Timedelta(30, "minutes")
 
         # self.log("")
         # self.log("Y is........")
@@ -2830,16 +2584,12 @@ class PVOpt(hass.Hass):
             car_on.iat[0] = 1
             car_on.iat[1] = 1
 
-        self.opt = pd.concat(
-            [self.opt, car_on], axis=1
-        )  # Add car charge slot flags to self.opt
+        self.opt = pd.concat([self.opt, car_on], axis=1)  # Add car charge slot flags to self.opt
 
         # Clear off any expired car slots so dashboard displays correctly
         if not self.car_slots.empty:
             self.car_slots = self.car_slots.drop(
-                self.car_slots[
-                    self.car_slots["end_dt"] < pd.Timestamp.now(self.tz)
-                ].index
+                self.car_slots[self.car_slots["end_dt"] < pd.Timestamp.now(self.tz)].index
             )
 
             if self.debug and "E" in self.debug_cat:
@@ -2882,10 +2632,7 @@ class PVOpt(hass.Hass):
             # so just clear it after this routine is finished? (i.e. not within the if)
 
             if (
-                (
-                    self.car_plugin_detected == 1
-                    and self.car_plugin_detected_delayed == 0
-                )
+                (self.car_plugin_detected == 1 and self.car_plugin_detected_delayed == 0)
                 or (self.agile_prices_updated and self.car_plugged_in)
                 or car_button == True
             ):
@@ -3008,20 +2755,13 @@ class PVOpt(hass.Hass):
                     retries += 1
                     self.inverter.enable_timed_mode()
 
-                time_to_slot_start = (
-                    self.charge_start_datetime - pd.Timestamp.now(self.tz)
-                ).total_seconds() / 60
-                time_to_slot_end = (
-                    self.charge_end_datetime - pd.Timestamp.now(self.tz)
-                ).total_seconds() / 60
+                time_to_slot_start = (self.charge_start_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60
+                time_to_slot_end = (self.charge_end_datetime - pd.Timestamp.now(self.tz)).total_seconds() / 60
 
                 # if len(self.windows) > 0:
                 if (
                     (time_to_slot_start > 0)
-                    and (
-                        time_to_slot_start
-                        < self.get_config("optimise_frequency_minutes")
-                    )
+                    and (time_to_slot_start < self.get_config("optimise_frequency_minutes"))
                     and (len(self.windows) > 0)
                 ) or (self.get_config("id_battery_soc") < self.get_config("sleep_soc")):
                     # Next slot starts before the next optimiser run. This implies we are not currently in
@@ -3032,9 +2772,7 @@ class PVOpt(hass.Hass):
                             f"Current SOC of {self.get_config('id_battery_soc'):0.1f}% is less than battery_sleep SOC of {self.get_config('sleep_soc'):0.1f}%"
                         )
                     elif len(self.windows) > 0:
-                        self.log(
-                            f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes."
-                        )
+                        self.log(f"Next charge/discharge window starts in {time_to_slot_start:0.1f} minutes.")
                     else:
                         self.log("No charge/discharge windows planned.")
 
@@ -3064,9 +2802,7 @@ class PVOpt(hass.Hass):
                     # For IOG hold slots, so they don't write to the inverter all night
                     # This however will not pickup normal hold slots "<=", they are dealt with below when actually within a hold period.
 
-                    elif (self.charge_power == 1) & (
-                        self.windows["hold_soc"].iloc[0] == "<=Car"
-                    ):
+                    elif (self.charge_power == 1) & (self.windows["hold_soc"].iloc[0] == "<=Car"):
                         self.log("Car slot")
                         self.inverter.control_discharge(enable=False)
 
@@ -3080,10 +2816,7 @@ class PVOpt(hass.Hass):
 
                 elif (
                     (time_to_slot_start <= 0)
-                    and (
-                        time_to_slot_start
-                        < self.get_config("optimise_frequency_minutes")
-                    )
+                    and (time_to_slot_start < self.get_config("optimise_frequency_minutes"))
                     and (len(self.windows) > 0)
                 ):
                     # We are currently in a charge/discharge slot
@@ -3101,57 +2834,34 @@ class PVOpt(hass.Hass):
                         self.log("")
                         self.log(status)  # This is the inverter status
                         self.log("")
-                        self.log(
-                            self.hold
-                        )  # Two elements, active (true/false) and SOC (value)
-                        self.log(
-                            self.hold[0]["soc"]
-                        )  # SOC value stored in first row of self.hold
-                        self.log(
-                            status.get("hold_soc", {}).get("active", False)
-                        )  # What the inverter thinks its doing
+                        self.log(self.hold)  # Two elements, active (true/false) and SOC (value)
+                        self.log(self.hold[0]["soc"])  # SOC value stored in first row of self.hold
+                        self.log(status.get("hold_soc", {}).get("active", False))  # What the inverter thinks its doing
                         self.log(
                             status.get("hold_soc", {}).get("soc", 0)
                         )  # The value of backup_soc last read from the inverter.
 
                         # If status is not hold OR the inverter SOC value isnt matching the required SOC hold value
                         if (
-                            not status["hold_soc"]["active"]
-                            or status["hold_soc"]["soc"] != self.hold[0]["soc"]
+                            not status["hold_soc"]["active"] or status["hold_soc"]["soc"] != self.hold[0]["soc"]
                         ):  #  not sure what this line will report
                             self.log("....but status is not hold")
-                            self.log(
-                                f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%"
-                            )
+                            self.log(f"  Enabling SOC hold at SOC of {self.hold[0]['soc']:0.0f}%")
                             # self.inverter.hold_soc_old(enable=True, soc=self.hold[0]["soc"])
-                            self.inverter.hold_soc(
-                                enable=True, target_soc=self.hold[0]["soc"]
-                            )
+                            self.inverter.hold_soc(enable=True, target_soc=self.hold[0]["soc"])
                         else:
-                            self.log(
-                                f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%"
-                            )
+                            self.log(f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%")
 
                     else:  # if already in Car slot, this bit should run
-                        self.log(
-                            f"Current charge/discharge window ends in {time_to_slot_end:0.1f} minutes."
-                        )
+                        self.log(f"Current charge/discharge window ends in {time_to_slot_end:0.1f} minutes.")
 
-                        if (
-                            self.charge_power > 0
-                        ):  # Intentionally 0 (not 1) to ensure Car slots are also encompassed.
+                        if self.charge_power > 0:  # Intentionally 0 (not 1) to ensure Car slots are also encompassed.
                             if not status["charge"]["active"]:
-                                self.log(
-                                    "Charge status is not active, setting start time value now"
-                                )
+                                self.log("Charge status is not active, setting start time value now")
                                 start = pd.Timestamp.now(tz=self.tz).floor("1min")
-                                self.log(
-                                    f"Setting start time to {start.strftime(DATE_TIME_FORMAT_SHORT)}"
-                                )
+                                self.log(f"Setting start time to {start.strftime(DATE_TIME_FORMAT_SHORT)}")
                             else:
-                                self.log(
-                                    "Charge status is active, not setting start time"
-                                )
+                                self.log("Charge status is active, not setting start time")
                                 start = None
 
                             if status["discharge"]["active"]:
@@ -3161,9 +2871,7 @@ class PVOpt(hass.Hass):
                                 )
 
                             end = self.charge_end_datetime
-                            self.log(
-                                f"Setting end time to {end.strftime(DATE_TIME_FORMAT_SHORT)}"
-                            )
+                            self.log(f"Setting end time to {end.strftime(DATE_TIME_FORMAT_SHORT)}")
                             self.log(f"Setting power to {self.charge_power}")
                             self.log(f"Setting SOC to {self.charge_target_soc}")
 
@@ -3241,10 +2949,8 @@ class PVOpt(hass.Hass):
                     if len(self.windows) > 0:
                         if (
                             direction == "charge"
-                            and self.charge_start_datetime
-                            > status["discharge"]["start"]
-                            and status["discharge"]["start"]
-                            != status["discharge"]["end"]
+                            and self.charge_start_datetime > status["discharge"]["start"]
+                            and status["discharge"]["start"] != status["discharge"]["end"]
                         ):
                             str_log += " but inverter has a discharge slot before then. Disabling discharge."
                             self.log(str_log)
@@ -3313,8 +3019,9 @@ class PVOpt(hass.Hass):
                 )
 
             # Inverter updates complete. Now command EV charger on/off.
-            self._control_EV_charger()
-            self.log("")
+            if self.ev:
+                self._control_EV_charger()
+                self.log("")
 
     def _create_windows(self):
 
@@ -3377,9 +3084,7 @@ class PVOpt(hass.Hass):
             self.log("")
 
         # If there is either a charge/discharge plan or a car charging plan, create windows.
-        if ((self.opt["forced"] != 0).sum() > 0) or (
-            (self.opt["carslot"] != 0).sum() > 0
-        ):
+        if ((self.opt["forced"] != 0).sum() > 0) or ((self.opt["carslot"] != 0).sum() > 0):
             x = self.opt[self.opt["forced"] > 0].copy()
             x["start"] = x.index.tz_convert(self.tz)
             x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
@@ -3481,9 +3186,7 @@ class PVOpt(hass.Hass):
 
             tolerance = self.get_config("forced_power_group_tolerance")
             if tolerance > 0:
-                self.windows["forced"] = (
-                    (self.windows["forced"] / tolerance).round(0) * tolerance
-                ).astype(int)
+                self.windows["forced"] = ((self.windows["forced"] / tolerance).round(0) * tolerance).astype(int)
 
             if self.debug and "X" in self.debug_cat:
                 self.log("")
@@ -3510,10 +3213,7 @@ class PVOpt(hass.Hass):
                     self.log("Checking for Hold SOC slots (SOC changes less than 3%)")
 
                 self.windows.loc[
-                    (
-                        (self.windows["soc_end"] - self.windows["soc"]).abs()
-                        < HOLD_TOLERANCE
-                    )
+                    ((self.windows["soc_end"] - self.windows["soc"]).abs() < HOLD_TOLERANCE)
                     & (
                         self.windows["soc"] > self.get_config("maximum_dod_percent")
                     ),  # What is this line for? Why prevent setting a hold if on minimum SOC?
@@ -3541,17 +3241,13 @@ class PVOpt(hass.Hass):
             ] = "<=Car"
 
             # Set soc end to equal start soc for any car slots (Forced = 1) (purely for dashboard display purposes)
-            self.windows["soc_end"] = self.windows["soc_end"].where(
-                self.windows["forced"] != 1, self.windows["soc"]
-            )
+            self.windows["soc_end"] = self.windows["soc_end"].where(self.windows["forced"] != 1, self.windows["soc"])
             # end of gate removed******
 
             if self.debug and "W" in self.debug_cat:
 
                 self.log("")
-                self.log(
-                    "Printing Combined Window after <=Car added for any Car slots....."
-                )
+                self.log("Printing Combined Window after <=Car added for any Car slots.....")
                 self.log(f"\n{self.windows.to_string()}")
 
             self.log("")
@@ -3561,9 +3257,7 @@ class PVOpt(hass.Hass):
                     f"  {window[1]['start'].strftime('%d-%b %H:%M %Z'):>13s} - {window[1]['end'].strftime('%d-%b %H:%M %Z'):<13s}  Power: {window[1]['forced']:5.0f}W  SOC: {window[1]['soc']:4d}% -> {window[1]['soc_end']:4d}%  {window[1]['hold_soc']}"
                 )
 
-            self.charge_start_datetime = (
-                self.windows["start"].iloc[0].tz_convert(self.tz)
-            )
+            self.charge_start_datetime = self.windows["start"].iloc[0].tz_convert(self.tz)
             self.charge_end_datetime = self.windows["end"].iloc[0].tz_convert(self.tz)
 
             self.charge_power = self.windows["forced"].iloc[0]
@@ -3608,12 +3302,8 @@ class PVOpt(hass.Hass):
             self.charge_current = 0
             self.charge_power = 0
             self.charge_target_soc = 0
-            self.charge_start_datetime = self.pv_system.static_flows.index[
-                0
-            ].tz_convert(self.tz)
-            self.charge_end_datetime = self.pv_system.static_flows.index[0].tz_convert(
-                self.tz
-            )
+            self.charge_start_datetime = self.pv_system.static_flows.index[0].tz_convert(self.tz)
+            self.charge_end_datetime = self.pv_system.static_flows.index[0].tz_convert(self.tz)
             self.hold = []
             self.windows = pd.DataFrame()
 
@@ -3672,9 +3362,7 @@ class PVOpt(hass.Hass):
                 for x in status[s]:
                     units = UNITS.get(x, "")
                     if isinstance(status[s][x], pd.Timestamp):
-                        self.log(
-                            f"    {x:16s}: {status[s][x].strftime(DATE_TIME_FORMAT_SHORT)}"
-                        )
+                        self.log(f"    {x:16s}: {status[s][x].strftime(DATE_TIME_FORMAT_SHORT)}")
                     elif isinstance(status[s][x], float):
                         self.log(f"    {x:16s}: {status[s][x]:0.1f} {units}")
                     else:
@@ -3700,10 +3388,7 @@ class PVOpt(hass.Hass):
         cost_today = self._cost_actual()
         midnight = pd.Timestamp.now(tz="UTC").normalize() + pd.Timedelta(24, "hours")
         df = df.fillna(0).round(2)
-        df["period_start"] = (
-            df.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
-            + ":00"
-        )
+        df["period_start"] = df.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
         cols = [
             "soc",
             "forced",
@@ -3713,18 +3398,11 @@ class PVOpt(hass.Hass):
             "consumption",
         ]
 
-        cost = (
-            pd.DataFrame(pd.concat([cost_today, cost]))
-            .set_axis(["cost"], axis=1)
-            .fillna(0)
-        )
+        cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1).fillna(0)
         cost["cumulative_cost"] = cost["cost"].cumsum()
 
         for d in [df, cost]:
-            d["period_start"] = (
-                d.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
-                + ":00"
-            )
+            d["period_start"] = d.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
 
         state = round((cost["cost"].sum()) / 100, 2)
 
@@ -3735,17 +3413,12 @@ class PVOpt(hass.Hass):
                 "state_class": "measurement",
                 "unit_of_measurement": "GBP",
                 "cost_today": round(
-                    (cost["cost"].loc[: midnight - pd.Timedelta(30, "minutes")].sum())
-                    / 100,
+                    (cost["cost"].loc[: midnight - pd.Timedelta(30, "minutes")].sum()) / 100,
                     2,
                 ),
                 "cost_tomorrow": round((cost["cost"].loc[midnight:].sum()) / 100, 2),
             }
-            | {
-                col: df[["period_start", col]].to_dict("records")
-                for col in cols
-                if col in df.columns
-            }
+            | {col: df[["period_start", col]].to_dict("records") for col in cols if col in df.columns}
             | {"cost": cost[["period_start", "cumulative_cost"]].to_dict("records")}
             | attributes
         )
@@ -3960,9 +3633,7 @@ class PVOpt(hass.Hass):
     def load_solcast(self):
         if not self.get_config("use_solar", True):
             df = pd.DataFrame(
-                index=pd.date_range(
-                    pd.Timestamp.now(tz="UTC").normalize(), periods=96, freq="30min"
-                ),
+                index=pd.date_range(pd.Timestamp.now(tz="UTC").normalize(), periods=96, freq="30min"),
                 data={"Solcast": 0, "Solcast_p10": 0, "Solcast_p90": 0, "solar": 0},
             )
             return df
@@ -3970,12 +3641,12 @@ class PVOpt(hass.Hass):
         if self.debug and "X" in self.debug_cat:
             self.log("Getting Solcast data")
         try:
-            solar = self.get_state_retry(
-                self.config["id_solcast_today"], attribute="all"
-            )["attributes"]["detailedForecast"]
-            solar += self.get_state_retry(
-                self.config["id_solcast_tomorrow"], attribute="all"
-            )["attributes"]["detailedForecast"]
+            solar = self.get_state_retry(self.config["id_solcast_today"], attribute="all")["attributes"][
+                "detailedForecast"
+            ]
+            solar += self.get_state_retry(self.config["id_solcast_tomorrow"], attribute="all")["attributes"][
+                "detailedForecast"
+            ]
 
         except Exception as e:
             self.log(f"Failed to get solcast attributes: {e}")
@@ -4014,9 +3685,7 @@ class PVOpt(hass.Hass):
             self.log("")
             return
 
-    def _get_hass_power_from_daily_kwh(
-        self, entity_id, start=None, end=None, days=None, log=False
-    ):
+    def _get_hass_power_from_daily_kwh(self, entity_id, start=None, end=None, days=None, log=False):
         if days is None:
             days = (pd.Timestamp.now(tz="UTC") - start).days + 1
 
@@ -4036,14 +3705,8 @@ class PVOpt(hass.Hass):
             x = df.diff().clip(0).fillna(0).cumsum() + df.iloc[0]
             x.index = x.index.round("1s")
             x = x[~x.index.duplicated()]
-            y = -pd.concat(
-                [x.resample("1s").interpolate().resample("30min").asfreq(), x.iloc[-1:]]
-            ).diff(-1)
-            dt = (
-                y.index.diff().total_seconds()
-                / pd.Timedelta("60min").total_seconds()
-                / 1000
-            )
+            y = -pd.concat([x.resample("1s").interpolate().resample("30min").asfreq(), x.iloc[-1:]]).diff(-1)
+            dt = y.index.diff().total_seconds() / pd.Timedelta("60min").total_seconds() / 1000
             df = y[1:-1] / dt[2:]
 
             if start is not None:
@@ -4063,9 +3726,7 @@ class PVOpt(hass.Hass):
         if self.get_config("use_consumption_history"):
             time_now = pd.Timestamp.now(tz="UTC")
             if (start < time_now) and (end < time_now):
-                self.log(
-                    "  - Start and end are both in past so actuals will be used with no weighting"
-                )
+                self.log("  - Start and end are both in past so actuals will be used with no weighting")
                 days = (time_now - start).days + 1
             else:
                 days = int(self.get_config("consumption_history_days"))
@@ -4080,11 +3741,7 @@ class PVOpt(hass.Hass):
                 if not isinstance(entity_ids, list):
                     entity_ids = [entity_ids]
 
-                entity_ids = [
-                    entity_id
-                    for entity_id in entity_ids
-                    if self.entity_exists(entity_id)
-                ]
+                entity_ids = [entity_id for entity_id in entity_ids if self.entity_exists(entity_id)]
 
             if (
                 (len(entity_ids) == 0)
@@ -4141,9 +3798,7 @@ class PVOpt(hass.Hass):
 
             if (len(self.zappi_consumption_entities) > 0) and self.ev:
                 self.log("Getting consumption in kWh from Zappi Charger(s)")
-                ev_power = self._get_zappi(
-                    start=df.index[0], end=df.index[-1], log=True
-                )
+                ev_power = self._get_zappi(start=df.index[0], end=df.index[-1], log=True)
                 if len(ev_power) > 0:
                     self.log("")
                     self.log(
@@ -4173,30 +3828,18 @@ class PVOpt(hass.Hass):
                             [ev_power, df], axis=1
                         )  # concatenate total consumption and ev consumption into a single dataframe (as they are different lengths)
                         df_EV_Total.columns = ["EV", "Total"]  # Set column names
-                        df_EV_Total = df_EV_Total.fillna(
-                            0
-                        )  # fill any missing values with 0
+                        df_EV_Total = df_EV_Total.fillna(0)  # fill any missing values with 0
 
-                        df_EV = df_EV_Total[
-                            "EV"
-                        ].squeeze()  # Extract EV consumption to Series
-                        df_Total = df_EV_Total[
-                            "Total"
-                        ].squeeze()  # Extract total consumption to Series
-                        df = (
-                            df_Total - df_EV
-                        )  # Substract EV consumption from Total Consumption
+                        df_EV = df_EV_Total["EV"].squeeze()  # Extract EV consumption to Series
+                        df_Total = df_EV_Total["Total"].squeeze()  # Extract total consumption to Series
+                        df = df_Total - df_EV  # Substract EV consumption from Total Consumption
 
                         if self.debug and "Q" in self.debug_cat:
                             self.log("Result of subtraction is")
                             self.log(df.to_string())
 
-                        if (
-                            (df < 0).any().any()
-                        ):  # Are there any negative values in the subtraction?
-                            self.log(
-                                "    Unexpected Negative values after substraction found, setting to zero"
-                            )
+                        if (df < 0).any().any():  # Are there any negative values in the subtraction?
+                            self.log("    Unexpected Negative values after substraction found, setting to zero")
                             df[df < 0] = 0
 
                 # Add consumption margin
@@ -4208,9 +3851,7 @@ class PVOpt(hass.Hass):
                 dfx = pd.Series(index=df.index, data=df.to_list())
 
                 # Group by time and take the mean
-                df = df.groupby(df.index.time).aggregate(
-                    self.get_config("consumption_grouping")
-                )
+                df = df.groupby(df.index.time).aggregate(self.get_config("consumption_grouping"))
                 df.name = "consumption"
 
                 if self.debug and "Q" in self.debug_cat:
@@ -4221,14 +3862,10 @@ class PVOpt(hass.Hass):
 
                 temp = pd.DataFrame(index=index)
                 temp["time"] = temp.index.time
-                consumption_mean = temp.merge(
-                    df, "left", left_on="time", right_index=True
-                )["consumption"]
+                consumption_mean = temp.merge(df, "left", left_on="time", right_index=True)["consumption"]
 
                 if days >= 7:
-                    consumption_dow = (
-                        self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
-                    )
+                    consumption_dow = self.get_config("day_of_week_weighting") * dfx.iloc[: len(temp)]
                     if len(consumption_dow) != len(consumption_mean):
                         self.log(">>> Inconsistent lengths in consumption arrays")
                         self.log(f">>> dow : {len(consumption_dow)}")
@@ -4243,14 +3880,11 @@ class PVOpt(hass.Hass):
 
                     consumption["consumption"] += pd.Series(
                         consumption_dow.to_numpy()
-                        + consumption_mean.to_numpy()
-                        * (1 - self.get_config("day_of_week_weighting")),
+                        + consumption_mean.to_numpy() * (1 - self.get_config("day_of_week_weighting")),
                         index=consumption_mean.index,
                     )
                 else:
-                    self.log(
-                        f"  - Ignoring 'Day of Week Weighting' because only {days} days of history is available"
-                    )
+                    self.log(f"  - Ignoring 'Day of Week Weighting' because only {days} days of history is available")
                     consumption["consumption"] = consumption_mean
 
             if len(entity_ids) > 0:
@@ -4261,9 +3895,7 @@ class PVOpt(hass.Hass):
 
         else:
             daily_kwh = self.get_config("daily_consumption_kwh")
-            self.log(
-                f"  - Creating consumption based on daily estimate of {daily_kwh} kWh"
-            )
+            self.log(f"  - Creating consumption based on daily estimate of {daily_kwh} kWh")
 
             if self.get_config("shape_consumption_profile"):
                 self.log("    and typical usage profile.")
@@ -4278,15 +3910,11 @@ class PVOpt(hass.Hass):
                 daily.index = pd.to_datetime(daily.index, unit="h").time
                 consumption["time"] = consumption.index.time
                 consumption = pd.DataFrame(
-                    consumption.merge(daily, left_on="time", right_index=True)[
-                        "consumption_y"
-                    ]
+                    consumption.merge(daily, left_on="time", right_index=True)["consumption_y"]
                 ).set_axis(["consumption"], axis=1)
             else:
                 self.log("    and flat usage profile.")
-                consumption["consumption"] = (
-                    self.get_config("daily_consumption_kwh") * 1000 / 24
-                )
+                consumption["consumption"] = self.get_config("daily_consumption_kwh") * 1000 / 24
 
             self.log("  - Consumption estimated OK")
 
@@ -4301,9 +3929,7 @@ class PVOpt(hass.Hass):
         self.log(
             f"    Total consumption from {consumption.index[0].strftime(DATE_TIME_FORMAT_SHORT)} to {consumption.index[-1].strftime(DATE_TIME_FORMAT_SHORT)}:"
         )
-        self.log(
-            f"    Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh"
-        )
+        self.log(f"    Total consumption: {(consumption['consumption'].sum() / 2000):0.1f} kWh")
 
         if self.debug and "P" in self.debug_cat:
             self.log("Printing final result of routine load_consumption.....")
@@ -4318,9 +3944,7 @@ class PVOpt(hass.Hass):
         solar = self._get_solar(start, end)
         consumption = self.load_consumption(start, end)
         grid = self.load_grid(start, end)
-        soc = self.hass2df(self.config["id_battery_soc"], days=2, freq="30min").loc[
-            start:end
-        ]
+        soc = self.hass2df(self.config["id_battery_soc"], days=2, freq="30min").loc[start:end]
 
     def load_grid(self, start, end):
         self.log(
@@ -4339,14 +3963,7 @@ class PVOpt(hass.Hass):
             if self.entity_exists(entity_id):
                 x = self.hass2df(entity_id, days=days)
                 if x is not None:
-                    x = (
-                        (
-                            self.riemann_avg(x).loc[start : end - pd.Timedelta("30min")]
-                            / 10
-                        ).round(0)
-                        * 10
-                        * mults[id]
-                    )
+                    x = (self.riemann_avg(x).loc[start : end - pd.Timedelta("30min")] / 10).round(0) * 10 * mults[id]
                     if df is None:
                         df = x
                     else:
@@ -4369,13 +3986,9 @@ class PVOpt(hass.Hass):
             return
 
         consumption = self.load_consumption(start, end)
-        static = pd.concat([solar, consumption], axis=1).set_axis(
-            ["solar", "consumption"], axis=1
-        )
+        static = pd.concat([solar, consumption], axis=1).set_axis(["solar", "consumption"], axis=1)
 
-        initial_soc_df = self.hass2df(
-            self.config["id_battery_soc"], days=2, freq="30min"
-        )
+        initial_soc_df = self.hass2df(self.config["id_battery_soc"], days=2, freq="30min")
         initial_soc = initial_soc_df.loc[start]
 
         self.pv_system.calculate_flows()
@@ -4399,9 +4012,7 @@ class PVOpt(hass.Hass):
             name = tariff_set["name"]
             for imp_exp in IMPEXP:
                 code[imp_exp] = tariff_set[f"octopus_{imp_exp}_tariff_code"]
-                tariffs[imp_exp] = pv.Tariff(
-                    code[imp_exp], export=(imp_exp == "export"), host=self
-                )
+                tariffs[imp_exp] = pv.Tariff(code[imp_exp], export=(imp_exp == "export"), host=self)
 
             contracts.append(
                 pv.Contract(
@@ -4413,10 +4024,7 @@ class PVOpt(hass.Hass):
             )
 
         actual = self._cost_actual(start=start, end=end - pd.Timedelta(30, "minutes"))
-        static["period_start"] = (
-            static.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
-            + ":00"
-        )
+        static["period_start"] = static.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
         entity_id = f"sensor.{self.prefix}_opt_cost_actual"
         self.set_state(
             state=round(actual.sum() / 100, 2),
@@ -4427,19 +4035,12 @@ class PVOpt(hass.Hass):
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison Actual",
             }
-            | {
-                col: static[["period_start", col]].to_dict("records")
-                for col in ["solar", "consumption"]
-            },
+            | {col: static[["period_start", col]].to_dict("records") for col in ["solar", "consumption"]},
         )
 
         self.ulog("Net Cost comparison:", underline=None)
-        self.log(
-            f"  {'Tariff':20s}  {'Base Cost (GBP)':>20s}  {'Optimised Cost (GBP)':>20s} "
-        )
-        self.log(
-            f"  {'------':20s}  {'---------------':>20s}  {'--------------------':>20s} "
-        )
+        self.log(f"  {'Tariff':20s}  {'Base Cost (GBP)':>20s}  {'Optimised Cost (GBP)':>20s} ")
+        self.log(f"  {'------':20s}  {'---------------':>20s}  {'--------------------':>20s} ")
         self.log(f"  {'Actual':20s}  {'':20s}  {(actual.sum()/100):>20.3f}")
 
         cols = [
@@ -4460,10 +4061,7 @@ class PVOpt(hass.Hass):
                 log=False,
             )
 
-            opt["period_start"] = (
-                opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2]
-                + ":00"
-            )
+            opt["period_start"] = opt.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
 
             attributes = {
                 "state_class": "measurement",
@@ -4471,16 +4069,10 @@ class PVOpt(hass.Hass):
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison {contract.name}",
                 "net_base": round(net_base.sum() / 100, 2),
-            } | {
-                col: opt[["period_start", col]].to_dict("records")
-                for col in cols
-                if col in opt.columns
-            }
+            } | {col: opt[["period_start", col]].to_dict("records") for col in cols if col in opt.columns}
 
             net_opt = contract.net_cost(opt, day_ahead=False, sum=False)
-            self.log(
-                f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}"
-            )
+            self.log(f"  {contract.name:20s}  {(net_base.sum()/100):>20.3f}  {(net_opt.sum()/100):>20.3f}")
             entity_id = f"sensor.{self.prefix}_opt_cost_{contract.name}"
             self.set_state(
                 state=round(net_opt.sum() / 100, 2),
@@ -4504,10 +4096,7 @@ class PVOpt(hass.Hass):
             if self.entity_exists(entity_id):
                 x = self.hass2df(entity_id, days=days)
                 if x is not None:
-                    x = (
-                        self.riemann_avg(x).loc[start : end - pd.Timedelta("30min")]
-                        / 10
-                    ).round(0) * 10
+                    x = (self.riemann_avg(x).loc[start : end - pd.Timedelta("30min")] / 10).round(0) * 10
                     if df is None:
                         df = x
                     else:
@@ -4542,9 +4131,7 @@ class PVOpt(hass.Hass):
                 # self.log(x.to_string())
 
                 df = pd.DataFrame(
-                    self.get_state_retry(
-                        self.bottlecap_entities[direction], attribute=("rates")
-                    )
+                    self.get_state_retry(self.bottlecap_entities[direction], attribute=("rates"))
                 ).set_index("start")["value_inc_vat"]
                 df.index = pd.to_datetime(df.index, utc=True)
                 df *= 100
@@ -4556,9 +4143,9 @@ class PVOpt(hass.Hass):
                 df = pd.concat(
                     [
                         df,
-                        self.contract.tariffs[direction].to_df(
-                            start=df.index[0], end=df.index[-1], day_ahead=False
-                        )["unit"],
+                        self.contract.tariffs[direction].to_df(start=df.index[0], end=df.index[-1], day_ahead=False)[
+                            "unit"
+                        ],
                     ],
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
@@ -4570,13 +4157,7 @@ class PVOpt(hass.Hass):
                 # Drop any Savings Sessions
 
                 for id in self.saving_events:
-                    df = df.drop(
-                        df[
-                            self.saving_events[id]["start"] : self.saving_events[id][
-                                "end"
-                            ]
-                        ].index[:-1]
-                    )
+                    df = df.drop(df[self.saving_events[id]["start"] : self.saving_events[id]["end"]].index[:-1])
 
                 pvopt_price = df["pv_opt"].mean()
                 bottlecap_price = df["bottlecap"].mean()
@@ -4613,10 +4194,7 @@ class PVOpt(hass.Hass):
             states = {k: states[k] for k in states if (f"{self.device_name}_") in k}
             # states = {k: states[k] for k in states if self.device_name in k or "zappi" in k}  # : print zappi entities as well
             for entity_id in states:
-                x = (
-                    entity_id
-                    + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
-                )
+                x = entity_id + f" ({states[entity_id]['attributes'].get('device_class',None)}):"
                 x = f"  {x:60s}"
 
                 if domain != "select":
@@ -4698,9 +4276,7 @@ class PVOpt(hass.Hass):
 
         return (changed, written)
 
-    def write_and_poll_value(
-        self, entity_id, value: int | float, tolerance=0.0, verbose=True
-    ):
+    def write_and_poll_value(self, entity_id, value: int | float, tolerance=0.0, verbose=True):
         changed = False
         written = False
         if tolerance == -1:
@@ -4720,9 +4296,7 @@ class PVOpt(hass.Hass):
         new_state = None
         if changed:
             try:
-                self.call_service(
-                    "number/set_value", entity_id=entity_id, value=str(value)
-                )
+                self.call_service("number/set_value", entity_id=entity_id, value=str(value))
                 written = False
                 retries = 0
                 while not written and retries < WRITE_POLL_RETRIES:
@@ -4748,9 +4322,7 @@ class PVOpt(hass.Hass):
         # Set consistent date for all comparisons
         value = value.replace(year=2024, month=1, day=1)
 
-        old_time = pd.to_datetime(
-            "2024/01/01 " + self.get_state_retry(entity_id=entity_id)
-        )
+        old_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
         new_time = None
 
         # self.log(f"Write_and_poll_time: time = {value}, old_time = {old_time}")
@@ -4773,9 +4345,7 @@ class PVOpt(hass.Hass):
                     retries += 1
                     time.sleep(WRITE_POLL_TIME_SLEEP)
 
-                    new_time = pd.to_datetime(
-                        "2024/01/01 " + self.get_state_retry(entity_id=entity_id)
-                    )
+                    new_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
 
                     # self.log(f"Write_and_poll_time:  while loop, new_time = {new_time}")
 
@@ -4794,9 +4364,7 @@ class PVOpt(hass.Hass):
         if state is not None:
             entity_id = self.config[f"id_{item}"]
             if self.get_state_retry(entity_id=entity_id) != state:
-                self.call_service(
-                    "select/select_option", entity_id=entity_id, option=state
-                )
+                self.call_service("select/select_option", entity_id=entity_id, option=state)
                 self.rlog(f"Setting {entity_id} to {state}")
 
     def get_state_retry(self, *args, **kwargs):
@@ -4835,11 +4403,7 @@ class PVOpt(hass.Hass):
         dt = x.index.diff().total_seconds().fillna(0)
 
         integral = (dt * x.shift(1)).fillna(0).cumsum().resample(freq).last()
-        avg = (
-            (integral.diff().shift(-1)[:-1] / pd.Timedelta(freq).total_seconds())
-            .fillna(0)
-            .round(1)
-        )
+        avg = (integral.diff().shift(-1)[:-1] / pd.Timedelta(freq).total_seconds()).fillna(0).round(1)
         # self.log(avg)
         return avg
 

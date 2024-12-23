@@ -131,12 +131,14 @@ INVERTER_DEFS = {
         # from the config.yaml file but not rquired outside of this module
         "brand_config": {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
+            "id_timed_charge_on": "switch.{device_name}_timed_charge_slot_1_enable"
             "id_timed_charge_start_hours": "number.{device_name}_timed_charge_start_hours",
             "id_timed_charge_start_minutes": "number.{device_name}_timed_charge_start_minutes",
             "id_timed_charge_end_hours": "number.{device_name}_timed_charge_end_hours",
             "id_timed_charge_end_minutes": "number.{device_name}_timed_charge_end_minutes",
             "id_timed_charge_current": "number.{device_name}_timed_charge_current",
             "id_timed_charge_soc": "number.{device_name}_timed_charge_soc",
+            "id_timed_discharge_on": "switch.{device_name}_timed_discharge_slot_1_enable"
             "id_timed_discharge_start_hours": "number.{device_name}_timed_discharge_start_hours",
             "id_timed_discharge_start_minutes": "number.{device_name}_timed_discharge_start_minutes",
             "id_timed_discharge_end_hours": "number.{device_name}_timed_discharge_end_hours",
@@ -456,20 +458,44 @@ class SolisInverter(BaseInverterController):
     @property
     def timed_mode(self):
         if self._hmi_fb00:
-            code = 33
+            timed_mode = self._get_slot_status(direction = 'charge') and self._get_slot_status(direction = 'discharge') and int(self._get_energy_control_code()) == 33
+            return timed_mode
         else:
-            code = 35
-        return int(self._get_energy_control_code()) == code
+            return int(self._get_energy_control_code()) == 35
+        
+    def _get_slot_status(self,direction='charge'):
+        cfg = f'id_timed_{direction}_on'
+        if cfg in self._brand_config:
+            return self.get_config(cfg)
+        else:
+            self.log(f"{cfg} is not defined so assuming switch is on", level="WARNING")
+            return True
 
     @final
     def enable_timed_mode(self):
         # set the energy control switch depending on HMI version
         if self._hmi_fb00:
             code = 33
+            self._enable_slot(direction="charge", slot=1)
+            self._enable_slot(direction="discharge", slot=1)
         else:
             code = 35
         self.log(f">>> Setting energy control switch to {code} to enable timed mode")
         self._set_energy_control_switch(code)
+
+    def _enable_slot(self,direction='charge'):
+        cfg = f'id_timed_{direction}_on'
+        entity_id = self._brand_config.get(cfg, None)
+        if cfg in self._brand_config and entity_id is not None:
+            try:
+                self._host.call_service("switch/turn_on", entity_id=entity_id)
+                self.log(f">>> Switch {entity_id} turned ON")
+            except:
+                self.log(f"Failed to turn on switch {entity_id}", level="WARNING")
+        else:
+            self.log(f"{cfg} is not defined so assuming switch is on", level="WARNING")
+            return True
+
 
     def _set_energy_control_switch(self, code: int):
         mode = self._modes.get(code, None)
@@ -581,6 +607,8 @@ class SolisInverter(BaseInverterController):
             """
             if changed or (self.status[direction].get("soc", 0) != target_soc):
                 self._set_target_soc(direction, target_soc, forced=True)
+
+
 
     def hold_soc(self, enable, target_soc=0, **kwargs):
         start = kwargs.get("start", pd.Timestamp.now(tz=self._tz).floor("1min"))
