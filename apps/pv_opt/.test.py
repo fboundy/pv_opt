@@ -1,15 +1,14 @@
 # %%
-import pandas as pd
-import numpy as np
-import requests
-from datetime import datetime
-from datetime import time
+from datetime import datetime, time
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pvpy as pvpy
+import requests
 import yaml
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
-
-import pvpy as pvpy
 
 entities = [
     "pv_total_power",
@@ -39,9 +38,19 @@ for entity in entities:
     result = query_api.query(org=org, query=query)
 
     # Process the results
-    data = [{"Time": record.get_time(), "Value": record.get_value()} for record in result[-1].records]
+    data = [
+        {"Time": record.get_time(), "Value": record.get_value()}
+        for record in result[-1].records
+    ]
     series += [pd.DataFrame(data)]
-    series[-1] = series[-1].set_index("Time").resample("1min").mean().fillna(0)["Value"].rename(entity)
+    series[-1] = (
+        series[-1]
+        .set_index("Time")
+        .resample("1min")
+        .mean()
+        .fillna(0)["Value"]
+        .rename(entity)
+    )
 df = pd.concat(series, axis=1)
 df = df.resample("5min").mean()
 # Close the client
