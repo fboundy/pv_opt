@@ -71,15 +71,10 @@ class InverterController:
         ):
             for item in defs:
                 if isinstance(defs[item], str):
-                    conf[item] = defs[item].replace(
-                        "{device_name}", self.host.device_name
-                    )
+                    conf[item] = defs[item].replace("{device_name}", self.host.device_name)
                     # conf[item] = defs[item].replace("{inverter_sn}", self.host.inverter_sn)
                 elif isinstance(defs[item], list):
-                    conf[item] = [
-                        z.replace("{device_name}", self.host.device_name)
-                        for z in defs[item]
-                    ]
+                    conf[item] = [z.replace("{device_name}", self.host.device_name) for z in defs[item]]
                     # conf[item] = [z.replace("{inverter_sn}", self.host.inverter_sn) for z in defs[item]]
                 else:
                     conf[item] = defs[item]
@@ -111,9 +106,7 @@ class InverterController:
             if enable:
                 self.host.set_select("use_mode", "Force Time Use")
                 time_now = pd.Timestamp.now(tz=self.tz)
-                start = (
-                    kwargs.get("start", time_now).floor("15min").strftime(TIMEFORMAT)
-                )
+                start = kwargs.get("start", time_now).floor("15min").strftime(TIMEFORMAT)
                 end = kwargs.get("end", time_now).ceil("30min").strftime(TIMEFORMAT)
                 self.host.set_select("charge_start_time_1", start)
                 self.host.set_select("charge_end_time_1", end)
@@ -126,25 +119,17 @@ class InverterController:
                     voltage = self.host.get_config("battery_voltage")
                     if voltage == 0:
                         voltage = BATTERY_VOLTAGE_DEFAULT
-                        self.log(
-                            f"Read a battery voltage of zero. Assuming default of {BATTERY_VOLTAGE_DEFAULT}"
-                        )
+                        self.log(f"Read a battery voltage of zero. Assuming default of {BATTERY_VOLTAGE_DEFAULT}")
                     current = abs(round(power / voltage, 1))
-                    current = min(
-                        current, self.host.get_config("battery_current_limit_amps")
-                    )
+                    current = min(current, self.host.get_config("battery_current_limit_amps"))
 
                     # If power is exactly "1" then this is a car hold slot, to prevent sleep, set to 1A
                     if power == 1:
                         current = 1
-                        self.log(
-                            "Power = 1W (hold slot). Setting current to 1A (to prevent sleep SOC being reached)"
-                        )
+                        self.log("Power = 1W (hold slot). Setting current to 1A (to prevent sleep SOC being reached)")
                         self.log("")
                     else:
-                        self.log(
-                            f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V"
-                        )
+                        self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
 
                     changed, written = self.host.write_and_poll_value(
                         entity_id=entity_id, value=current, tolerance=1, verbose=True
@@ -154,9 +139,7 @@ class InverterController:
                         if written:
                             self.log(f"Current {current}A written to inverter")
                         else:
-                            self.log(
-                                f"Failed to write current of {current}A to inverter"
-                            )
+                            self.log(f"Failed to write current of {current}A to inverter")
                     else:
                         self.log("Inverter already at correct current")
 
@@ -172,9 +155,7 @@ class InverterController:
                         if written:
                             self.log(f"Target SOC {target_soc}% written to inverter")
                         else:
-                            self.log(
-                                f"Failed to write Target SOC of {target_soc}% to inverter"
-                            )
+                            self.log(f"Failed to write Target SOC of {target_soc}% to inverter")
                     else:
                         self.log("Inverter already at correct Target SOC")
             else:
@@ -267,17 +248,11 @@ class InverterController:
         if self.type == "SOLAX_X1":
             return {
                 limit: pd.Timestamp(
-                    self.host.get_state_retry(
-                        entity_id=self.host.config[f"id_charge_{limit}_time_1"]
-                    ),
+                    self.host.get_state_retry(entity_id=self.host.config[f"id_charge_{limit}_time_1"]),
                     tz=self.tz,
                 )
                 for limit in LIMITS
-            } | {
-                "current": self.host.get_state_retry(
-                    entity_id=self.host.config[f"id_max_charge_current"]
-                )
-            }
+            } | {"current": self.host.get_state_retry(entity_id=self.host.config[f"id_max_charge_current"])}
 
         else:
             self._unknown_inverter()
