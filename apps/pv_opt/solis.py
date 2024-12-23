@@ -278,9 +278,7 @@ class SolisCloud:
         return body
 
     def digest(self, body: str) -> str:
-        return base64.b64encode(hashlib.md5(body.encode("utf-8")).digest()).decode(
-            "utf-8"
-        )
+        return base64.b64encode(hashlib.md5(body.encode("utf-8")).digest()).decode("utf-8")
 
     def header(self, body: str, canonicalized_resource: str) -> dict[str, str]:
         content_md5 = self.digest(body)
@@ -289,17 +287,7 @@ class SolisCloud:
         now = datetime.now(timezone.utc)
         date = now.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
-        encrypt_str = (
-            "POST"
-            + "\n"
-            + content_md5
-            + "\n"
-            + content_type
-            + "\n"
-            + date
-            + "\n"
-            + canonicalized_resource
-        )
+        encrypt_str = "POST" + "\n" + content_md5 + "\n" + content_type + "\n" + date + "\n" + canonicalized_resource
         hmac_obj = hmac.new(
             self.key_secret.encode("utf-8"),
             msg=encrypt_str.encode("utf-8"),
@@ -320,9 +308,7 @@ class SolisCloud:
     def inverter_id(self):
         body = self.get_body(stationId=self.plant_id)
         header = self.header(body, self.URLS["inverterList"])
-        response = requests.post(
-            self.URLS["root"] + self.URLS["inverterList"], data=body, headers=header
-        )
+        response = requests.post(self.URLS["root"] + self.URLS["inverterList"], data=body, headers=header)
         if response.status_code == HTTPStatus.OK:
             return response.json()["data"]["page"]["records"][0].get("id", "")
 
@@ -330,9 +316,7 @@ class SolisCloud:
     def inverter_sn(self):
         body = self.get_body(stationId=self.plant_id)
         header = self.header(body, self.URLS["inverterList"])
-        response = requests.post(
-            self.URLS["root"] + self.URLS["inverterList"], data=body, headers=header
-        )
+        response = requests.post(self.URLS["root"] + self.URLS["inverterList"], data=body, headers=header)
         if response.status_code == HTTPStatus.OK:
             return response.json()["data"]["page"]["records"][0].get("sn", "")
 
@@ -340,9 +324,7 @@ class SolisCloud:
     def inverter_details(self):
         body = self.get_body(id=self.inverter_id, sn=self.inverter_sn)
         header = self.header(body, self.URLS["inverterDetail"])
-        response = requests.post(
-            self.URLS["root"] + self.URLS["inverterDetail"], data=body, headers=header
-        )
+        response = requests.post(self.URLS["root"] + self.URLS["inverterDetail"], data=body, headers=header)
 
         if response.status_code == HTTPStatus.OK:
             return response.json()["data"]
@@ -366,9 +348,7 @@ class SolisCloud:
             body = self.get_body(inverterSn=self.inverter_sn, cid=cid)
             headers = self.header(body, self.URLS["atRead"])
             headers["token"] = self.token
-            response = requests.post(
-                self.URLS["root"] + self.URLS["atRead"], data=body, headers=headers
-            )
+            response = requests.post(self.URLS["root"] + self.URLS["atRead"], data=body, headers=headers)
             if response.status_code == HTTPStatus.OK:
                 data = response.json()["data"]["msg"]
             else:
@@ -388,18 +368,14 @@ class SolisCloud:
             body = self.get_body(inverterSn=self.inverter_sn, cid=cid, value=value)
             headers = self.header(body, self.URLS["control"])
             headers["token"] = self.token
-            response = requests.post(
-                self.URLS["root"] + self.URLS["control"], data=body, headers=headers
-            )
+            response = requests.post(self.URLS["root"] + self.URLS["control"], data=body, headers=headers)
             if response.status_code == HTTPStatus.OK:
                 return response.json()
 
     def login(self):
         body = self.get_body(username=self.username, password=self.md5password)
         header = self.header(body, self.URLS["login"])
-        response = requests.post(
-            self.URLS["root"] + self.URLS["login"], data=body, headers=header
-        )
+        response = requests.post(self.URLS["root"] + self.URLS["login"], data=body, headers=header)
         status = response.status_code
         if status == HTTPStatus.OK:
             result = response.json()
@@ -478,14 +454,9 @@ class InverterController:
         ):
             for item in defs:
                 if isinstance(defs[item], str):
-                    conf[item] = defs[item].replace(
-                        "{device_name}", self.host.device_name
-                    )
+                    conf[item] = defs[item].replace("{device_name}", self.host.device_name)
                 elif isinstance(defs[item], list):
-                    conf[item] = [
-                        z.replace("{device_name}", self.host.device_name)
-                        for z in defs[item]
-                    ]
+                    conf[item] = [z.replace("{device_name}", self.host.device_name) for z in defs[item]]
                 else:
                     conf[item] = defs[item]
         if self.type == "SOLIS_CLOUD":
@@ -519,9 +490,7 @@ class InverterController:
             "SOLIS_SOLARMAN",
             "SOLIS_CLOUD",
         ]:
-            self._solis_set_mode_switch(
-                SelfUse=True, Timed=True, GridCharge=True, Backup=False
-            )
+            self._solis_set_mode_switch(SelfUse=True, Timed=True, GridCharge=True, Backup=False)
         else:
             self._unknown_inverter()
 
@@ -561,16 +530,10 @@ class InverterController:
         raise Exception(e)
 
     def hold_soc_old(self, enable, soc=None):
-        if (
-            self.type == "SOLIS_SOLAX_MODBUS"
-            or self.type == "SOLIS_CORE_MODBUS"
-            or self.type == "SOLIS_SOLARMAN"
-        ):
+        if self.type == "SOLIS_SOLAX_MODBUS" or self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
 
             if enable:
-                self._solis_set_mode_switch(
-                    SelfUse=True, Timed=False, GridCharge=True, Backup=True
-                )
+                self._solis_set_mode_switch(SelfUse=True, Timed=False, GridCharge=True, Backup=True)
             else:
                 self.enable_timed_mode()
 
@@ -584,9 +547,7 @@ class InverterController:
 
             self.log(f"Setting Backup SOC to {soc}%")
             if self.type == "SOLIS_SOLAX_MODBUS":
-                changed, written = self.host.write_and_poll_value(
-                    entity_id=entity_id, value=soc
-                )
+                changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=soc)
             elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
                 changed, written = self.solis_write_holding_register(
                     address=INVERTER_DEFS(self.type)["registers"]["backup_mode_soc"],
@@ -665,9 +626,7 @@ class InverterController:
             for limit in times:
                 if times[limit] is not None:
                     for unit in ["hours", "minutes"]:
-                        entity_id = self.host.config[
-                            f"id_timed_{direction}_{limit}_{unit}"
-                        ]
+                        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
                         if unit == "hours":
                             value = times[limit].hour
                         else:
@@ -677,13 +636,8 @@ class InverterController:
                             changed, written = self.host.write_and_poll_value(
                                 entity_id=entity_id, value=value, verbose=True
                             )
-                        elif (
-                            self.type == "SOLIS_CORE_MODBUS"
-                            or self.type == "SOLIS_SOLARMAN"
-                        ):
-                            changed, written = self._solis_write_time_register(
-                                direction, limit, unit, value
-                            )
+                        elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
+                            changed, written = self._solis_write_time_register(direction, limit, unit, value)
 
                         else:
                             e = "Unknown inverter type"
@@ -692,9 +646,7 @@ class InverterController:
 
                         if changed:
                             if written:
-                                self.log(
-                                    f"Wrote {direction} {limit} {unit} of {value} to inverter"
-                                )
+                                self.log(f"Wrote {direction} {limit} {unit} of {value} to inverter")
                                 value_changed = True
                             else:
                                 self.log(
@@ -709,13 +661,9 @@ class InverterController:
                     self.host.call_service("button/press", entity_id=entity_id)
                     time.sleep(0.5)
                     try:
-                        time_pressed = pd.Timestamp(
-                            self.host.get_state_retry(entity_id)
-                        )
+                        time_pressed = pd.Timestamp(self.host.get_state_retry(entity_id))
 
-                        dt = (
-                            pd.Timestamp.now(self.host.tz) - time_pressed
-                        ).total_seconds()
+                        dt = (pd.Timestamp.now(self.host.tz) - time_pressed).total_seconds()
                         if dt < 10:
                             self.log(f"Successfully pressed button {entity_id}")
 
@@ -724,9 +672,7 @@ class InverterController:
                                 f"Failed to press button {entity_id}. Last pressed at {time_pressed.strftime(TIMEFORMAT)} ({dt:0.2f} seconds ago)"
                             )
                     except:
-                        self.log(
-                            f"Failed to press button {entity_id}: it appears to never have been pressed."
-                        )
+                        self.log(f"Failed to press button {entity_id}: it appears to never have been pressed.")
 
             else:
                 self.log("Inverter already at correct time settings")
@@ -735,20 +681,12 @@ class InverterController:
                 entity_id = self.host.config[f"id_timed_{direction}_current"]
 
                 current = abs(round(power / self.host.get_config("battery_voltage"), 1))
-                current = min(
-                    current, self.host.get_config("battery_current_limit_amps")
-                )
-                self.log(
-                    f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V"
-                )
+                current = min(current, self.host.get_config("battery_current_limit_amps"))
+                self.log(f"Power {power:0.0f} = {current:0.1f}A at {self.host.get_config('battery_voltage')}V")
                 if self.type == "SOLIS_SOLAX_MODBUS":
-                    changed, written = self.host.write_and_poll_value(
-                        entity_id=entity_id, value=current, tolerance=1
-                    )
+                    changed, written = self.host.write_and_poll_value(entity_id=entity_id, value=current, tolerance=1)
                 elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
-                    changed, written = self._solis_write_current_register(
-                        direction, current, tolerance=1
-                    )
+                    changed, written = self._solis_write_current_register(direction, current, tolerance=1)
                 else:
                     e = "Unknown inverter type"
                     self.log(e, level="ERROR")
@@ -765,12 +703,8 @@ class InverterController:
         elif self.type == "SOLIS_CLOUD":
             current = abs(round(power / self.host.get_config("battery_voltage"), 0))
             current = min(current, self.host.get_config("battery_current_limit_amps"))
-            self.log(
-                f"Power {power:0.0f} = {current:0.0f}A at {self.host.get_config('battery_voltage')}V"
-            )
-            response = self.cloud.set_timer(
-                direction, times["start"], times["end"], current
-            )
+            self.log(f"Power {power:0.0f} = {current:0.0f}A at {self.host.get_config('battery_voltage')}V")
+            response = self.cloud.set_timer(direction, times["start"], times["end"], current)
             if response["code"] == -1:
                 self.log("Inverter already at correct time and current settings")
             elif response["code"] == 0:
@@ -811,10 +745,7 @@ class InverterController:
 
         if self.type == "SOLIS_SOLAX_MODBUS":
             entity_modes = self.host.get_state_retry(entity_id, attribute="options")
-            modes = {
-                INVERTER_DEFS[self.type]["codes"].get(mode): mode
-                for mode in entity_modes
-            }
+            modes = {INVERTER_DEFS[self.type]["codes"].get(mode): mode for mode in entity_modes}
             # mode = INVERTER_DEFS[self.type]["modes"].get(code)
             mode = modes.get(code)
             if self.host.debug:
@@ -827,17 +758,13 @@ class InverterController:
 
         elif self.type == "SOLIS_CORE_MODBUS" or self.type == "SOLIS_SOLARMAN":
             address = INVERTER_DEFS[self.type]["registers"]["storage_control_switch"]
-            self._solis_write_holding_register(
-                address=address, value=code, entity_id=entity_id
-            )
+            self._solis_write_holding_register(address=address, value=code, entity_id=entity_id)
 
         elif self.type == "SOLIS_CLOUD":
             self.cloud.set_mode_switch(code)
 
     def _solis_solax_solarman_mode_switch(self):
-        inverter_mode = self.host.get_state_retry(
-            entity_id=self.host.config["id_inverter_mode"]
-        )
+        inverter_mode = self.host.get_state_retry(entity_id=self.host.config["id_inverter_mode"])
         if self.type == "SOLIS_SOLAX_MODBUS":
             code = INVERTER_DEFS[self.type]["codes"][inverter_mode]
         else:
@@ -853,9 +780,7 @@ class InverterController:
 
     def _solis_core_mode_switch(self):
         bits = INVERTER_DEFS["SOLIS_CORE_MODBUS"]["bits"]
-        code = int(
-            self.host.get_state_retry(entity_id=self.host.config["id_inverter_mode"])
-        )
+        code = int(self.host.get_state_retry(entity_id=self.host.config["id_inverter_mode"]))
         switches = {bit: (code & 2**i == 2**i) for i, bit in enumerate(bits)}
         return {"code": code, "switches": switches}
 
@@ -879,21 +804,15 @@ class InverterController:
                 for limit in limits:
                     states = {}
                     for unit in ["hours", "minutes"]:
-                        entity_id = self.host.config[
-                            f"id_timed_{direction}_{limit}_{unit}"
-                        ]
-                        states[unit] = int(
-                            float(self.host.get_state_retry(entity_id=entity_id))
-                        )
+                        entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
+                        states[unit] = int(float(self.host.get_state_retry(entity_id=entity_id)))
                     status[direction][limit] = pd.Timestamp(
                         f"{states['hours']:02d}:{states['minutes']:02d}",
                         tz=self.host.tz,
                     )
 
             status[direction]["current"] = float(
-                self.host.get_state_retry(
-                    self.host.config[f"id_timed_{direction}_current"]
-                )
+                self.host.get_state_retry(self.host.config[f"id_timed_{direction}_current"])
             )
 
         elif self.type == "SOLIS_CLOUD":
@@ -959,9 +878,7 @@ class InverterController:
             if changed:
                 data = {"register": address, "value": value}
                 # self.host.call_service("solarman/write_holding_register", **data)
-                self.log(
-                    ">>> Writing {value} to inverter register {address} using Solarman"
-                )
+                self.log(">>> Writing {value} to inverter register {address} using Solarman")
                 written = True
 
         return changed, written
@@ -978,11 +895,7 @@ class InverterController:
         )
 
     def _solis_write_time_register(self, direction, limit, unit, value):
-        address = INVERTER_DEFS[self.type]["registers"][
-            f"timed_{direction}_{limit}_{unit}"
-        ]
+        address = INVERTER_DEFS[self.type]["registers"][f"timed_{direction}_{limit}_{unit}"]
         entity_id = self.host.config[f"id_timed_{direction}_{limit}_{unit}"]
 
-        return self._solis_write_holding_register(
-            address=address, value=value, entity_id=entity_id
-        )
+        return self._solis_write_holding_register(address=address, value=value, entity_id=entity_id)
