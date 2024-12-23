@@ -29,8 +29,7 @@ jobs:
             exit 1
           fi
           echo "VERSION=$VERSION"
-          echo "version=$VERSION" >> $GITHUB_ENV
-          echo "::set-output name=version::$VERSION"
+          echo "version=$VERSION" >> $GITHUB_ENV  # Save to environment file
 
       # Step 3: Create GitHub Release
       - name: Create GitHub Release

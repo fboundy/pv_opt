@@ -56,17 +56,13 @@ INVERTER_DEFS = {
             "id_priority_load": "sensor.{device_name}_{inverter_sn}_priority_load",
             "id_timed_charge_start": "sensor.{device_name}_{inverter_sn}_prog1_time",
             "id_timed_charge_end": "sensor.{device_name}_{inverter_sn}_prog2_time",
-            "id_timed_charge_unused": [
-                "sensor.{device_name}_{inverter_sn}_" + f"prog{i}_time"
-                for i in range(2, 7)
-            ],
+            "id_timed_charge_unused": ["sensor.{device_name}_{inverter_sn}_" + f"prog{i}_time" for i in range(2, 7)],
             "id_timed_charge_enable": "sensor.{device_name}_{inverter_sn}_prog1_charge",
             "id_timed_charge_capacity": "sensor.{device_name}_{inverter_sn}_prog1_capacity",
             "id_timed_discharge_start": "sensor.{device_name}_{inverter_sn}_prog3_time",
             "id_timed_discharge_end": "sensor.{device_name}_{inverter_sn}_prog4_time",
             "id_timed_discharge_unused": [
-                "sensor.{device_name}_{inverter_sn}_" + f"prog{i}_time"
-                for i in [1, 2, 5, 6]
+                "sensor.{device_name}_{inverter_sn}_" + f"prog{i}_time" for i in [1, 2, 5, 6]
             ],
             "id_timed_dicharge_enable": "sensor.{device_name}_{inverter_sn}_prog3_charge",
             "id_timed_discharge_capacity": "sensor.{device_name}_{inverter_sn}_prog3_capacity",
@@ -111,21 +107,11 @@ class InverterController:
         ):
             for item in defs:
                 if isinstance(defs[item], str):
-                    conf[item] = defs[item].replace(
-                        "{device_name}", self.host.device_name
-                    )
-                    conf[item] = defs[item].replace(
-                        "{inverter_sn}", self.host.inverter_sn
-                    )
+                    conf[item] = defs[item].replace("{device_name}", self.host.device_name)
+                    conf[item] = defs[item].replace("{inverter_sn}", self.host.inverter_sn)
                 elif isinstance(defs[item], list):
-                    conf[item] = [
-                        z.replace("{device_name}", self.host.device_name)
-                        for z in defs[item]
-                    ]
-                    conf[item] = [
-                        z.replace("{inverter_sn}", self.host.inverter_sn)
-                        for z in defs[item]
-                    ]
+                    conf[item] = [z.replace("{device_name}", self.host.device_name) for z in defs[item]]
+                    conf[item] = [z.replace("{inverter_sn}", self.host.inverter_sn) for z in defs[item]]
                 else:
                     conf[item] = defs[item]
 
@@ -169,18 +155,13 @@ class InverterController:
                 self.enable_timed_mode()
                 params = {
                     self.config["json_work_mode"]: 2,
-                    self.config["json_timed_charge_target_soc"]: kwargs.get(
-                        "target_soc", 100
-                    ),
-                    self.config["json_timed_charge_start"]: kwargs.get(
-                        "start", time_now.strftime(TIMEFORMAT)
-                    ),
+                    self.config["json_timed_charge_target_soc"]: kwargs.get("target_soc", 100),
+                    self.config["json_timed_charge_start"]: kwargs.get("start", time_now.strftime(TIMEFORMAT)),
                     self.config["json_timed_charge_end"]: kwargs.get(
                         "end", time_now.ceil("30min").strftime(TIMEFORMAT)
                     ),
                     self.config["json_charge_current"]: min(
-                        kwargs.get("power", 0)
-                        / self.host.get_config("battery_voltage"),
+                        kwargs.get("power", 0) / self.host.get_config("battery_voltage"),
                         self.host.get_config("battery_current_limit_amps"),
                     ),
                     self.config["json_timed_charge_enable"]: True,
@@ -195,9 +176,7 @@ class InverterController:
                     self.config["json_target_soc"]: 100,
                     self.config["json_timed_charge_start"]: "00:00",
                     self.config["json_timed_charge_end"]: "00:00",
-                    self.config["json_charge_current"]: self.host.get_config(
-                        "battery_current_limit_amps"
-                    ),
+                    self.config["json_charge_current"]: self.host.get_config("battery_current_limit_amps"),
                     self.config["json_timed_charge_enable"]: False,
                     self.config["json_gen_charge_enable"]: True,
                 } | {x: "00:00" for x in self.config["json_timed_charge_unused"]}
@@ -215,9 +194,7 @@ class InverterController:
                     self.config["json_timed_discharge_target_soc"]: kwargs.get(
                         "target_soc", self.host.get_config("maximum_dod_percent")
                     ),
-                    self.config["json_timed_discharge_start"]: kwargs.get(
-                        "start", time_now.strftime(TIMEFORMAT)
-                    ),
+                    self.config["json_timed_discharge_start"]: kwargs.get("start", time_now.strftime(TIMEFORMAT)),
                     self.config["json_timed_discharge_end"]: kwargs.get(
                         "end", time_now.ceil("30min").strftime(TIMEFORMAT)
                     ),
@@ -254,18 +231,10 @@ class InverterController:
         time_now = pd.Timestamp.now(tz=self.tz)
 
         if self.type == "SUNSYNK_SOLARSYNK2":
-            charge_start = pd.Timestamp(
-                self.host.get_config("id_timed_charge_start"), tz=self.tz
-            )
-            charge_end = pd.Timestamp(
-                self.host.get_config("id_timed_charge_end"), tz=self.tz
-            )
-            discharge_start = pd.Timestamp(
-                self.host.get_config("id_timed_charge_start"), tz=self.tz
-            )
-            discharge_end = pd.Timestamp(
-                self.host.get_config("id_timed_charge_end"), tz=self.tz
-            )
+            charge_start = pd.Timestamp(self.host.get_config("id_timed_charge_start"), tz=self.tz)
+            charge_end = pd.Timestamp(self.host.get_config("id_timed_charge_end"), tz=self.tz)
+            discharge_start = pd.Timestamp(self.host.get_config("id_timed_charge_start"), tz=self.tz)
+            discharge_end = pd.Timestamp(self.host.get_config("id_timed_charge_end"), tz=self.tz)
 
             status = {
                 "timer mode": self.host.get_config("id_use_timer"),
