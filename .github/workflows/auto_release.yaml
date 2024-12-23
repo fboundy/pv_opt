@@ -3,10 +3,10 @@ name: Auto Release for Main Branch
 on:
   push:
     branches:
-      - main  # Trigger on pushes to the main branch
-  pull_request:
-    branches:
-      - main  # Trigger on pull requests targeting the main branch
+      - main  # Trigger on pushes to main (e.g., after a PR is merged)
+  pull_request_review:
+    types:
+      - submitted  # Trigger when a review is submitted
 
 jobs:
   publish-release:
@@ -34,14 +34,16 @@ jobs:
 
       # Step 3: Create GitHub Release
       - name: Create GitHub Release
-        if: github.event_name == 'push' || github.event.pull_request.merged == true
+        if: |
+          github.event_name == 'push' || 
+          (github.event_name == 'pull_request_review' && github.event.review.state == 'approved')
         uses: actions/create-release@v1
         with:
           tag_name: "v${{ env.version }}"
           release_name: "Release v${{ env.version }}"
           body: |
             ## Changes
-            This release was automatically generated from the `main` branch.
+            This release was automatically generated.
           draft: false
           prerelease: false
         env:
