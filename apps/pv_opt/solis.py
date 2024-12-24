@@ -469,8 +469,8 @@ class SolisInverter(BaseInverterController):
         # set the energy control switch depending on HMI version
         if self._hmi_fb00:
             code = 33
-            self._enable_slot(direction="charge", slot=1)
-            self._enable_slot(direction="discharge", slot=1)
+            self._enable_slot(direction="charge")
+            self._enable_slot(direction="discharge")
         else:
             code = 35
         self.log(f">>> Setting energy control switch to {code} to enable timed mode")
