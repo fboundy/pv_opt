@@ -128,29 +128,61 @@ jobs:
         run: |
           sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/v$patch_version/" README.md
 
-      - name: Commit changes
-        if: success()
+     
+  commit-changes:
+    needs:
+    - auto-format
+    - validate-version
+    name: Commit and Push All Changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+        fetch-depth: 0
+      
+      - name: Configure Git User
         run: |
-          echo "Configuring git user..."
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-      
-          echo "Checking out the branch..."
+    
+      - name: Pull Latest Changes
+        run: |
           git checkout -b patch || git checkout patch
-      
-          echo "Staging all changes..."
-          git add README.md apps/pv_opt/pv_opt.py
-      
-          echo "Committing temporary changes..."
-          git commit -m "Temporary commit for pull rebase" || echo "No changes to commit"
-      
-          echo "Pulling latest changes to avoid conflicts..."
           git pull origin patch --rebase
-      
-          echo "Amending commit with updated changes..."
+    
+      - name: Commit All Changes
+        run: |
           git add README.md apps/pv_opt/pv_opt.py
-          git commit --amend --no-edit
+          git commit --amend --no-edit || echo "No changes to commit"
       
-          echo "Pushing changes to the remote branch..."
+      - name: Push Changes
+        run: |
           git push --force-with-lease --set-upstream origin patch
+
+      # - name: Commit changes
+      #   if: success()
+      #   run: |
+      #     echo "Configuring git user..."
+      #     git config user.name "github-actions"
+      #     git config user.email "github-actions@users.noreply.github.com"
+      
+      #     echo "Checking out the branch..."
+      #     git checkout -b patch || git checkout patch
+      
+      #     echo "Staging all changes..."
+      #     git add README.md apps/pv_opt/pv_opt.py
+      
+      #     echo "Committing temporary changes..."
+      #     git commit -m "Temporary commit for pull rebase" || echo "No changes to commit"
+      
+      #     echo "Pulling latest changes to avoid conflicts..."
+      #     git pull origin patch --rebase
+      
+      #     echo "Amending commit with updated changes..."
+      #     git add README.md apps/pv_opt/pv_opt.py
+      #     git commit --amend --no-edit
+      
+      #     echo "Pushing changes to the remote branch..."
+      #     git push --force-with-lease --set-upstream origin patch
         
