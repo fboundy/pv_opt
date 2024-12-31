@@ -76,7 +76,7 @@ jobs:
         run: |
           git push origin HEAD:patch
 
-      - name: Create Pull Request for Main
+      - name: Create or Update Pull Request for Main
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -84,9 +84,10 @@ jobs:
           base: main
           title: "Automated Version Fix and README Update"
           body: |
-            This pull request was automatically created to fix the version number and update the README.md file.
+            This pull request was automatically created or updated to fix the version number and update the README.md file.
+            Please review and merge to apply these changes to the main branch.
           labels: automated
-          update-existing: true
+          delete-branch: false
 
   publish-release:
     name: Publish Release
