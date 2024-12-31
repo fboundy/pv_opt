@@ -136,7 +136,10 @@ jobs:
           git config user.email "github-actions@users.noreply.github.com"
       
           echo "Checking out the branch..."
-          git checkout -b ${{ github.head_ref }} || git checkout ${{ github.head_ref }}
+          git checkout -b patch || git checkout patch
+      
+          echo "Pulling latest changes to avoid conflicts..."
+          git pull origin patch --rebase
       
           echo "Staging changes..."
           git add README.md apps/pv_opt/pv_opt.py
@@ -145,5 +148,5 @@ jobs:
           git commit -m "Update version in README.md to $patch_version"
       
           echo "Setting upstream branch and pushing changes..."
-          git push --set-upstream origin ${{ github.head_ref }}
+          git push --set-upstream origin patch
         
