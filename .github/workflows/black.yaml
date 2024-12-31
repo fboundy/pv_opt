@@ -1,7 +1,6 @@
 name: Auto-format Code with Debugging
 
 on:
-  push:
   pull_request:
 
 jobs:
