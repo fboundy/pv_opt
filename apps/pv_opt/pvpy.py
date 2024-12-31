@@ -7,7 +7,6 @@ import pandas as pd
 import requests
 from numpy import isnan
 
-
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 AGILE_PREDICT_URL = r"https://agilepredict.com/api/"
 
@@ -355,7 +354,6 @@ class Tariff:
                             self.agile_predict.loc[df.index[-1] + pd.Timedelta("30min") : end],
                         ]
                     )
-
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (len(df) > 1 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30) or len(df) == 1:
@@ -1003,7 +1001,6 @@ class PVsystemModel:
                         search_window = self._search_window(self.flows, available, max_slot)
                         str_log += f" {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
 
-
                         if len(search_window) > 0:
                             min_price = search_window["import"].min()
 
@@ -1031,7 +1028,6 @@ class PVsystemModel:
                                         ((100 - search_window["soc_end"].loc[slot]) / 100 * self.battery.capacity)
                                         * 2
                                         * factor,
-
                                         0,
                                     )
                                     min_power = min(
@@ -1049,7 +1045,6 @@ class PVsystemModel:
                                         str_log_x = (
                                             f">>> {i:3d} Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {search_window['forced'].loc[slot]:6.0f}W  "
                                             + f"End SOC: {search_window['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
-
                                             + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W "
                                             + f"RSC: {remaining_slot_capacity:6.0f}W"
                                         )
@@ -1222,7 +1217,6 @@ class PVsystemModel:
             self.slots = slots
             self.slots_added = slots_added
             self.best_cost = best_cost
-
 
         if log:
             self.log("")

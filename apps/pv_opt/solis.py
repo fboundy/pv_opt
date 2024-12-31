@@ -303,7 +303,6 @@ def create_inverter_controller(inverter_type: str, host):
             host=host,
         )
 
-
     elif inverter_type == "SOLIS_CLOUD":
         return SolisCloudInverter(
             inverter_type=inverter_type,
@@ -386,6 +385,7 @@ class BaseInverterController(ABC):
 
     def get_config(self, config_variable, default=None):
         return self._host.get_config(config_variable, default)
+
     @property
     @abstractmethod
     def status(self):
@@ -667,8 +667,7 @@ class SolisInverter(BaseInverterController):
             tolerance = 0
 
         if entity_id is not None:
-            changed, written = self.write_to_hass(
-            )
+            changed, written = self.write_to_hass()
 
         if changed:
             if written:
