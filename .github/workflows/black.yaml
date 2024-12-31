@@ -77,16 +77,6 @@ jobs:
       - name: Fetch main branch
         run: git fetch origin main:main
 
-      - name: Get VERSION from patch branch
-        id: get_patch_version
-        run: |
-          VERSION=$(grep -m 1 -oP '^VERSION=\K.*' VERSION_FILE)
-          if [ -z "$VERSION" ]; then
-            echo "Error: VERSION not found in VERSION_FILE on patch branch." >&2
-            exit 1
-          fi
-          echo "patch_version=$VERSION" >> $GITHUB_ENV
-
       - name: Fetch main branch into a temporary branch
         run: |
           git fetch origin main
