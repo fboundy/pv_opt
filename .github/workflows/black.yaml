@@ -133,6 +133,16 @@ jobs:
           echo "Configuring git user..."
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
+      
+          echo "Checking out the branch..."
+          git checkout -b ${{ github.head_ref }} || git checkout ${{ github.head_ref }}
+      
+          echo "Staging changes..."
           git add README.md apps/pv_opt/pv_opt.py
+      
+          echo "Committing changes..."
           git commit -m "Update version in README.md to $patch_version"
+      
+          echo "Setting upstream branch and pushing changes..."
           git push --set-upstream origin ${{ github.head_ref }}
+        
