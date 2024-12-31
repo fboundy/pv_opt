@@ -16,8 +16,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch main branch
-        run: git fetch origin main:main
+      - name: Fetch main branch into a temporary branch
+        run: |
+          git fetch origin main
+          git checkout -b temp-main origin/main
 
       - name: Get VERSION from patch branch
         id: get_patch_version
@@ -32,7 +34,7 @@ jobs:
       - name: Get VERSION from main branch
         id: get_main_version
         run: |
-          git checkout main
+          git checkout temp-main
           VERSION=$(grep -m 1 -oP '(?<=^VERSION = ")[^"]+' apps/pv_opt/pv_opt.py)
           if [ -z "$VERSION" ]; then
             echo "Error: VERSION not found in apps/pv_opt/pv_opt.py on main branch." >&2
