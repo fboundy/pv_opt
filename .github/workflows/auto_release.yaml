@@ -42,8 +42,8 @@ jobs:
           fi
           echo "main_version=$VERSION" >> $GITHUB_ENV
 
-      - name: Validate version increment
-        id: validate_version
+      - name: Validate or Fix Version Increment
+        id: validate_or_fix_version
         run: |
           patch_version=$patch_version
           main_version=$main_version
@@ -54,21 +54,23 @@ jobs:
 
           # Check if the patch version is incremented correctly
           if [ "$patch_patch" -ne $((main_patch + 1)) ]; then
-            echo "Error: PATCH version is not incremented correctly." >&2
-            echo "Main version: $main_version, Patch version: $patch_version" >&2
-            exit 1
+            echo "Warning: PATCH version is not incremented correctly. Fixing..."
+            new_patch_version=$(echo "$main_version" | awk -F '.' '{print $1"."$2"."($3+1)}')
+            sed -i "s/^VERSION = \".*\"/VERSION = \"$new_patch_version\"/" apps/pv_opt/pv_opt.py
+            echo "Corrected version to $new_patch_version."
+            echo "patch_version=$new_patch_version" >> $GITHUB_ENV
           fi
 
       - name: Update README.md version
         run: |
           sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/v$patch_version/" README.md
 
-      - name: Commit README.md changes
+      - name: Commit Changes if Needed
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add README.md
-          git commit -m "Update README.md version to $patch_version"
+          git add apps/pv_opt/pv_opt.py README.md
+          git diff --cached --quiet || git commit -m "Fix version and update README.md to $patch_version"
 
       - name: Push changes back to patch branch
         run: |
