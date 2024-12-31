@@ -11,6 +11,8 @@ jobs:
       # Step 1: Checkout the repository
       - name: Checkout Repository
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
 
       # Step 2: Set up Python environment
       - name: Set up Python
@@ -46,72 +48,70 @@ jobs:
           git status
 
           if [ -n "$(git status --porcelain)" ]; then
-            echo "Changes detected. Inspecting changes..."
-            git diff
-
-            echo "Staging files..."
+            echo "Changes detected. Staging files..."
             git add .
 
             echo "Committing changes..."
             git commit -m "Auto-format code with Black and isort"
 
-            echo "Pushing changes to branch..."
-            git push
+            echo "Pushing changes to the branch..."
+            git push origin ${{ github.head_ref }}
             echo "Push completed successfully."
           else
             echo "No changes detected. Nothing to commit or push."
 
+
+
   validate-version:
     if: github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'patch'
+
+    name: Validate Version
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          fetch-depth: 0
 
-      - name: Extract version from patch branch
+      - name: Fetch main branch into a detached HEAD
+        run: |
+          git fetch origin main
+          git checkout origin/main -b temp-main-branch
+
+      - name: Get VERSION from patch branch
         id: get_patch_version
         run: |
-          grep -Eo 'VERSION=[0-9]+\.[0-9]+\.[0-9]+' <your-version-file> | cut -d'=' -f2 > patch_version.txt
-          echo "patch_version=$(cat patch_version.txt)" >> $GITHUB_ENV
+          VERSION=$(grep -m 1 -oP '^VERSION=\K.*' VERSION_FILE)
+          echo "patch_version=$VERSION" >> $GITHUB_ENV
 
-      - name: Extract version from main branch
+      - name: Get VERSION from main branch
         id: get_main_version
         run: |
-          git fetch origin main:main
-          git checkout main
-          grep -Eo 'VERSION=[0-9]+\.[0-9]+\.[0-9]+' <your-version-file> | cut -d'=' -f2 > main_version.txt
-          echo "main_version=$(cat main_version.txt)" >> $GITHUB_ENV
+          git checkout temp-main-branch
+          VERSION=$(grep -m 1 -oP '^VERSION=\K.*' VERSION_FILE)
+          echo "main_version=$VERSION" >> $GITHUB_ENV
 
-      - name: Compare versions
-        id: compare_versions
+      - name: Validate version increment
+        id: validate_version
         run: |
-          IFS='.' read -r main_major main_minor main_patch <<< "$main_version"
-          IFS='.' read -r patch_major patch_minor patch_patch <<< "$patch_version"
-    
-          if [[ "$main_major" -ne "$patch_major" || "$main_minor" -ne "$patch_minor" ]]; then
-            echo "::error::Major and minor versions must match between main and patch."
+          patch_version=$patch_version
+          main_version=$main_version
+
+          # Extract PATCH numbers
+          main_patch=$(echo "$main_version" | awk -F '.' '{print $3}')
+          patch_patch=$(echo "$patch_version" | awk -F '.' '{print $3}')
+
+          # Check if the patch version is incremented correctly
+          if [ "$patch_patch" -ne $((main_patch + 1)) ]; then
+            echo "Error: PATCH version is not incremented correctly." >&2
+            echo "Main version: $main_version, Patch version: $patch_version" >&2
             exit 1
           fi
-    
-          if [[ $((main_patch + 1)) -ne "$patch_patch" ]]; then
-            echo "::warning::Patch version is not incremented by 1. Updating to match."
-            patch_patch=$((main_patch + 1))
-            patch_version="$main_major.$main_minor.$patch_patch"
-            echo "patch_version=$patch_version" >> $GITHUB_ENV
-            echo "VERSION=$patch_version" > <your-version-file>
-          fi
-    
-          echo "Version check passed with version $patch_version."
 
-      - name: Update version in README.md
-        id: update_readme
+      - name: Update README.md version
         run: |
-          sed -i "1s/v$main_version/v$patch_version/" README.md
+          sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/v$patch_version/" README.md
 
       - name: Commit changes
         if: success()
@@ -121,4 +121,4 @@ jobs:
           git add README.md
           git commit -m "Update version in README.md to $patch_version"
           git push origin patch
-
+  
