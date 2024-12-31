@@ -59,7 +59,6 @@ jobs:
             sed -i "s/^VERSION = \".*\"/VERSION = \"$new_patch_version\"/" apps/pv_opt/pv_opt.py
             echo "Corrected version to $new_patch_version."
             echo "patch_version=$new_patch_version" >> $GITHUB_ENV
-          fi
 
       - name: Update README.md version
         run: |
@@ -72,12 +71,21 @@ jobs:
           git add apps/pv_opt/pv_opt.py README.md
           git diff --cached --quiet || git commit -m "Fix version and update README.md to $patch_version"
 
-      - name: Push changes back to main and patch branches
+      - name: Push changes back to patch branch
         run: |
-          git checkout temp-main
-          git merge --no-ff -m "Merge validated version from patch" HEAD
-          git push origin temp-main:main
           git push origin HEAD:patch
+
+      - name: Create Pull Request for Main
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: patch
+          base: main
+          title: "Automated Version Fix and README Update"
+          body: |
+            This pull request was automatically created to fix the version number and update the README.md file.
+          labels: automated
+          update-existing: true
 
   publish-release:
     name: Publish Release
