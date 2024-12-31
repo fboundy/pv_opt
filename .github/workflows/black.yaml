@@ -31,7 +31,7 @@ jobs:
       - name: Run Black and isort
         run: |
           echo "Running black..."
-          black .
+          black --line-length=119 .
           echo "Running isort..."
           isort .
 

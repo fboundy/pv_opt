@@ -9,6 +9,7 @@ LIMITS = ["start", "end"]
 DIRECTIONS = ["charge", "discharge"]
 TIME_UNITS = ["hours", "minutes"]
 
+
 URLS = {
     "root": "https://www.soliscloud.com:13333",
     "login": "/v2/api/login",
@@ -109,6 +110,8 @@ INVERTER_DEFS = {
         # required config. These config items can be over-written by config specified in the config.yaml
         # file. They are required for the main PV_Opt module and if they cannot be found an ERROR will be
         # raised
+        # house_load_x and _bypass_load_x are not the defaults for Solax.
+        # This is probably intentional, as the datafiles are large and loading kWh is preferred
         "default_config": {
             "maximum_dod_percent": "number.{device_name}_battery_minimum_soc",
             "id_battery_soc": "sensor.{device_name}_battery_soc",
@@ -129,12 +132,14 @@ INVERTER_DEFS = {
         # from the config.yaml file but not rquired outside of this module
         "brand_config": {
             "battery_voltage": "sensor.{device_name}_battery_voltage",
+            "id_timed_charge_on": "switch.{device_name}_timed_charge_slot_1_enable",
             "id_timed_charge_start_hours": "number.{device_name}_timed_charge_start_hours",
             "id_timed_charge_start_minutes": "number.{device_name}_timed_charge_start_minutes",
             "id_timed_charge_end_hours": "number.{device_name}_timed_charge_end_hours",
             "id_timed_charge_end_minutes": "number.{device_name}_timed_charge_end_minutes",
             "id_timed_charge_current": "number.{device_name}_timed_charge_current",
             "id_timed_charge_soc": "number.{device_name}_timed_charge_soc",
+            "id_timed_discharge_on": "switch.{device_name}_timed_discharge_slot_1_enable",
             "id_timed_discharge_start_hours": "number.{device_name}_timed_discharge_start_hours",
             "id_timed_discharge_start_minutes": "number.{device_name}_timed_discharge_start_minutes",
             "id_timed_discharge_end_hours": "number.{device_name}_timed_discharge_end_hours",
@@ -199,6 +204,7 @@ INVERTER_DEFS = {
             "id_battery_soc": "sensor.{device_name}_battery_soc",
             "id_consumption_today": "sensor.{device_name}_daily_house_backup_consumption",
             "id_grid_power": "sensor.{device_name}_meter_active_power",
+            "id_grid_import_today": "sensor.{device_name}_daily_energy_imported",
             "id_inverter_ac_power": "sensor.{device_name}_inverter_ac_power",
             "supports_hold_soc": True,
             "supports_forced_discharge": True,
@@ -337,9 +343,7 @@ class BaseInverterController(ABC):
         self._device_name = self._host.device_name
         self._config = {}
         self._brand_config = {}
-        self._online = INVERTER_DEFS[self._type]["online"].replace(
-            "{device_name}", self._device_name
-        )
+        self._online = INVERTER_DEFS[self._type]["online"].replace("{device_name}", self._device_name)
         for defs, conf in zip(
             [INVERTER_DEFS[self._type][x] for x in ["default_config", "brand_config"]],
             [self._config, self._brand_config],
@@ -348,10 +352,7 @@ class BaseInverterController(ABC):
                 if isinstance(defs[item], str):
                     conf[item] = defs[item].replace("{device_name}", self._device_name)
                 elif isinstance(defs[item], list):
-                    conf[item] = [
-                        z.replace("{device_name}", self._device_name)
-                        for z in defs[item]
-                    ]
+                    conf[item] = [z.replace("{device_name}", self._device_name) for z in defs[item]]
                 else:
                     conf[item] = defs[item]
         self.log(f"Loading controller for inverter type {self._type}")
@@ -379,7 +380,7 @@ class BaseInverterController(ABC):
         pass
 
     @abstractmethod
-    def hold_soc(self, enable, soc=None, **kwargs):
+    def hold_soc(self, enable, target_soc=None, **kwargs):
         pass
 
     def get_config(self, config_variable, default=None):
@@ -406,14 +407,10 @@ class BaseInverterController(ABC):
             pass
 
         if isinstance(value, int) or isinstance(value, float):
-            return self._host.write_and_poll_value(
-                entity_id=entity_id, value=value, **kwargs
-            )
+            return self._host.write_and_poll_value(entity_id=entity_id, value=value, **kwargs)
         else:
             try:
-                return self._host.write_and_poll_time(
-                    entity_id=entity_id, time=value, **kwargs
-                )
+                return self._host.write_and_poll_time(entity_id=entity_id, time=value, **kwargs)
             except:
                 self.log(
                     f"Unable to write value {value} to entity {entity_id}",
@@ -434,9 +431,7 @@ class BaseInverterController(ABC):
                     f"Failed to press button {entity_id}. Last pressed at {time_pressed.strftime(TIMEFORMAT)} ({dt:0.2f} seconds ago)"
                 )
         except:
-            self.log(
-                f"Failed to press button {entity_id}: it appears to never have been pressed."
-            )
+            self.log(f"Failed to press button {entity_id}: it appears to never have been pressed.")
 
 
 class SolisInverter(BaseInverterController):
@@ -448,24 +443,52 @@ class SolisInverter(BaseInverterController):
         self._modes = {self._codes[code]: code for code in self._codes}
         self._bits = SOLIS_BITS
         self._requires_button_press = True
+        self._hold_soc = {"active": False, "soc": 0}
 
     @property
     def timed_mode(self):
         if self._hmi_fb00:
-            code = 33
+            timed_mode = (
+                self._get_slot_status(direction="charge")
+                and self._get_slot_status(direction="discharge")
+                and int(self._get_energy_control_code()) == 33
+            )
+            return timed_mode
         else:
-            code = 35
-        return int(self._get_energy_control_code()) == code
+            return int(self._get_energy_control_code()) == 35
+
+    def _get_slot_status(self, direction="charge"):
+        cfg = f"id_timed_{direction}_on"
+        if cfg in self._brand_config:
+            return self.get_config(cfg)
+        else:
+            self.log(f"{cfg} is not defined so assuming switch is on", level="WARNING")
+            return True
 
     @final
     def enable_timed_mode(self):
         # set the energy control switch depending on HMI version
         if self._hmi_fb00:
             code = 33
+            self._enable_slot(direction="charge")
+            self._enable_slot(direction="discharge")
         else:
             code = 35
         self.log(f">>> Setting energy control switch to {code} to enable timed mode")
         self._set_energy_control_switch(code)
+
+    def _enable_slot(self, direction="charge"):
+        cfg = f"id_timed_{direction}_on"
+        entity_id = self._brand_config.get(cfg, None)
+        if cfg in self._brand_config and entity_id is not None:
+            try:
+                self._host.call_service("switch/turn_on", entity_id=entity_id)
+                self.log(f">>> Switch {entity_id} turned ON")
+            except:
+                self.log(f"Failed to turn on switch {entity_id}", level="WARNING")
+        else:
+            self.log(f"{cfg} is not defined so assuming switch is on", level="WARNING")
+            return True
 
     def _set_energy_control_switch(self, code: int):
         mode = self._modes.get(code, None)
@@ -481,10 +504,7 @@ class SolisInverter(BaseInverterController):
         code = self._get_energy_control_code()
         status = {"code": code}
         status = status | {"switches": self._switches(code)}
-        status = status | {
-            direction: self._get_times_current(direction=direction)
-            for direction in DIRECTIONS
-        }
+        status = status | {direction: self._get_times_current(direction=direction) for direction in DIRECTIONS}
         voltage = self.voltage
         for direction in DIRECTIONS:
             status[direction]["power"] = status[direction]["current"] * voltage
@@ -496,9 +516,8 @@ class SolisInverter(BaseInverterController):
                 and (self._hmi_fb00 or status["switches"].get("Timed", False))
                 and status["switches"].get("GridCharge", False)
             )
-        # status["hold_soc"] = {
-        #     "active": status["switches"].get("GridCharge", False) and status["switches"].get("Backup", False)
-        # }
+        status["hold_soc"] = self._hold_soc
+
         return status
 
     def _switches(self, code):
@@ -533,23 +552,21 @@ class SolisInverter(BaseInverterController):
         if enable:
             times["start"] = kwargs.get("start", None)
             times["end"] = kwargs.get("end", None)
-            current = kwargs.get(
-                "current", abs(round(kwargs.get("power", 0) / self.voltage, 1))
-            )
-            soc = kwargs.get("target_soc", None)
+            current = kwargs.get("current", abs(round(kwargs.get("power", 0) / self.voltage, 1)))
+            target_soc = kwargs.get("target_soc", None)
 
         else:
             # Disable by setting end time = start time:
             times["start"] = self.status["charge"]["start"]
             times["end"] = times["start"]
             current = 0
-            soc = None
+            target_soc = None
 
-        if soc is None and self._hmi_fb00:
+        if target_soc is None and self._hmi_fb00:
             if direction == "charge":
-                soc = 100
+                target_soc = 100
             else:
-                soc = self.get_config("maximum_dod_percent")
+                target_soc = self.get_config("maximum_dod_percent")
 
         self.log(f">>> direction: {direction}")
         self.log(f">>> times: {times}")
@@ -564,24 +581,26 @@ class SolisInverter(BaseInverterController):
             if self._hmi_fb00:
                 entity_id = self.brand_config.get(f"id_timed_{direction}_button", None)
             else:
-                entity_id = self.brand_config.get(
-                    f"id_timed_charge_discharge_button", None
-                )
+                entity_id = self.brand_config.get(f"id_timed_charge_discharge_button", None)
 
             self.log(f">>> {entity_id}")
             if entity_id is not None:
                 self._press_button(entity_id=entity_id)
 
-        if changed and self._hmi_fb00:
+        if self._hmi_fb00:
             """
             There seems to be a bug where with the FB00+ firmware the changes aren't saved unless
             the target SOC is also set
             """
-            self._set_target_soc(direction, soc, forced=True)
+            if changed or (self.status[direction].get("soc", 0) != target_soc):
+                self._set_target_soc(direction, target_soc, forced=True)
 
-    def hold_soc(self, enable, soc=None, **kwargs):
+    def hold_soc(self, enable, target_soc=0, **kwargs):
         start = kwargs.get("start", pd.Timestamp.now(tz=self._tz).floor("1min"))
         end = kwargs.get("end", pd.Timestamp.now(tz=self._tz).ceil("30min"))
+        self._hold_soc = {"active": enable, "soc": target_soc}
+        self.log(f">>>>SOC: {target_soc}")
+
         if self._hmi_fb00:
             self._control_charge_discharge(
                 "charge",
@@ -589,9 +608,10 @@ class SolisInverter(BaseInverterController):
                 start=start,
                 end=end,
                 power=3000,
-                soc=soc,
+                target_soc=target_soc,
             )
         else:
+
             self._control_charge_discharge(
                 "charge",
                 enable=enable,
@@ -602,13 +622,15 @@ class SolisInverter(BaseInverterController):
 
     def _get_times_current(self, direction):
         times = {
-            limit: pd.Timestamp(
-                self.get_config(f"id_timed_{direction}_{limit}", "0:00"), tz=self._tz
-            )
+            limit: pd.Timestamp(self.get_config(f"id_timed_{direction}_{limit}", "0:00"), tz=self._tz)
             for limit in LIMITS
         }
         current = {"current": self.get_config(f"id_timed_{direction}_current", 0)}
-        return times | current
+        if self._hmi_fb00:
+            target_soc = {"target_soc": self.get_config(f"id_timed_{direction}_soc", 0)}
+        else:
+            target_soc = {}
+        return times | current | target_soc
 
     def _set_times(self, direction, **times) -> bool:
         value_changed = False
@@ -617,9 +639,7 @@ class SolisInverter(BaseInverterController):
             if time is not None:
                 entity_id = self._host.config.get(f"id_timed_{direction}_{limit}", None)
                 if entity_id is not None:
-                    changed, written = self.write_to_hass(
-                        entity_id=entity_id, value=time, verbose=True
-                    )
+                    changed, written = self.write_to_hass(entity_id=entity_id, value=time, verbose=True)
                     value_changed = value_changed or written
 
         return value_changed
@@ -627,9 +647,7 @@ class SolisInverter(BaseInverterController):
     def _set_current(self, direction, current: float = 0) -> bool:
         entity_id = self._host.config.get(f"id_timed_{direction}_current", None)
         if entity_id is not None:
-            changed, written = self.write_to_hass(
-                entity_id=entity_id, value=current, tolerance=0.1, verbose=True
-            )
+            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=0.1, verbose=True)
 
         if changed:
             if written:
@@ -641,7 +659,7 @@ class SolisInverter(BaseInverterController):
 
         return not (changed and not written)
 
-    def _set_target_soc(self, direction, soc: int = 100, forced=True) -> bool:
+    def _set_target_soc(self, direction, target_soc: int = 100, forced=True) -> bool:
         entity_id = self._host.config.get(f"id_timed_{direction}_soc", None)
         if forced:
             tolerance = -1
@@ -649,15 +667,13 @@ class SolisInverter(BaseInverterController):
             tolerance = 0
 
         if entity_id is not None:
-            changed, written = self.write_to_hass(
-                entity_id=entity_id, value=soc, tolerance=tolerance, verbose=True
-            )
+            changed, written = self.write_to_hass()
 
         if changed:
             if written:
-                self.log(f"Target SOC {soc}% written to inverter")
+                self.log(f"Target SOC {target_soc}% written to inverter")
             else:
-                self.log(f"Failed to write SOC {soc}% to inverter")
+                self.log(f"Failed to write SOC {target_soc}% to inverter")
         else:
             self.log("Inverter already at correct target SOC")
 
@@ -687,16 +703,15 @@ class SolisSolaxModbusInverter(SolisInverter):
         # Required if the times are set as separate_hours and units
         times = {}
         for limit in LIMITS:
-            x = {
-                unit: self.get_config(f"id_timed_{direction}_{limit}_{unit}", 0)
-                for unit in TIME_UNITS
-            }
-            times[limit] = pd.Timestamp(
-                pd.Timestamp.today().date(), tz=self._tz
-            ) + pd.Timedelta(**x)
+            x = {unit: self.get_config(f"id_timed_{direction}_{limit}_{unit}", 0) for unit in TIME_UNITS}
+            times[limit] = pd.Timestamp(pd.Timestamp.today().date(), tz=self._tz) + pd.Timedelta(**x)
 
         current = {"current": self.get_config(f"id_timed_{direction}_current", 0)}
-        return times | current
+        if self._hmi_fb00:
+            target_soc = {"target_soc": self.get_config(f"id_timed_{direction}_soc", 0)}
+        else:
+            target_soc = {}
+        return times | current | target_soc
 
     def _set_times(self, direction, **times) -> bool:
         # Required if the times are set as separate_hours and units
@@ -704,21 +719,13 @@ class SolisSolaxModbusInverter(SolisInverter):
         for limit in LIMITS:
             time = times.get(limit, None)
             if time is not None:
-                entity_id = self._host.config.get(
-                    f"id_timed_{direction}_{limit}_hours", None
-                )
+                entity_id = self._host.config.get(f"id_timed_{direction}_{limit}_hours", None)
                 if entity_id is not None:
-                    changed, written = self.write_to_hass(
-                        entity_id=entity_id, value=time.hour, verbose=True
-                    )
+                    changed, written = self.write_to_hass(entity_id=entity_id, value=time.hour, verbose=True)
                     value_changed = value_changed or (changed and written)
-                entity_id = self._host.config.get(
-                    f"id_timed_{direction}_{limit}_minutes", None
-                )
+                entity_id = self._host.config.get(f"id_timed_{direction}_{limit}_minutes", None)
                 if entity_id is not None:
-                    changed, written = self.write_to_hass(
-                        entity_id=entity_id, value=time.minute, verbose=True
-                    )
+                    changed, written = self.write_to_hass(entity_id=entity_id, value=time.minute, verbose=True)
                     value_changed = value_changed or (changed and written)
         return value_changed
 
@@ -763,23 +770,18 @@ class SolisCoreModbusInverter(SolisInverter):
             multiplier=10,
         )
 
-    def write_soc_register(self, direction, soc):
+    def write_soc_register(self, direction, target_soc):
         cfg = "id_timed_{direction}_soc"
         register = self._registers[f"timed_{direction}_soc"]
-        return self._write_modbus_register(register=register, value=int(soc), cfg=cfg)
+        return self._write_modbus_register(register=register, value=int(target_soc), cfg=cfg)
 
-    def _write_modbus_register(
-        self, register, value, cfg=None, tolerance=0, multiplier=1
-    ):
+    def _write_modbus_register(self, register, value, cfg=None, tolerance=0, multiplier=1):
         changed = True
         written = False
         self.log(f"Setting register {register} to {value} for entity {cfg}")
         if cfg is not None:
             current_value = int(float(self.get_config(cfg)))
-            if (
-                isinstance(current_value, int)
-                and abs(current_value / multiplier - value) <= tolerance
-            ):
+            if isinstance(current_value, int) and abs(current_value / multiplier - value) <= tolerance:
                 self.log(f"Inverter value already set to {value}.")
                 changed = False
 
@@ -803,16 +805,15 @@ class SolisCoreModbusInverter(SolisInverter):
         # Required if the times are set as separate_hours and units
         times = {}
         for limit in LIMITS:
-            x = {
-                unit: self.get_config(f"id_timed_{direction}_{limit}_{unit}", 0)
-                for unit in TIME_UNITS
-            }
-            times[limit] = pd.Timestamp(
-                pd.Timestamp.today().date(), tz=self._tz
-            ) + pd.Timedelta(**x)
+            x = {unit: self.get_config(f"id_timed_{direction}_{limit}_{unit}", 0) for unit in TIME_UNITS}
+            times[limit] = pd.Timestamp(pd.Timestamp.today().date(), tz=self._tz) + pd.Timedelta(**x)
 
         current = {"current": self.get_config(f"id_timed_{direction}_current", 0)}
-        return times | current
+        if self._hmi_fb00:
+            target_soc = {"target_soc": self.get_config(f"id_timed_{direction}_soc", 0)}
+        else:
+            target_soc = {}
+        return times | current | target_soc
 
     def _set_times(self, direction, **times) -> bool:
         # Required if the times are set as separate_hours and units
@@ -820,13 +821,9 @@ class SolisCoreModbusInverter(SolisInverter):
         for limit in LIMITS:
             time = times.get(limit, None)
             if time is not None:
-                changed, written = self.write_time_register(
-                    direction, limit, "hours", time.hour
-                )
+                changed, written = self.write_time_register(direction, limit, "hours", time.hour)
                 value_changed = value_changed or (changed and written)
-                changed, written = self.write_time_register(
-                    direction, limit, "minutes", time.minute
-                )
+                changed, written = self.write_time_register(direction, limit, "minutes", time.minute)
                 value_changed = value_changed or (changed and written)
         return value_changed
 
@@ -844,9 +841,7 @@ class SolisSolarmanModbusInverter(SolisInverter):
             cfg=cfg,
         )
 
-    def _write_modbus_register(
-        self, register, value, cfg=None, tolerance=0, multiplier=1
-    ):
+    def _write_modbus_register(self, register, value, cfg=None, tolerance=0, multiplier=1):
         if cfg is not None and self._host.entity_exists(cfg):
             old_value = int(float(self._host.get_state_retry(entity_id=cfg)))
             if isinstance(old_value, int) and abs(old_value - value) <= tolerance:
@@ -856,7 +851,5 @@ class SolisSolarmanModbusInverter(SolisInverter):
         if changed:
             data = {"register": register, "value": value}
             self._host.call_service("solarman/write_holding_register", **data)
-            self.log(
-                ">>> Writing {value} to inverter register {address} using Solarman"
-            )
+            self.log(">>> Writing {value} to inverter register {address} using Solarman")
             written = True
