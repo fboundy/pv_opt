@@ -1,4 +1,4 @@
-name: Auto-format Code with Debugging
+name: PR Validation and Auto-formatting
 
 on:
   pull_request:
@@ -7,7 +7,6 @@ jobs:
   auto-format:
     name: Auto-format and Push Changes
     runs-on: ubuntu-latest
-
     steps:
       # Step 1: Checkout the repository
       - name: Checkout Repository
@@ -61,4 +60,65 @@ jobs:
             echo "Push completed successfully."
           else
             echo "No changes detected. Nothing to commit or push."
+
+  validate-version:
+    if: github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'patch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Extract version from patch branch
+        id: get_patch_version
+        run: |
+          grep -Eo 'VERSION=[0-9]+\.[0-9]+\.[0-9]+' <your-version-file> | cut -d'=' -f2 > patch_version.txt
+          echo "patch_version=$(cat patch_version.txt)" >> $GITHUB_ENV
+
+      - name: Extract version from main branch
+        id: get_main_version
+        run: |
+          git fetch origin main:main
+          git checkout main
+          grep -Eo 'VERSION=[0-9]+\.[0-9]+\.[0-9]+' <your-version-file> | cut -d'=' -f2 > main_version.txt
+          echo "main_version=$(cat main_version.txt)" >> $GITHUB_ENV
+
+      - name: Compare versions
+        id: compare_versions
+        run: |
+          IFS='.' read -r main_major main_minor main_patch <<< "$main_version"
+          IFS='.' read -r patch_major patch_minor patch_patch <<< "$patch_version"
+    
+          if [[ "$main_major" -ne "$patch_major" || "$main_minor" -ne "$patch_minor" ]]; then
+            echo "::error::Major and minor versions must match between main and patch."
+            exit 1
           fi
+    
+          if [[ $((main_patch + 1)) -ne "$patch_patch" ]]; then
+            echo "::warning::Patch version is not incremented by 1. Updating to match."
+            patch_patch=$((main_patch + 1))
+            patch_version="$main_major.$main_minor.$patch_patch"
+            echo "patch_version=$patch_version" >> $GITHUB_ENV
+            echo "VERSION=$patch_version" > <your-version-file>
+          fi
+    
+          echo "Version check passed with version $patch_version."
+
+      - name: Update version in README.md
+        id: update_readme
+        run: |
+          sed -i "1s/v$main_version/v$patch_version/" README.md
+
+      - name: Commit changes
+        if: success()
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update version in README.md to $patch_version"
+          git push origin patch
+
