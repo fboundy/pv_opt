@@ -138,15 +138,19 @@ jobs:
           echo "Checking out the branch..."
           git checkout -b patch || git checkout patch
       
+          echo "Staging all changes..."
+          git add README.md apps/pv_opt/pv_opt.py
+      
+          echo "Committing temporary changes..."
+          git commit -m "Temporary commit for pull rebase" || echo "No changes to commit"
+      
           echo "Pulling latest changes to avoid conflicts..."
           git pull origin patch --rebase
       
-          echo "Staging changes..."
+          echo "Amending commit with updated changes..."
           git add README.md apps/pv_opt/pv_opt.py
+          git commit --amend --no-edit
       
-          echo "Committing changes..."
-          git commit -m "Update version in README.md to $patch_version"
-      
-          echo "Setting upstream branch and pushing changes..."
-          git push --set-upstream origin patch
+          echo "Pushing changes to the remote branch..."
+          git push --force-with-lease --set-upstream origin patch
         
