@@ -64,8 +64,7 @@ jobs:
 
   validate-version:
     if: github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'patch'
-
-    name: Validate Version
+    name: Validate and Update Version
     runs-on: ubuntu-latest
 
     steps:
@@ -74,22 +73,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch main branch into a detached HEAD
-        run: |
-          git fetch origin main
-          git checkout origin/main -b temp-main-branch
+      - name: Fetch main branch
+        run: git fetch origin main:main
 
       - name: Get VERSION from patch branch
         id: get_patch_version
         run: |
           VERSION=$(grep -m 1 -oP '^VERSION=\K.*' VERSION_FILE)
+          if [ -z "$VERSION" ]; then
+            echo "Error: VERSION not found in VERSION_FILE on patch branch." >&2
+            exit 1
+          fi
           echo "patch_version=$VERSION" >> $GITHUB_ENV
 
       - name: Get VERSION from main branch
         id: get_main_version
         run: |
-          git checkout temp-main-branch
+          git checkout main
           VERSION=$(grep -m 1 -oP '^VERSION=\K.*' VERSION_FILE)
+          if [ -z "$VERSION" ]; then
+            echo "Error: VERSION not found in VERSION_FILE on main branch." >&2
+            exit 1
+          fi
           echo "main_version=$VERSION" >> $GITHUB_ENV
 
       - name: Validate version increment
@@ -108,6 +113,7 @@ jobs:
             echo "Main version: $main_version, Patch version: $patch_version" >&2
             exit 1
           fi
+
 
       - name: Update README.md version
         run: |
