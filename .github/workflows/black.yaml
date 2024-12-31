@@ -64,6 +64,7 @@ jobs:
 
 
   validate-version:
+    needs: auto-format
     if: github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'patch'
     name: Validate and Update Version
     runs-on: ubuntu-latest
