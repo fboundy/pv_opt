@@ -131,34 +131,35 @@ jobs:
      
   commit-changes:
     needs:
-    - auto-format
-    - validate-version
+      - auto-format
+      - validate-version
     name: Commit and Push All Changes
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-        fetch-depth: 0
-      
+          fetch-depth: 0
+
       - name: Configure Git User
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-    
+
       - name: Pull Latest Changes
         run: |
           git checkout -b patch || git checkout patch
           git pull origin patch --rebase
-    
+
       - name: Commit All Changes
         run: |
           git add README.md apps/pv_opt/pv_opt.py
           git commit --amend --no-edit || echo "No changes to commit"
-      
+
       - name: Push Changes
         run: |
           git push --force-with-lease --set-upstream origin patch
+
 
       # - name: Commit changes
       #   if: success()
