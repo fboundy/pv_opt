@@ -87,19 +87,35 @@ jobs:
           fi
           echo "patch_version=$VERSION" >> $GITHUB_ENV
 
+      - name: Fetch main branch into a temporary branch
+        run: |
+          git fetch origin main
+          git checkout -b temp-main origin/main
+  
+      - name: Get VERSION from patch branch
+        id: get_patch_version
+        run: |
+          VERSION=$(grep -m 1 -oP '(?<=^VERSION = ")[^"]+' apps/pv_opt/pv_opt.py)
+          if [ -z "$VERSION" ]; then
+            echo "Error: VERSION not found in apps/pv_opt/pv_opt.py on patch branch." >&2
+            exit 1
+          fi
+          echo "patch_version=$VERSION" >> $GITHUB_ENV
+
       - name: Get VERSION from main branch
         id: get_main_version
         run: |
-          git checkout main
-          VERSION=$(grep -m 1 -oP '^VERSION=\K.*' VERSION_FILE)
+          git checkout temp-main
+          VERSION=$(grep -m 1 -oP '(?<=^VERSION = ")[^"]+' apps/pv_opt/pv_opt.py)
           if [ -z "$VERSION" ]; then
-            echo "Error: VERSION not found in VERSION_FILE on main branch." >&2
+            echo "Error: VERSION not found in apps/pv_opt/pv_opt.py on main branch." >&2
             exit 1
           fi
           echo "main_version=$VERSION" >> $GITHUB_ENV
 
-      - name: Validate version increment
-        id: validate_version
+
+      - name: Validate or Fix Version Increment
+        id: validate_or_fix_version
         run: |
           patch_version=$patch_version
           main_version=$main_version
@@ -110,11 +126,12 @@ jobs:
 
           # Check if the patch version is incremented correctly
           if [ "$patch_patch" -ne $((main_patch + 1)) ]; then
-            echo "Error: PATCH version is not incremented correctly." >&2
-            echo "Main version: $main_version, Patch version: $patch_version" >&2
-            exit 1
+            echo "Warning: PATCH version is not incremented correctly. Fixing..."
+            new_patch_version=$(echo "$main_version" | awk -F '.' '{print $1"."$2"."($3+1)}')
+            sed -i "s/^VERSION = \".*\"/VERSION = \"$new_patch_version\"/" apps/pv_opt/pv_opt.py
+            echo "Corrected version to $new_patch_version."
+            echo "patch_version=$new_patch_version" >> $GITHUB_ENV
           fi
-
 
       - name: Update README.md version
         run: |
