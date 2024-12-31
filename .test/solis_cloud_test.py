@@ -1,6 +1,5 @@
 # %%
 import base64
-import base64
 import hashlib
 import hmac
 import json
@@ -9,7 +8,6 @@ from datetime import datetime, timezone
 from http import HTTPStatus
 
 import pandas as pd
-import requests
 import requests
 
 # def getInverterList(config):
