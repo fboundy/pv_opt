@@ -59,6 +59,7 @@ jobs:
             sed -i "s/^VERSION = \".*\"/VERSION = \"$new_patch_version\"/" apps/pv_opt/pv_opt.py
             echo "Corrected version to $new_patch_version."
             echo "patch_version=$new_patch_version" >> $GITHUB_ENV
+          fi
 
       - name: Update README.md version
         run: |
