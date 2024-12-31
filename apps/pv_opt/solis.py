@@ -9,6 +9,7 @@ LIMITS = ["start", "end"]
 DIRECTIONS = ["charge", "discharge"]
 TIME_UNITS = ["hours", "minutes"]
 
+
 URLS = {
     "root": "https://www.soliscloud.com:13333",
     "login": "/v2/api/login",
@@ -302,6 +303,7 @@ def create_inverter_controller(inverter_type: str, host):
             host=host,
         )
 
+
     elif inverter_type == "SOLIS_CLOUD":
         return SolisCloudInverter(
             inverter_type=inverter_type,
@@ -384,7 +386,6 @@ class BaseInverterController(ABC):
 
     def get_config(self, config_variable, default=None):
         return self._host.get_config(config_variable, default)
-
     @property
     @abstractmethod
     def status(self):
@@ -516,6 +517,7 @@ class SolisInverter(BaseInverterController):
                 and status["switches"].get("GridCharge", False)
             )
         status["hold_soc"] = self._hold_soc
+
         return status
 
     def _switches(self, code):
@@ -666,7 +668,6 @@ class SolisInverter(BaseInverterController):
 
         if entity_id is not None:
             changed, written = self.write_to_hass(
-                entity_id=entity_id, value=target_soc, tolerance=tolerance, verbose=True
             )
 
         if changed:

@@ -1,14 +1,11 @@
 # %%
 from copy import copy
-# from scipy.stats import linregress
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import requests
 from numpy import isnan
-
-# from scipy.optimize import differential_evolution
 
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
@@ -358,8 +355,7 @@ class Tariff:
                             self.agile_predict.loc[df.index[-1] + pd.Timedelta("30min") : end],
                         ]
                     )
-                    # self.log("Df concat with agile predict is")
-                    # self.log(f"\n{df}")
+
 
             # If the index frequency >30 minutes so we need to just extend it:
             if (len(df) > 1 and ((df.index[-1] - df.index[-2]).total_seconds() / 60) > 30) or len(df) == 1:
@@ -579,7 +575,15 @@ class BatteryModel:
     @property
     def max_charge_power(self) -> int:
         """returns the maximum watts at which the battery can charge."""
-        return self.current_limit_amps * self.voltage
+        try:
+            max_charge_power = self.current_limit_amps * self.voltage
+        except:
+            self.log(
+                f"Unable to calculate max_charge_power from current limit {self.current_limit_amps} x voltage {self.voltage}",
+                level="WARINING",
+            )
+            max_charge_power = 100000
+        return max_charge_power
 
     @property
     def max_discharge_power(self) -> int:
@@ -871,7 +875,6 @@ class PVsystemModel:
         self.calculate_flows()
         self.base_cost = self.net_cost
         self.best_cost = self.base_cost
-
         self.net_costs = [self.base_cost]
 
         if log:
@@ -1000,6 +1003,7 @@ class PVsystemModel:
                         search_window = self._search_window(self.flows, available, max_slot)
                         str_log += f" {round_trip_energy_required:5.2f} kWh at {max_import_cost:6.2f}p. "
 
+
                         if len(search_window) > 0:
                             min_price = search_window["import"].min()
 
@@ -1027,6 +1031,7 @@ class PVsystemModel:
                                         ((100 - search_window["soc_end"].loc[slot]) / 100 * self.battery.capacity)
                                         * 2
                                         * factor,
+
                                         0,
                                     )
                                     min_power = min(
@@ -1044,6 +1049,7 @@ class PVsystemModel:
                                         str_log_x = (
                                             f">>> {i:3d} Slot: {slot.strftime(TIME_FORMAT)} Factor: {factor:0.3f} Forced: {search_window['forced'].loc[slot]:6.0f}W  "
                                             + f"End SOC: {search_window['soc_end'].loc[slot]:4.1f}%  SPR: {slot_power_required:6.0f}W  "
+
                                             + f"SCPA: {slot_charger_power_available:6.0f}W  SAC: {slot_available_capacity:6.0f}W  Min Power: {min_power:6.0f}W "
                                             + f"RSC: {remaining_slot_capacity:6.0f}W"
                                         )
@@ -1061,6 +1067,7 @@ class PVsystemModel:
 
                                 self.calculate_flows(slots=slots)
                                 self.net_costs.append(self.net_cost)
+
                                 slot_count.append(len(factors))
 
                                 str_log += f"New SOC: {self.flows.loc[start_window]['soc']:5.1f}%->{self.flows.loc[start_window]['soc_end']:5.1f}% "
@@ -1069,6 +1076,7 @@ class PVsystemModel:
 
                                 if log:
                                     self.log(str_log)
+
                             else:
                                 if log:
                                     self.log(str_log + "No cheaper slots")
@@ -1214,6 +1222,7 @@ class PVsystemModel:
             self.slots = slots
             self.slots_added = slots_added
             self.best_cost = best_cost
+
 
         if log:
             self.log("")

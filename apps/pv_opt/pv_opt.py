@@ -2378,6 +2378,7 @@ class PVOpt(hass.Hass):
             )
             soc_now = soc_last_day.iloc[-1]
 
+
         # x = x.astype(float)
 
         try:

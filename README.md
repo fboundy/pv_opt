@@ -1,5 +1,6 @@
 # PV Opt: Home Assistant Solar/Battery Optimiser v4.0.0
 
+
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
 
 The application will integrate fully with Solis inverters which are controlled using any of:
@@ -61,7 +62,8 @@ This app is not stand-alone it requires the following:
 
 <h3>3. Install the Solcast PV Solar Integration (v4.1.x)</h3>
 
-1. Install the integation: https://github.com/BJReplay/ha-solcast-solar
+
+1. Install the integation via HACS: https://github.com/BJReplay/ha-solcast-solar
 2. Add the Integration via Settings: http://homeassistant.local:8123/config/integrations/dashboard
 3. Once installed configure using your Solcast API Key from (1) . 
 4. Set up an automation to update according to your desired schedule. Once every 3 hours will work.
