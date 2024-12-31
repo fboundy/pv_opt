@@ -59,6 +59,7 @@ jobs:
             echo "Push completed successfully."
           else
             echo "No changes detected. Nothing to commit or push."
+          fi
 
 
 
