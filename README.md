@@ -425,7 +425,7 @@ These parameters will define how PV Opt estimates daily consumption:
 | Car Charge Slot max price | p | `number.max_ev_price_p` | 30 | Maximum 1/2 hour slot price per kWh in pence added to the candidate car charging plan. Disable by setting to 0. Note: setting a low value may mean the car will not charge to the required SOC if overnight Agile rates are high. |
 | Car Charge Efficiency | % | `number.ev_charger_efficiency_percent` | 92 | Charging Efficiency for EV Charger/Car. 92% is average for most cars/chargers but adjust if the car is consistently undercharging or overcharging against its target. |
 | Prevent Discharge | On/off | `switch.pvopt_prevent_discharge` | Off | Set to prevent house battery discharge. Clear to allow normal inverter use. Useful for house battery dicharge prevention when high loads are being used (EVs not otherwise coupled in to Pv_opt, showers etc). When set, does not affect the house battery charge plan. |
-| id_zappi_plug_status | `string` |    | Autodetected | In config.yaml, remap the autodeteted Zappi car plugin status entity to a named entity. If you have a single Zappi then this line should remain commented out. If you have multiple zappis then if required, change the entity name to the Zappi linked to IOG / load the Agile car charging plan. |
+| id_zappi_plug_status | `string` |    | Auto detected | In config.yaml, remap the autodeteted Zappi car plugin status entity to a named entity. If you have a single Zappi then this line should remain commented out. If you have multiple zappis then if required, change the entity name to the Zappi linked to IOG / load the Agile car charging plan. |
 
 <h3>Pricing Parameters</h3>
 These parameters set the price that PV Opt uses:
