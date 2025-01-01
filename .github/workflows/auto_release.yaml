@@ -28,18 +28,40 @@ jobs:
           echo "VERSION=$VERSION"
           echo "version=$VERSION" >> $GITHUB_ENV  # Save to environment file
 
-      # Step 3: Create GitHub Release
+      # Step 3: Generate Release Notes
+      - name: Generate Release Notes
+        id: generate_notes
+        run: |
+          # Get the latest tag before this release
+          LAST_TAG=$(git describe --tags --abbrev=0 --match "v*" $(git rev-list --tags --max-count=1))
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG=$(git rev-list --max-parents=0 HEAD)  # Use initial commit if no tags exist
+          fi
+
+          # Gather commit messages since the last tag
+          COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)")
+
+          # Format the release notes
+          RELEASE_NOTES="## Changes\n"
+          if [ -z "$COMMITS" ]; then
+            RELEASE_NOTES+="No significant changes."
+          else
+            RELEASE_NOTES+="${COMMITS}"
+          fi
+
+          # Output the release notes
+          echo "${RELEASE_NOTES}"
+          echo "release_notes<<EOF" >> $GITHUB_ENV
+          echo "${RELEASE_NOTES}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      # Step 4: Create GitHub Release
       - name: Create GitHub Release
-        if: |
-          github.event_name == 'push' || 
-          (github.event_name == 'pull_request_review' && github.event.review.state == 'approved')
         uses: actions/create-release@v1
         with:
           tag_name: "v${{ env.version }}"
           release_name: "Release v${{ env.version }}"
-          body: |
-            ## Changes
-            This release was automatically generated.
+          body: ${{ env.release_notes }}
           draft: false
           prerelease: false
         env:
