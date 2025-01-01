@@ -5,7 +5,7 @@ on:
 
 jobs:
   auto-format:
-    name: Auto-format and Push Changes
+    name: Auto-format with Black and iSort
     runs-on: ubuntu-latest
 
     steps:
@@ -114,10 +114,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Pull Latest Changes
-        run: |
-          git checkout -b patch || git checkout patch
-          git pull origin patch --rebase
 
       - name: Commit All Changes
         run: |
