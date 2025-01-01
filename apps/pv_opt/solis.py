@@ -667,7 +667,7 @@ class SolisInverter(BaseInverterController):
             tolerance = 0
 
         if entity_id is not None:
-            changed, written = self.write_to_hass()
+            changed, written = self.write_to_hass(entity_id=entity_id, value=target_soc, tolerance=tolerance)
 
         if changed:
             if written:
