@@ -35,13 +35,19 @@ jobs:
     name: Validate Version
     runs-on: ubuntu-latest
     needs: auto-format
-    if: github.base_ref == 'main' && (startsWith(github.head_ref, 'patch') || startsWith(github.head_ref, 'dev'))
+    if: github.base_ref == 'main'
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+
+      - name: Skip Validation for Non-patch/dev Branches
+        run: |
+          if [[ "$GITHUB_HEAD_REF" != patch* && "$GITHUB_HEAD_REF" != dev* ]]; then
+            echo "Skipping validation for non-patch/dev branch."
+            exit 0
+          fi
+
 
       - name: Fetch main branch into a temporary branch
         run: |
@@ -100,9 +106,10 @@ jobs:
   commit-changes:
     needs:
       - auto-format
+      - validate-version
     name: Commit and Push All Changes
     runs-on: ubuntu-latest
-    if: success() || github.event.pull_request.base.ref == 'main'
+    
 
     steps:
       - name: Checkout Repository
