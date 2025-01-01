@@ -31,6 +31,21 @@ jobs:
           black --line-length=119 .
           isort .
 
+      # Step 5: Commit Formatting Changes
+      - name: Commit Formatting Changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "No formatting changes to commit."
+            exit 0
+          fi
+          git commit -m "Auto-format code with Black and isort"
+          git push origin HEAD
+
   validate-version:
     name: Validate Version
     runs-on: ubuntu-latest
@@ -47,7 +62,6 @@ jobs:
             echo "Skipping validation for non-patch/dev branch."
             exit 0
           fi
-
 
       - name: Fetch main branch into a temporary branch
         run: |
@@ -103,42 +117,13 @@ jobs:
           patch_version=$(grep -m 1 -oP '(?<=^VERSION = ")[^"]+' apps/pv_opt/pv_opt.py)
           sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/v$patch_version/" README.md
 
-  commit-changes:
-    needs:
-      - auto-format
-      - validate-version
-    name: Commit and Push All Changes
-    runs-on: ubuntu-latest
-    
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git User
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Checkout or Create Patch Branch
-        run: |
-          git checkout -b patch || git checkout patch
-
-      - name: Commit All Changes
-        env:
-          VERSION_CHANGED: ${{ env.VERSION_CHANGED || 'false' }}
-        run: |
-          git add .
-          if [ "$VERSION_CHANGED" = "true" ]; then
-            git commit -m "Auto-format code and update version to [Version Updated]"
-          else
-            git commit -m "Auto-format code and validate version"
-          fi
-
-      - name: Push Changes
+      - name: Commit Version Changes
+        if: env.VERSION_CHANGED == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git push --force-with-lease --set-upstream origin patch
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/pv_opt/pv_opt.py README.md
+          git commit -m "Update version to $patch_version"
+          git push origin HEAD
