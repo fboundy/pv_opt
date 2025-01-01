@@ -70,9 +70,9 @@ jobs:
 
           # Output the release notes
           echo -e "Release notes generated:\n${RELEASE_NOTES}"
-          echo "release_notes<<EOF" >> $GITHUB_ENV
-          echo -e "${RELEASE_NOTES}" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "${RELEASE_NOTES}" > release_notes.txt
+          echo "RELEASE_NOTES=$(<release_notes.txt)" >> $GITHUB_ENV
+
 
       # Step 5: Create GitHub Release
       - name: Create GitHub Release
