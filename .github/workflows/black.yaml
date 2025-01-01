@@ -110,12 +110,13 @@ jobs:
 
           sed -i "s/^VERSION = \".*\"/VERSION = \"$new_patch_version\"/" apps/pv_opt/pv_opt.py
           echo "Corrected version to $new_patch_version."
+          echo "new_patch_version=$new_patch_version" >> $GITHUB_ENV
           echo "VERSION_CHANGED=true" >> $GITHUB_ENV
 
       - name: Update README.md version
         run: |
-          patch_version=$(grep -m 1 -oP '(?<=^VERSION = ")[^"]+' apps/pv_opt/pv_opt.py)
-          sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/v$patch_version/" README.md
+          new_patch_version=${{ env.new_patch_version }}
+          sed -i "1s/v[0-9]*\\.[0-9]*\\.[0-9]*/v$new_patch_version/" README.md
 
       - name: Commit Version Changes
         if: env.VERSION_CHANGED == 'true'
@@ -125,5 +126,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add apps/pv_opt/pv_opt.py README.md
-          git commit -m "Update version to $patch_version"
+          git commit -m "Update version to ${{ env.new_patch_version }}"
           git push origin HEAD
+    
