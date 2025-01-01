@@ -420,7 +420,7 @@ These parameters will define how PV Opt estimates daily consumption:
 | Transfer Car Charge Plan | On/Off | `switch.transfer_car_charge_plan` | 30 | Make Candidate Car Charging Plan the active plan. Useful if adjusting any of the below paramaters after the car has been plugged in. This will automatically be set back to Off after the plan is transferred. This ensures any external HA automations used to auto-calculate "Car Charge to Add" based on car SOC don't corrupt the car charging plan once the car starts charging. |
 | EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. |
 | EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 60 | Set EV Battery Capacity.   |
-| Car Ready By | Time | `select.car_charging_ready_by` | 06:30 | Set Time for when the Car is to be ready by.   |
+| Car Ready By| Time | `select.car_charging_ready_by` | 06:30 | Set Time for when the Car is to be ready by.   |
 | Car Charge to Add | % | `number.ev_charge_target_percent` | 30 | % of 'charge to add' to the car. I.e if your car is at 40% and want it to be charged to 90% then set this to 50%.  |
 | Car Charge Slot max price | p | `number.max_ev_price_p` | 30 | Maximum 1/2 hour slot price per kWh in pence added to the candidate car charging plan. Disable by setting to 0. Note: setting a low value may mean the car will not charge to the required SOC if overnight Agile rates are high. |
 | Car Charge Efficiency | % | `number.ev_charger_efficiency_percent` | 92 | Charging Efficiency for EV Charger/Car. 92% is average for most cars/chargers but adjust if the car is consistently undercharging or overcharging against its target. |
