@@ -11,7 +11,7 @@ The application will integrate fully with Solis inverters which are controlled u
 - [Home Assistant Solarman Integration](https://github.com/davidrapan/ha-solarman) (1)
 
 (1) https://github.com/StephanJoubert/home_assistant_solarman appears to be no longer maintained so has been replaced with
-https://github.com/davidrapan/ha-solarman. This should be used for new installs for PvOpt v3.17.0 onwards.
+https://github.com/davidrapan/ha-solarman. This should be used for new installs for PvOpt v4.0.0 onwards.
 
 Once installed it should require miminal configuration. Other inverters/integrations can be added if required or can be controlled indirectly using automations.
 
@@ -77,8 +77,7 @@ This excellent integration will pull Octopus Price data in to Home Assistant. Pv
 
 <h3>5. Install the Integration to Control Your Inverter</h3>
 
-At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus) or the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus, or combining the [Solis-Senor](https://github.com/hultenvp/solis-sensor) and [Solis-Control](https://github.com/hultenvp/solis_control) integrations.  
-Support for the Solarman integrations (https://github.com/StephanJoubert/home_assistant_solarman and https://github.com/davidrapan/ha-solarman) are in test. 
+At present this app only works directly with Solis hybrid inverters using either the Solax Modbus integration (https://github.com/wills106/homeassistant-solax-modbus) or the HA Core Modbus as described here: https://github.com/fboundy/ha_solis_modbus, or combining the [Solis-Senor](https://github.com/hultenvp/solis-sensor) and [Solis-Control](https://github.com/hultenvp/solis_control) integrations. A Solarman integration (https://github.com/davidrapan/ha-solarman) is also supported. 
 
 <h4>Solax Modbus:</h4>
 
@@ -114,7 +113,7 @@ Follow the Github instructions here: (https://github.com/davidrapan/ha-solarman)
 
 For Solis Inverters, replace existing Solis_Hybrid.yaml with this one:
 
-https://github.com/stevebuk1/pv_opt/blob/patch2/apps/pv_opt/solis_hybrid.yaml
+https://github.com/fboundy/pv_opt/blob/steveb-patch/files/solis_hybrid.yaml
 
 Note:  installs using https://github.com/StephanJoubert/home_assistant_solarman have writes to the inverter disabled. For full inverter control, reinstall using the Solarman repo 
 above.
@@ -388,7 +387,7 @@ There are then only a few things to control the optimisation process.  These hav
 These are the main parameters that will control how PV Opt runs:
 
 | Parameter | Units | Entity | Default | Description |
-|:--|:--:| :-- | :--:|:--|
+| :--| :--: | :--| :--:| :--|
 | Read Only Mode | `on`/`off` | `switch.pvopt_read_only` | On | Controls whether the app will actually control the inverter. Start with this on until you are happy the charge/discharge plan makes sense.
 | Optimise Charging | `on`/`off` | `switch.pvopt_forced_charge` | On | Controls whether the app will calculate an Optimised plan. If `off` only the Base forecast will be updated.
 | Optimise Discharging | `on`/`off` | `switch.pvopt_forced_discharge` | On | Controls whether the app will allow for forced discharge as well as charge
