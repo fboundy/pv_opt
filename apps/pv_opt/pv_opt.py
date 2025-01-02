@@ -2537,6 +2537,11 @@ class PVOpt(hass.Hass):
             self.car_slots = car_slots
             self.car_slots_last_loaded = pd.Timestamp.now(tz="UTC")
 
+            if not self.car_slots.empty:
+                self.ev_total_charge = self.car_slots["charge_in_kwh"].sum()
+                self.ev_total_cost = self.car_slots["import"].sum()
+                self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
+
         # If on Agile tariff, (re)calculate car slots now.
 
         if self.agile and self.ev and self.car_charging:
