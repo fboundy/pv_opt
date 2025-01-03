@@ -549,6 +549,32 @@ The dashboards also depend on the following Frontend components from HACS:
  - layout-card
  - apexcharts-card
 
+<h2>EV Charging on the Agile Tariff</h2>
+
+For Agile tariff users, Pv_opt also contains functionality to generate a charge plan for your EV. This is fully integrated with the Pv_opt core functionality of optimising house battery use, such that EV charge plans will not discharge your house battery. 
+
+An example Dashbaord for control and output for this is provided at XXXXXX. 
+
+To enable the functionality, do the following, either in the dashboard directly or in config.yaml:
+
+1) set XXXXXXX to On 
+2) Set Charger to Zappi. 
+3) Set the car battery capacity
+4) Adjust the EV charge rate (if required)
+
+Pv_opt will then generate a candidate car charging plan on each optimiser run.
+
+The candidate car charge plan calculated is based on the following settings:
+    - Charge to add (XXXXXX), i.e if EV is at 40% and you want to get charge it to 90% then set to 50%
+    - Maximum slot price (XXXXXXX). If the slot price is above this limit then the car will not charge during this slot. 
+
+The candidate plan is automatically made active upon car plugin, but is not changed again.
+The candidate plan can also be made active via Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become avaialble, or the parameters above are adjusted. 
+
+The active car charging plan is then output live on binary_sensor.pvopt_car_charging_slot for use in HA automations to switch the EV charger on and off. An example automation for a Zappi charger is available here: https://github.com/fboundy/pv_opt/blob/steveb-patch/files/zappi_automation.yaml
+
+In the example dashboard, both the candidate charging plan and the active charging plan are displayed as a list of 1/2 hour charging slots and a series of charging windows; which one you select is a matter of personal preference. 
+
 
 <h2> Known Issues</h2>
 

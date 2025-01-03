@@ -2734,8 +2734,8 @@ class PVOpt(hass.Hass):
 
             # Set the EV charger entity, even if in ReadOnly
             ### For code development only - allows test of EV charger whilst not interferring with inverter. Remove when code development complete.
-            self._control_EV_charger()
-            self.log("")
+            # self._control_EV_charger()
+            # self.log("")
 
         else:
 
