@@ -1079,7 +1079,7 @@ class PVsystemModel:
                         else:
                             if log:
                                 self.log(str_log + "No search window")
-                            done = True
+                            tested.loc[max_slot] = True
                 else:
                     done = True
             else:
