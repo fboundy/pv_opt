@@ -557,23 +557,25 @@ An example Dashbaord for control and output for this is provided at XXXXXX.
 
 To enable the functionality, do the following, either in the dashboard directly or in config.yaml:
 
-1) set XXXXXXX to On 
-2) Set Charger to Zappi. 
-3) Set the car battery capacity
-4) Adjust the EV charge rate (if required)
+1) set XXXXXXX to On (XXXXXX, or id_XXXXXXXX)
+2) Set Charger to Zappi (XXXXXX, or id_XXXXXXXX)
+3) Set the car battery capacity ((XXXXXX, or id_XXXXXXXX))
+4) Adjust the EV charge rate (if required)   ((XXXXXX, or id_XXXXXXXX))
 
 Pv_opt will then generate a candidate car charging plan on each optimiser run.
 
 The candidate car charge plan calculated is based on the following settings:
-    - Charge to add (XXXXXX), i.e if EV is at 40% and you want to get charge it to 90% then set to 50%
-    - Maximum slot price (XXXXXXX). If the slot price is above this limit then the car will not charge during this slot. 
+ - Charge to add , i.e if EV is at 40% and you want to get charge it to 90% then set to 50%  (XXXXXX, or id_XXXXXX)
+ - Maximum slot price . If the slot price is above this limit then the car will not charge during this slot  (XXXXXXX, or id_XXXXXX). 
 
-The candidate plan is automatically made active upon car plugin, but is not changed again.
-The candidate plan can also be made active via Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become avaialble, or the parameters above are adjusted. 
+The candidate plan is automatically made active upon car plugin, but is not changed again. This is to ensure that if the charge to add value is calculated by an external automation based on the cars SOC, the charging plan stays the same once charging begins and the cars SOC increments.
+
+If required, the candidate plan can also be made active via mamual Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become avaialble, or parameters above are adjusted after car plugin. 
+
+In the example dashboard, both the candidate charging plan and the active charging plan are displayed as a list of 1/2 hour charging slots and a series of charging windows; which one you select is a matter of personal preference. 
 
 The active car charging plan is then output live on binary_sensor.pvopt_car_charging_slot for use in HA automations to switch the EV charger on and off. An example automation for a Zappi charger is available here: https://github.com/fboundy/pv_opt/blob/steveb-patch/files/zappi_automation.yaml
 
-In the example dashboard, both the candidate charging plan and the active charging plan are displayed as a list of 1/2 hour charging slots and a series of charging windows; which one you select is a matter of personal preference. 
 
 
 <h2> Known Issues</h2>
