@@ -4253,18 +4253,35 @@ class PVOpt(hass.Hass):
         if isinstance(time, pd.Timestamp):
             time = time.strftime("%H:%M")
         state = self.get_state_retry(entity_id=entity_id)
+        
+        # SVB debugging
+        self.log(f"Write_and_poll_time: time = {time}, old_time = {state}")
+
+
         if state != time:
             changed = True
+            
+            # SVB debugging
+            self.log(f"Write_and_poll_time: Changed = true")
+
+
             try:
                 self.call_service("time/set_value", entity_id=entity_id, time=time)
 
                 written = False
                 retries = 0
                 while not written and retries < WRITE_POLL_RETRIES:
+
+                    # SVB debugging 
+                    self.log("Write_and_poll_time: Entered while loop")
+
                     retries += 1
                     time.sleep(WRITE_POLL_SLEEP)
                     new_state = self.get_state_retry(entity_id=entity_id)
                     written = new_state == time
+ 
+                    # SVB debugging
+                    self.log(f"Write_and_poll_time:  while loop, new_time = {new_state}")
 
             except:
                 written = False
