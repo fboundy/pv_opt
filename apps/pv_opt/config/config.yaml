@@ -197,8 +197,8 @@ pv_opt:
   # ev_charge_target_percent: 30  # Default 30%
   #
   #
-  # If on Agile, Pv_opt can generate a car charging plan using the cheapest slots to charge to a target. To enable
-  # this, uncomment the next line. (IOG users should leave this line commented out). 
+  # If on Agile, Pv_opt can generate a car charging plan using the cheapest slots to charge to a target SOC. 
+  # To enable this, uncomment the next line. (IOG users should leave this line commented out). 
   #
   # control_car_charging: On   # Default = Off
   #
