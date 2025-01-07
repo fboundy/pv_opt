@@ -118,15 +118,16 @@ jobs:
             exit 1
           fi
 
-          sed -i "s/^VERSION = \".*\"/VERSION = \"v$new_patch_version\"/" apps/pv_opt/pv_opt.py
-          echo "Corrected version to v$new_patch_version."
+          sed -i "s/^VERSION = \".*\"/VERSION = \"$new_patch_version\"/" apps/pv_opt/pv_opt.py
+          echo "Corrected version to $new_patch_version."
           echo "new_patch_version=v$new_patch_version" >> $GITHUB_ENV
           echo "VERSION_CHANGED=true" >> $GITHUB_ENV
-
+  
       - name: Update README.md version
         run: |
           new_patch_version=${{ env.new_patch_version }}
-          sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/$new_patch_version/" README.md
+          version_without_v=$(echo "$new_patch_version" | sed 's/^v//')
+          sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/v$version_without_v/" README.md
 
       - name: Commit Version Changes
         if: env.VERSION_CHANGED == 'true'
