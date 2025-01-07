@@ -73,21 +73,20 @@ jobs:
             echo "Error: No tags found in the repository." >&2
             exit 1
           fi
-          echo "Latest Tag: '$LATEST_TAG'"  # Debug: Log the tag
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_ENV
-  
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "Latest Tag: '$LATEST_TAG'"
 
       - name: Get VERSION from Latest Tag
         id: get_tag_version
         run: |
-          echo "Latest Tag: '$LATEST_TAG'"  # Debug: Print the raw tag value
-          VERSION=$(echo "$LATEST_TAG" | sed -n 's/^v\\([0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\\)$/\\1/p' | tr -d '[:space:]')
-          echo "Extracted VERSION: '$VERSION'"  # Debug: Print the extracted version
+          VERSION=$(echo "${{ env.LATEST_TAG }}" | sed -n 's/^v\\([0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\\)$/\\1/p')
           if [ -z "$VERSION" ]; then
             echo "Error: VERSION could not be extracted from the latest tag." >&2
             exit 1
           fi
-          echo "tag_version=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Extracted VERSION: '$VERSION'"
+  
         
         
       - name: Get VERSION from Current Branch
