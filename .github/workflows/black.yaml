@@ -68,26 +68,13 @@ jobs:
       - name: Get Latest Tag
         id: get_latest_tag
         run: |
-          LATEST_TAG=$(git tag --list | sort -V | tail -n 1)
+          LATEST_TAG=$(git describe --tags --abbrev=0)
           if [ -z "$LATEST_TAG" ]; then
             echo "Error: No tags found in the repository." >&2
             exit 1
           fi
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
-          echo "Latest Tag: '$LATEST_TAG'"
-
-      - name: Get VERSION from Latest Tag
-        id: get_tag_version
-        run: |
-          VERSION=$(echo "$LATEST_TAG" | sed -E 's/^v([0-9]+\\.[0-9]+\\.[0-9]+)$/\\1/')
-          echo "Extracted VERSION: '$VERSION'"
-          if [ -z "$VERSION" ]; then
-            echo "Error: VERSION could not be extracted from the latest tag." >&2
-            exit 1
-          fi
+          VERSION=$(echo "$LATEST_TAG" | sed -E 's/^v?([0-9]+\.[0-9]+\.[0-9]+)$/\1/')
           echo "tag_version=$VERSION" >> $GITHUB_ENV
-  
-  
 
       - name: Get VERSION from Current Branch
         id: get_patch_version
@@ -120,14 +107,13 @@ jobs:
 
           sed -i "s/^VERSION = \".*\"/VERSION = \"$new_patch_version\"/" apps/pv_opt/pv_opt.py
           echo "Corrected version to $new_patch_version."
-          echo "new_patch_version=v$new_patch_version" >> $GITHUB_ENV
+          echo "new_patch_version=$new_patch_version" >> $GITHUB_ENV
           echo "VERSION_CHANGED=true" >> $GITHUB_ENV
-  
+
       - name: Update README.md version
         run: |
           new_patch_version=${{ env.new_patch_version }}
-          version_without_v=$(echo "$new_patch_version" | sed 's/^v//')
-          sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/v$version_without_v/" README.md
+          sed -i "1s/v[0-9]*\.[0-9]*\.[0-9]*/v$new_patch_version/" README.md
 
       - name: Commit Version Changes
         if: env.VERSION_CHANGED == 'true'
