@@ -799,9 +799,7 @@ class SolisCoreModbusInverter(SolisInverter):
                 self._host.call_service("modbus/write_register", **data)
                 sleep(0.1)
                 new_value = int(float(self.get_config(cfg))) / multiplier
-                # self.log(f">>> current_value: {current_value/multiplier}")
-                # self.log(f">>> value: {value}")
-                # self.log(f">>> new_value: {new_value}")
+
                 written = new_value == value
         return changed, written
 
