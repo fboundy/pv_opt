@@ -115,7 +115,7 @@ jobs:
           else
             echo "Error: Unsupported source branch type." >&2
             exit 1
-          fi
+          fi 
 
           sed -i "s/^VERSION = \".*\"/VERSION = \"$new_patch_version\"/" apps/pv_opt/pv_opt.py
           echo "Corrected version to $new_patch_version."
