@@ -79,15 +79,14 @@ jobs:
       - name: Get VERSION from Latest Tag
         id: get_tag_version
         run: |
-          VERSION=$(echo "${{ env.LATEST_TAG }}" | sed -n 's/^v\\([0-9]\\+\\.[0-9]\\+\\.[0-9]\\+\\)$/\\1/p')
+          VERSION=$(echo "$LATEST_TAG" | sed -E 's/^v([0-9]+\\.[0-9]+\\.[0-9]+)$/\\1/')
+          echo "Extracted VERSION: '$VERSION'"
           if [ -z "$VERSION" ]; then
             echo "Error: VERSION could not be extracted from the latest tag." >&2
             exit 1
           fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Extracted VERSION: '$VERSION'"
+          echo "tag_version=$VERSION" >> $GITHUB_ENV
   
-        
         
       - name: Get VERSION from Current Branch
         id: get_patch_version
