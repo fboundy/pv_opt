@@ -698,6 +698,10 @@ class SolisSolarmanV2Inverter(SolisInverter):
 class SolisSolaxModbusInverter(SolisInverter):
     def __init__(self, inverter_type: str, host):
         super().__init__(inverter_type, host)
+        entity_id = self.brand_config["id_inverter_mode"]
+        entity_modes = self._host.get_state_retry(entity_id, attribute="options")
+        self._codes = INVERTER_DEFS[inverter_type]["codes"][self._hmi_fb00]
+        self._modes = {self._codes[code]: code for code in entity_modes}
 
     def _get_times_current(self, direction):
         # Required if the times are set as separate_hours and units
@@ -795,9 +799,9 @@ class SolisCoreModbusInverter(SolisInverter):
                 self._host.call_service("modbus/write_register", **data)
                 sleep(0.1)
                 new_value = int(float(self.get_config(cfg))) / multiplier
-                self.log(f">>> current_value: {current_value/multiplier}")
-                self.log(f">>> value: {value}")
-                self.log(f">>> new_value: {new_value}")
+                # self.log(f">>> current_value: {current_value/multiplier}")
+                # self.log(f">>> value: {value}")
+                # self.log(f">>> new_value: {new_value}")
                 written = new_value == value
         return changed, written
 
