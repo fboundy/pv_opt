@@ -822,6 +822,8 @@ class PVsystemModel:
         self.flows["soc"] = (self.flows["chg"] / self.battery.capacity) * 100
         self.flows["soc_end"] = (self.flows["chg_end"] / self.battery.capacity) * 100
 
+        # self.log(f">>>\n{self.flows.iloc[:3].to_string()}")
+
         if self.prices is not None:
             self.flows = pd.concat(
                 [self.prices, consumption, self.flows],

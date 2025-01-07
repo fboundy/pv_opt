@@ -2414,6 +2414,7 @@ class PVOpt(hass.Hass):
 
         self.log("")
         self.log(f"Initial SOC: {self.pv_system.initial_soc}")
+        self.log(f"Current SOC: {self.pv_system.soc_now}")
 
         self.pv_system.calculate_flows()
         self.flows = {"Base": self.pv_system.flows}

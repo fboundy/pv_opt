@@ -14,9 +14,9 @@ inverters:
 pv_opt:
   module: pv_opt
   class: PVOpt
-  # dependencies:
-  #   - pvpy
-  #   - solis
+  dependencies:
+    - pvpy
+    - solis
 
   log: pv_opt_log
   prefix: pvopt
