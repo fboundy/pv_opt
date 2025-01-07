@@ -68,12 +68,14 @@ jobs:
       - name: Get Latest Tag
         id: get_latest_tag
         run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0)
+          LATEST_TAG=$(git tag --list | sort -V | tail -n 1)
           if [ -z "$LATEST_TAG" ]; then
             echo "Error: No tags found in the repository." >&2
             exit 1
           fi
+          echo "Latest Tag: '$LATEST_TAG'"  # Debug: Log the tag
           echo "latest_tag=$LATEST_TAG" >> $GITHUB_ENV
+  
 
       - name: Get VERSION from Latest Tag
         id: get_tag_version
