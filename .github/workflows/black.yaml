@@ -134,10 +134,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B $GITHUB_HEAD_REF  # Create or switch to the correct branch
           git add apps/pv_opt/pv_opt.py README.md
           if git diff --cached --quiet; then
             echo "No version changes to commit."
             exit 0
           fi
           git commit -m "Update version to ${{ env.new_patch_version }}"
-          git push origin HEAD        
+          git push origin $GITHUB_HEAD_REF
+  
