@@ -3987,10 +3987,17 @@ class PVOpt(hass.Hass):
             return
 
         consumption = self.load_consumption(start, end)
-        static = pd.concat([solar, consumption], axis=1).set_axis(["solar", "consumption"], axis=1)
+        self.pv_system.static_flows = pd.concat([solar, consumption], axis=1).set_axis(["solar", "consumption"], axis=1)
 
         initial_soc_df = self.hass2df(self.config["id_battery_soc"], days=2, freq="30min")
-        initial_soc = initial_soc_df.loc[start]
+        self.pv_system.initial_soc = initial_soc_df.loc[start]
+
+        # Not sure about the next lines, but calculate_flows requires soc_now
+        soc_now = self.get_config("id_battery_soc")
+        self.time_now = pd.Timestamp.utcnow()
+        self.pv_system.soc_now = (self.time_now, soc_now)
+
+        # self.pv_system.soc_now = initial_soc_df.loc[start]
 
         self.pv_system.calculate_flows()
         base = self.pv_system.flows
@@ -4000,12 +4007,12 @@ class PVOpt(hass.Hass):
         self.log("")
         self.log(f"Start:       {start.strftime(DATE_TIME_FORMAT_SHORT):>15s}")
         self.log(f"End:         {end.strftime(DATE_TIME_FORMAT_SHORT):>15s}")
-        self.log(f"Initial SOC: {initial_soc:>15.1f}%")
-        self.log(f"Consumption: {static['consumption'].sum()/2000:15.1f} kWh")
-        self.log(f"Solar:       {static['solar'].sum()/2000:15.1f} kWh")
+        self.log(f"Initial SOC: {self.pv_system.initial_soc:>15.1f}%")
+        self.log(f"Consumption: {self.pv_system.static_flows['consumption'].sum()/2000:15.1f} kWh")
+        self.log(f"Solar:       {self.pv_system.static_flows['solar'].sum()/2000:15.1f} kWh")
 
         if self.debug and "T" in self.debug_cat:
-            self.log(f">>> Yesterday's data:\n{static.to_string()}")
+            self.log(f">>> Yesterday's data:\n{self.pv_system.static_flows.to_string()}")
 
         for tariff_set in self.config["alt_tariffs"]:
             code = {}
@@ -4025,7 +4032,7 @@ class PVOpt(hass.Hass):
             )
 
         actual = self._cost_actual(start=start, end=end - pd.Timedelta(30, "minutes"))
-        static["period_start"] = static.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+        self.pv_system.static_flows["period_start"] = self.pv_system.static_flows.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
         entity_id = f"sensor.{self.prefix}_opt_cost_actual"
         self.set_state(
             state=round(actual.sum() / 100, 2),
@@ -4036,7 +4043,7 @@ class PVOpt(hass.Hass):
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison Actual",
             }
-            | {col: static[["period_start", col]].to_dict("records") for col in ["solar", "consumption"]},
+            | {col: self.pv_system.static_flows[["period_start", col]].to_dict("records") for col in ["solar", "consumption"]},
         )
 
         self.ulog("Net Cost comparison:", underline=None)
