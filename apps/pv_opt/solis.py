@@ -571,6 +571,9 @@ class SolisInverter(BaseInverterController):
         self.log(f">>> direction: {direction}")
         self.log(f">>> times: {times}")
         self.log(f">>> current: {current}")
+
+        current = min(current, self.get_config("battery_current_limit_amps"))
+
         changed = self._set_times(direction, **times)
         self.log(f">>> changed: {changed}")
         changed = changed or self._set_current(direction, current)
