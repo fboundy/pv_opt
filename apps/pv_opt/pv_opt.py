@@ -13,11 +13,12 @@ import pandas as pd
 import pvpy as pv
 from numpy import nan
 
-VERSION = "4.0.7-Beta-1"
+VERSION = "4.0.7-Beta-2"
 UNITS = {
     "current": "A",
     "power": "W",
 }
+
 
 OCTOPUS_PRODUCT_URL = r"https://api.octopus.energy/v1/products/"
 
