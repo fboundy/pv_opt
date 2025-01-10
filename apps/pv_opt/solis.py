@@ -29,11 +29,11 @@ SOLIS_DEFAULT_CODES = {
         "Feed-in priority": 64,
     },
     False: {
-        "SelfUse - No Grid Charging": 1,
+        "Selfuse - No Grid Charging": 1,
         "Self-Use - No Grid Charging": 1,
         "Timed Charge/Discharge - No Grid Charging": 3,
         "Backup/Reserve - No Grid Charging": 17,
-        "SelfUse": 33,
+        "Selfuse": 33,
         "Self-Use - No Timed Charge/Discharge": 33,
         "Self-Use": 35,
         "Timed Charge/Discharge": 35,
@@ -571,6 +571,9 @@ class SolisInverter(BaseInverterController):
         self.log(f">>> direction: {direction}")
         self.log(f">>> times: {times}")
         self.log(f">>> current: {current}")
+
+        current = min(current, self.get_config("battery_current_limit_amps"))
+
         changed = self._set_times(direction, **times)
         self.log(f">>> changed: {changed}")
         changed = changed or self._set_current(direction, current)
