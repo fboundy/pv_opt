@@ -1011,8 +1011,6 @@ class PVsystemModel:
                                     slots_added += 1
 
                                 self.calculate_flows(slots=slots)
-                                if i == 1:
-                                    self.log(f">>>\n{self.flows.to_string()}")
                                 self.net_costs.append(self.net_cost)
 
                                 slot_count.append(len(factors))
