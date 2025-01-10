@@ -567,7 +567,7 @@ class SolisInverter(BaseInverterController):
 
         battery_current_limit = self.get_config("battery_current_limit_amps")
         if battery_current_limit < current:
-            self.log(f"battery_current_limit_amps of {battery_current_limit} is less than current of {current}A required by charging plan.")
+            self.log(f"battery_current_limit_amps of {battery_current_limit}A is less than current of {current}A required by charging plan.")
             self.log(f"Reducing inverter charge current to {battery_current_limit}A. ")
             self.log("Check value of charger_power_watts in config.yaml if this is unexpected.")
             self.log("")
