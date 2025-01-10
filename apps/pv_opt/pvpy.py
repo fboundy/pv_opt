@@ -710,8 +710,9 @@ class PVsystemModel:
 
         self.flows = self.static_flows.copy()[[solar_id, consumption_id]].set_axis(["solar", "consumption"], axis=1)
         self.flows["dt_hours"] = get_dt_hours(self.flows)
-        self.flows["battery_no_force"] = self.flows["consumption"] - self.flows["solar"]
+        self.flows["battery_grid_requirement"] = self.flows["consumption"] - self.flows["solar"]
         self.flows["forced"] = 0
+        self.flows["battery_temp"] = self.flows["consumption"] - self.flows["solar"]
         # forced_charge = pd.Series(index=self.flows.index, data=0)
 
         if len(slots) > 0:
@@ -722,13 +723,13 @@ class PVsystemModel:
                     timed_slot_flows.loc[t] += int(c)
 
             chg_mask = timed_slot_flows != 0
-            self.flows["battery_no_force"][chg_mask] = timed_slot_flows[chg_mask]
+            self.flows["battery_temp"][chg_mask] = -timed_slot_flows[chg_mask]
             self.flows["forced"][chg_mask] = timed_slot_flows[chg_mask]
 
         chg = [self.initial_soc / 100 * self.battery.capacity]
 
         for idx in self.flows.index:
-            flow = self.flows["battery_no_force"].loc[idx]
+            flow = self.flows["battery_temp"].loc[idx]
             dt_hours = self.flows["dt_hours"].loc[idx]
 
             if flow > 0:
@@ -763,7 +764,7 @@ class PVsystemModel:
             self.flows["battery"] * self.inverter.inverter_efficiency
         )
         self.flows.loc[self.flows["battery"] < 0, "battery"] = self.flows["battery"] / self.inverter.charger_efficiency
-        self.flows["grid"] = (self.flows["battery_no_force"] - self.flows["battery"]).round(0)
+        self.flows["grid"] = (self.flows["battery_grid_requirement"] - self.flows["battery"]).round(0)
         self.flows["soc"] = (self.flows["chg"] / self.battery.capacity) * 100
         self.flows["soc_end"] = (self.flows["chg_end"] / self.battery.capacity) * 100
 
@@ -929,13 +930,17 @@ class PVsystemModel:
             if (i > 96) or (available.sum() == 0):
                 done = True
 
-            import_cost = ((self.flows["import"] * self.flows["grid"]).clip(0) / 2000)[~tested]
+            import_cost = ((self.flows["import"] * self.flows["grid"]).clip(0) * self.flows["dt_hours"] / 1000)[
+                ~tested
+            ]
 
             if len(import_cost[self.flows["forced"] == 0]) > 0:
                 max_import_cost = import_cost[self.flows["forced"] == 0].max()
                 if len(import_cost[import_cost == max_import_cost]) > 0:
                     max_slot = import_cost[import_cost == max_import_cost].index[0]
-                    max_slot_energy = round(self.flows["grid"].loc[max_slot] / 2000, 2)  # kWh
+                    max_slot_energy = round(
+                        self.flows["grid"].loc[max_slot] / 1000 * self.flows["dt_hours"].loc[max_slot], 2
+                    )  # kWh
                     str_log = f"{i:3d} {available.sum():3d} {max_slot.tz_convert(self.tz).strftime(TIME_FORMAT)}:"
 
                     if max_slot_energy > 0:
@@ -1006,6 +1011,8 @@ class PVsystemModel:
                                     slots_added += 1
 
                                 self.calculate_flows(slots=slots)
+                                if i == 1:
+                                    self.log(f">>>\n{self.flows.to_string()}")
                                 self.net_costs.append(self.net_cost)
 
                                 slot_count.append(len(factors))

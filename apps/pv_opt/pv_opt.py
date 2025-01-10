@@ -2512,11 +2512,6 @@ class PVOpt(hass.Hass):
 
         self.base = self.flows["Base"]
 
-        self.log("")
-        self.ulog("1/2 Hour Base")
-        self.log(f"\n{self.base.to_string()}")
-        self.log("")
-
         # SVB debug logging
         # self.log("")
         # self.log("Returned from .flows. self.opt is........")
