@@ -723,8 +723,11 @@ class PVsystemModel:
                     timed_slot_flows.loc[t] += int(c)
 
             chg_mask = timed_slot_flows != 0
-            self.flows["battery_temp"][chg_mask] = -timed_slot_flows[chg_mask]
-            self.flows["forced"][chg_mask] = timed_slot_flows[chg_mask]
+            # self.flows["battery_temp"][chg_mask] = -timed_slot_flows[chg_mask]
+            # self.flows["forced"][chg_mask] = timed_slot_flows[chg_mask]
+
+            self.flows.loc[chg_mask, "battery_temp"] = -timed_slot_flows[chg_mask]
+            self.flows.loc[chg_mask, "forced"] = timed_slot_flows[chg_mask]
 
         chg = [self.initial_soc / 100 * self.battery.capacity]
 
