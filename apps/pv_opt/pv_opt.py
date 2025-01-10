@@ -2355,67 +2355,69 @@ class PVOpt(hass.Hass):
             return
 
         self.pv_system.static_flows = pd.concat([solcast, consumption], axis=1)
-        self.time_now = pd.Timestamp.utcnow()
+        self.time_now = pd.Timestamp.utcnow().floor("1min")
 
         self.pv_system.static_flows = self.pv_system.static_flows[self.time_now.floor("30min") :].fillna(0)
+        self.pv_system.static_flows.index = [self.time_now] + list(self.pv_system.static_flows.index[1:])
 
         soc_now = self.get_config("id_battery_soc")
-        soc_last_day = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
-        if self.debug and "S" in self.debug_cat:
-            self.log(f">>> soc_now: {soc_now}")
-            self.log(f">>> soc_last_day: {soc_last_day}")
-            self.log(
-                f">>> Original: {soc_last_day.loc[soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :]}"
-            )
+        self.pv_system.initial_soc = soc_now
+        # soc_last_day = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
+        # if self.debug and "S" in self.debug_cat:
+        #     self.log(f">>> soc_now: {soc_now}")
+        #     self.log(f">>> soc_last_day: {soc_last_day}")
+        #     self.log(
+        #         f">>> Original: {soc_last_day.loc[soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :]}"
+        #     )
 
-        try:
-            soc_now = float(soc_now)
+        # try:
+        #     soc_now = float(soc_now)
 
-        except:
-            self.log("")
-            self.log(
-                "Unable to get current SOC from HASS. Using last value from History.",
-                level="WARNING",
-            )
-            soc_now = soc_last_day.iloc[-1]
+        # except:
+        #     self.log("")
+        #     self.log(
+        #         "Unable to get current SOC from HASS. Using last value from History.",
+        #         level="WARNING",
+        #     )
+        #     soc_now = soc_last_day.iloc[-1]
 
-        # x = x.astype(float)
+        # # x = x.astype(float)
 
-        try:
-            soc_last_day = pd.to_numeric(soc_last_day, errors="coerce").interpolate()
+        # try:
+        #     soc_last_day = pd.to_numeric(soc_last_day, errors="coerce").interpolate()
 
-            soc_last_day = soc_last_day.loc[soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :]
-            if self.debug and "S" in self.debug_cat:
-                self.log(
-                    f">>> Fixed   : {soc_last_day.loc[soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :]}"
-                )
+        #     soc_last_day = soc_last_day.loc[soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :]
+        #     if self.debug and "S" in self.debug_cat:
+        #         self.log(
+        #             f">>> Fixed   : {soc_last_day.loc[soc_last_day.loc[: self.pv_system.static_flows.index[0]].index[-1] :]}"
+        #         )
 
-            soc_last_day = pd.concat(
-                [
-                    soc_last_day,
-                    pd.Series(
-                        data=[soc_now, nan],
-                        index=[self.time_now, self.pv_system.static_flows.index[0]],
-                    ),
-                ]
-            ).sort_index()
-            self.pv_system.initial_soc = soc_last_day.interpolate().loc[self.pv_system.static_flows.index[0]]
-        except:
-            self.pv_system.initial_soc = None
+        #     soc_last_day = pd.concat(
+        #         [
+        #             soc_last_day,
+        #             pd.Series(
+        #                 data=[soc_now, nan],
+        #                 index=[self.time_now, self.pv_system.static_flows.index[0]],
+        #             ),
+        #         ]
+        #     ).sort_index()
+        #     self.pv_system.initial_soc = soc_last_day.interpolate().loc[self.pv_system.static_flows.index[0]]
+        # except:
+        #     self.pv_system.initial_soc = None
 
-        if not isinstance(self.pv_system.initial_soc, float):
-            self.log("")
-            self.log(
-                "Unable to retrieve initial SOC - assuming it is the same as current SOC",
-                level="WARNING",
-            )
-            self.pv_system.initial_soc = soc_now
+        # if not isinstance(self.pv_system.initial_soc, float):
+        #     self.log("")
+        #     self.log(
+        #         "Unable to retrieve initial SOC - assuming it is the same as current SOC",
+        #         level="WARNING",
+        #     )
+        #     self.pv_system.initial_soc = soc_now
 
-        self.pv_system.soc_now = (self.time_now, soc_now)
+        # self.pv_system.soc_now = (self.time_now, soc_now)
 
-        self.log("")
-        self.log(f"Initial SOC: {self.pv_system.initial_soc}")
-        self.log(f"Current SOC: {self.pv_system.soc_now}")
+        # self.log("")
+        # self.log(f"Initial SOC: {self.pv_system.initial_soc}")
+        # self.log(f"Current SOC: {self.pv_system.soc_now}")
 
         self.pv_system.calculate_flows()
         self.flows = {"Base": self.pv_system.flows}
@@ -2507,6 +2509,13 @@ class PVOpt(hass.Hass):
             self.log(str_log + self.summary_costs[case]["Selected"])
 
         self.opt = self.flows[self.selected_case]
+
+        self.base = self.flows["Base"]
+
+        self.log("")
+        self.ulog("1/2 Hour Base")
+        self.log(f"\n{self.base.to_string()}")
+        self.log("")
 
         # SVB debug logging
         # self.log("")
@@ -3988,7 +3997,9 @@ class PVOpt(hass.Hass):
             return
 
         consumption = self.load_consumption(start, end)
-        self.pv_system.static_flows = pd.concat([solar, consumption], axis=1).set_axis(["solar", "consumption"], axis=1)
+        self.pv_system.static_flows = pd.concat([solar, consumption], axis=1).set_axis(
+            ["solar", "consumption"], axis=1
+        )
 
         initial_soc_df = self.hass2df(self.config["id_battery_soc"], days=2, freq="30min")
         self.pv_system.initial_soc = initial_soc_df.loc[start]
@@ -4033,7 +4044,9 @@ class PVOpt(hass.Hass):
             )
 
         actual = self._cost_actual(start=start, end=end - pd.Timedelta(30, "minutes"))
-        self.pv_system.static_flows["period_start"] = self.pv_system.static_flows.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+        self.pv_system.static_flows["period_start"] = (
+            self.pv_system.static_flows.index.tz_convert(self.tz).strftime("%Y-%m-%dT%H:%M:%S%z").str[:-2] + ":00"
+        )
         entity_id = f"sensor.{self.prefix}_opt_cost_actual"
         self.set_state(
             state=round(actual.sum() / 100, 2),
@@ -4044,7 +4057,10 @@ class PVOpt(hass.Hass):
                 "unit_of_measurement": "GBP",
                 "friendly_name": f"PV Opt Comparison Actual",
             }
-            | {col: self.pv_system.static_flows[["period_start", col]].to_dict("records") for col in ["solar", "consumption"]},
+            | {
+                col: self.pv_system.static_flows[["period_start", col]].to_dict("records")
+                for col in ["solar", "consumption"]
+            },
         )
 
         self.ulog("Net Cost comparison:", underline=None)
