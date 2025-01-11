@@ -4272,6 +4272,7 @@ class PVOpt(hass.Hass):
         written = False
         if isinstance(time, pd.Timestamp):
             time = time.strftime("%H:%M")
+            self.log("write and poll time - time detected. Trimming time to hours and minutes")
         state = self.get_state_retry(entity_id=entity_id)
         
         # SVB debugging
