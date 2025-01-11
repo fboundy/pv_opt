@@ -29,11 +29,11 @@ SOLIS_DEFAULT_CODES = {
         "Feed-in priority": 64,
     },
     False: {
-        "SelfUse - No Grid Charging": 1,
+        "Selfuse - No Grid Charging": 1,
         "Self-Use - No Grid Charging": 1,
         "Timed Charge/Discharge - No Grid Charging": 3,
         "Backup/Reserve - No Grid Charging": 17,
-        "SelfUse": 33,
+        "Selfuse": 33,
         "Self-Use - No Timed Charge/Discharge": 33,
         "Self-Use": 35,
         "Timed Charge/Discharge": 35,
@@ -151,6 +151,7 @@ INVERTER_DEFS = {
             "id_timed_charge_discharge_button": "button.{device_name}_update_charge_discharge_times",
             "id_inverter_mode": "select.{device_name}_energy_storage_control_switch",
             "id_backup_mode_soc": "number.{device_name}_backup_mode_soc",
+            "id_solar_power": ["sensor.{device_name}_pv_power_1", "sensor.{device_name}_pv_power_2"],
         },
     },
     "SOLIS_CORE_MODBUS": {
@@ -400,7 +401,6 @@ class BaseInverterController(ABC):
         return self._brand_config
 
     def write_to_hass(self, entity_id, value, **kwargs):
-        self.log(f">>> {value}")
         try:
             value = float(value)
         except:
@@ -410,7 +410,7 @@ class BaseInverterController(ABC):
             return self._host.write_and_poll_value(entity_id=entity_id, value=value, **kwargs)
         else:
             try:
-                return self._host.write_and_poll_time(entity_id=entity_id, time=value, **kwargs)
+                return self._host.write_and_poll_time(entity_id=entity_id, time=value, verbose=True, **kwargs)
             except:
                 self.log(
                     f"Unable to write value {value} to entity {entity_id}",
@@ -474,7 +474,6 @@ class SolisInverter(BaseInverterController):
             self._enable_slot(direction="discharge")
         else:
             code = 35
-        self.log(f">>> Setting energy control switch to {code} to enable timed mode")
         self._set_energy_control_switch(code)
 
     def _enable_slot(self, direction="charge"):
@@ -483,7 +482,6 @@ class SolisInverter(BaseInverterController):
         if cfg in self._brand_config and entity_id is not None:
             try:
                 self._host.call_service("switch/turn_on", entity_id=entity_id)
-                self.log(f">>> Switch {entity_id} turned ON")
             except:
                 self.log(f"Failed to turn on switch {entity_id}", level="WARNING")
         else:
@@ -568,13 +566,19 @@ class SolisInverter(BaseInverterController):
             else:
                 target_soc = self.get_config("maximum_dod_percent")
 
-        self.log(f">>> direction: {direction}")
-        self.log(f">>> times: {times}")
-        self.log(f">>> current: {current}")
+        battery_current_limit = self.get_config("battery_current_limit_amps")
+        if battery_current_limit < current:
+            self.log(
+                f"battery_current_limit_amps of {battery_current_limit} is less than current of {current}A required by charging plan."
+            )
+            self.log(f"Reducing inverter charge current to {battery_current_limit}A. ")
+            self.log("Check value of charger_power_watts in config.yaml if this is unexpected.")
+            self.log("")
+
+        current = min(current, battery_current_limit)
+
         changed = self._set_times(direction, **times)
-        self.log(f">>> changed: {changed}")
         changed = changed or self._set_current(direction, current)
-        self.log(f">>> changed: {changed}")
 
         if changed and self._requires_button_press:
             self.log("Something changed - need to press the appropriate Button")
@@ -583,7 +587,6 @@ class SolisInverter(BaseInverterController):
             else:
                 entity_id = self.brand_config.get(f"id_timed_charge_discharge_button", None)
 
-            self.log(f">>> {entity_id}")
             if entity_id is not None:
                 self._press_button(entity_id=entity_id)
 
@@ -599,7 +602,6 @@ class SolisInverter(BaseInverterController):
         start = kwargs.get("start", pd.Timestamp.now(tz=self._tz).floor("1min"))
         end = kwargs.get("end", pd.Timestamp.now(tz=self._tz).ceil("30min"))
         self._hold_soc = {"active": enable, "soc": target_soc}
-        self.log(f">>>>SOC: {target_soc}")
 
         if self._hmi_fb00:
             self._control_charge_discharge(
@@ -853,5 +855,4 @@ class SolisSolarmanModbusInverter(SolisInverter):
         if changed:
             data = {"register": register, "value": value}
             self._host.call_service("solarman/write_holding_register", **data)
-            self.log(">>> Writing {value} to inverter register {address} using Solarman")
             written = True
