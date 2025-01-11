@@ -151,6 +151,7 @@ INVERTER_DEFS = {
             "id_timed_charge_discharge_button": "button.{device_name}_update_charge_discharge_times",
             "id_inverter_mode": "select.{device_name}_energy_storage_control_switch",
             "id_backup_mode_soc": "number.{device_name}_backup_mode_soc",
+            "id_solar_power": ["sensor.{device_name}_pv_power_1", "sensor.{device_name}_pv_power_2"],
         },
     },
     "SOLIS_CORE_MODBUS": {
