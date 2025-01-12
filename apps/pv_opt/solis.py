@@ -151,6 +151,7 @@ INVERTER_DEFS = {
             "id_timed_charge_discharge_button": "button.{device_name}_update_charge_discharge_times",
             "id_inverter_mode": "select.{device_name}_energy_storage_control_switch",
             "id_backup_mode_soc": "number.{device_name}_backup_mode_soc",
+            "id_solar_power": ["sensor.{device_name}_pv_power_1", "sensor.{device_name}_pv_power_2"],
         },
     },
     "SOLIS_CORE_MODBUS": {
@@ -409,7 +410,7 @@ class BaseInverterController(ABC):
             return self._host.write_and_poll_value(entity_id=entity_id, value=value, **kwargs)
         else:
             try:
-                return self._host.write_and_poll_time(entity_id=entity_id, time=value, **kwargs)
+                return self._host.write_and_poll_time(entity_id=entity_id, time=value, verbose=True, **kwargs)
             except:
                 self.log(
                     f"Unable to write value {value} to entity {entity_id}",
@@ -567,13 +568,15 @@ class SolisInverter(BaseInverterController):
 
         battery_current_limit = self.get_config("battery_current_limit_amps")
         if battery_current_limit < current:
-            self.log(f"battery_current_limit_amps of {battery_current_limit}A is less than current of {current}A required by charging plan.")
+            self.log(
+                f"battery_current_limit_amps of {battery_current_limit} is less than current of {current}A required by charging plan."
+            )
             self.log(f"Reducing inverter charge current to {battery_current_limit}A. ")
             self.log("Check value of charger_power_watts in config.yaml if this is unexpected.")
             self.log("")
 
         current = min(current, battery_current_limit)
-                
+
         changed = self._set_times(direction, **times)
         changed = changed or self._set_current(direction, current)
 
@@ -633,6 +636,11 @@ class SolisInverter(BaseInverterController):
 
     def _set_times(self, direction, **times) -> bool:
         value_changed = False
+        # Solis inverters can't cope with time slots spanning midnight so if the end is a different day
+        # crop it to 23:59
+
+        if times["end"].day != times["start"].day:
+            times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
         for limit in LIMITS:
             time = times.get(limit, None)
             if time is not None:
