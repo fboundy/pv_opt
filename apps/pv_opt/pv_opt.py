@@ -13,7 +13,7 @@ import pandas as pd
 import pvpy as pv
 from numpy import nan
 
-VERSION = "4.0.8-Beta-1"
+VERSION = "4.0.8-Solarman"
 UNITS = {
     "current": "A",
     "power": "W",
@@ -4268,10 +4268,15 @@ class PVOpt(hass.Hass):
         return df
 
     def write_and_poll_time(self, entity_id, time: str | pd.Timestamp, verbose=False):
+
+        self.log("write and poll time entered.")
+        var_type = type(time)
+        self.log(f"'time' = {time}")
+        self.log(f"type of 'time' = {var_type}")
         changed = False
         written = False
         if isinstance(time, pd.Timestamp):
-            time = time.strftime("%H:%M")
+            time = time.strftime('%X') # HH:MM:SS is needed as get_state_retry returns SS. 
             self.log("write and poll time - time detected. Trimming time to hours and minutes")
         state = self.get_state_retry(entity_id=entity_id)
         
@@ -4307,10 +4312,10 @@ class PVOpt(hass.Hass):
             except:
                 written = False
 
-            if verbose:
-                str_log = f"Entity: {entity_id:30s} Time: {time}  Old State: {state} "
-                str_log += f"New state: {new_state}"
-                self.log(str_log)
+            #if verbose:
+            #    str_log = f"Entity: {entity_id:30s} Time: {time}  Old State: {state} "
+            #    str_log += f"New state: {new_state}"
+            #    self.log(str_log)
 
         return (changed, written)
 
