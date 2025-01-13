@@ -644,8 +644,17 @@ class SolisInverter(BaseInverterController):
         # Solis inverters can't cope with time slots spanning midnight so if the end is a different day
         # crop it to 23:59
 
-        if times["end"].day != times["start"].day:
-            times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
+        if times["end"] is not None:
+            if times["start"] is None:
+                start_day = pd.Timestamp.now().day
+            else:
+                start_day = times["start"].day
+
+            #if times["end"].day != times["start"].day:
+            if start_day != times["end"].day:
+                times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
+
+
         for limit in LIMITS:
             time = times.get(limit, None)
             if time is not None:
@@ -706,6 +715,24 @@ class SolisSolarmanV2Inverter(SolisInverter):
         super().__init__(inverter_type, host)
         self._requires_button_press = False
 
+    def _set_current(self, direction, current: float = 0) -> bool:
+        entity_id = self._host.config.get(f"id_timed_{direction}_current", None)
+
+        current=round(current, 1)
+
+        if entity_id is not None:
+            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=0.1, verbose=True)
+
+        if changed:
+            if written:
+                self.log(f"Current {current}A written to inverter")
+            else:
+                self.log(f"Failed to write {current} to inverter")
+        else:
+            self.log("Inverter already at correct current")
+
+        return not (changed and not written)
+
 
 class SolisSolaxModbusInverter(SolisInverter):
     def __init__(self, inverter_type: str, host):
@@ -735,8 +762,16 @@ class SolisSolaxModbusInverter(SolisInverter):
         
         # Solis inverters can't cope with time slots spanning midnight so if the end is a different day
         # crop it to 23:59
-        if times["end"].day != times["start"].day:
-            times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
+
+        if times["end"] is not None:
+            if times["start"] is None:
+                start_day = pd.Timestamp.now().day
+            else:
+                start_day = times["start"].day
+
+            #if times["end"].day != times["start"].day:
+            if start_day != times["end"].day:
+                times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
 
         for limit in LIMITS:
             time = times.get(limit, None)
