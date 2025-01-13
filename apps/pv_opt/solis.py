@@ -406,11 +406,16 @@ class BaseInverterController(ABC):
         except:
             pass
 
+        
         if isinstance(value, int) or isinstance(value, float):
             return self._host.write_and_poll_value(entity_id=entity_id, value=value, **kwargs)
         else:
+            #self.log("write_to_hass - time detected")
+            #var_type = type(value)
+            #self.log(f"value = {value}")
+            #self.log(f"type of value = {var_type}")
             try:
-                return self._host.write_and_poll_time(entity_id=entity_id, time=value, verbose=True, **kwargs)
+                return self._host.write_and_poll_time(entity_id=entity_id, time=value, verbose=True)
             except:
                 self.log(
                     f"Unable to write value {value} to entity {entity_id}",
@@ -636,13 +641,18 @@ class SolisInverter(BaseInverterController):
 
     def _set_times(self, direction, **times) -> bool:
         value_changed = False
+        # Solis inverters can't cope with time slots spanning midnight so if the end is a different day
+        # crop it to 23:59
+
+        if times["end"].day != times["start"].day:
+            times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
         for limit in LIMITS:
             time = times.get(limit, None)
             if time is not None:
                 entity_id = self._host.config.get(f"id_timed_{direction}_{limit}", None)
                 if entity_id is not None:
                     changed, written = self.write_to_hass(entity_id=entity_id, value=time, verbose=True)
-                    value_changed = value_changed or written
+                    value_changed = value_changed or written   
 
         return value_changed
 
@@ -722,6 +732,12 @@ class SolisSolaxModbusInverter(SolisInverter):
     def _set_times(self, direction, **times) -> bool:
         # Required if the times are set as separate_hours and units
         value_changed = False
+        
+        # Solis inverters can't cope with time slots spanning midnight so if the end is a different day
+        # crop it to 23:59
+        if times["end"].day != times["start"].day:
+            times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
+
         for limit in LIMITS:
             time = times.get(limit, None)
             if time is not None:
