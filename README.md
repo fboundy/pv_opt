@@ -579,7 +579,7 @@ The candidate plan is automatically made the active plan on car plugin, but is n
 
 If required, the candidate plan can also be transferred to the active plan via mamual Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become available or parameters above are adjusted after car plugin, which then means the active plan needs an update. 
 
-In the example dashboard, the candidate charging plan is displayed as a list of 1/2 hour charging slots and a series of charging windows. The 1/2 hour slot display contains more detailed information. A 1/2 slot version of the active plan is future work. 
+In the example dashboard, the candidate charging plan and active charging plan are both displayed as a list of 1/2 hour charging slots. The active plan is also displayed as a series of charging windows. Display of the candiate plan as charging windows is future work. 
 
 The main PV_opt dashboard will display the house battery charge plan with any necessary car charging information interlaced. If your car is scheduled to charge but the house battery isnt then a hold slot with power 1W and "<=Car" is scheduled to prevent house battery discharge when the car is charging:
 
