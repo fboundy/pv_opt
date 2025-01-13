@@ -13,7 +13,9 @@ import pandas as pd
 import pvpy as pv
 from numpy import nan
 
-VERSION = "4.0.8-Solarman"
+
+VERSION = "4.0.8-Beta-2"
+
 UNITS = {
     "current": "A",
     "power": "W",
@@ -2523,7 +2525,17 @@ class PVOpt(hass.Hass):
         y = self.opt.loc[:, ["import", "forced"]].copy()
 
         y["start"] = self.opt.index.tz_convert(self.tz).copy()
-        y["end"] = self.opt.index.tz_convert(self.tz).copy() + pd.Timedelta(30, "minutes")
+
+        # y["end"] = self.opt.index.tz_convert(self.tz).copy() + pd.Timedelta(30, "minutes")
+
+        # end times are start times from one row down (deals with partial first slots)
+        y["end"] = y["start"]
+        y["end"] = y["end"].shift(-1) 
+
+        # Set last end time to be 30 mins greater than last start time. 
+    
+        (y.at[y.index[-1],"end"]) = (y.at[y.index[-1],"start"]) + pd.Timedelta (30, "minutes")
+
 
         # self.log("")
         # self.log("Y is........")
@@ -2557,13 +2569,13 @@ class PVOpt(hass.Hass):
 
         if self.debug and "E" in self.debug_cat:
             self.log("Self.candidate_car_slots is")
-            self.log(self.candidate_car_slots.to_string())
+            self.log(f"\n{self.candidate_car_slots.to_string()}")
 
             self.log("self.car_slots is")
-            self.log(self.car_slots.to_string())
+            self.log(f"\n{self.car_slots.to_string()}")
 
             self.log("y is")
-            self.log(y.to_string())
+            self.log(f"\n{y.to_string()}")
 
         # For each time range in the IOG Charging Schedule/Agile Car Charge Plan, set 1/2 hour Car slot flag to "1"
         # Problem: If the car is plugged in and starts to charge, car slot flag is not being set.

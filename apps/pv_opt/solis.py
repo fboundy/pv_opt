@@ -641,6 +641,11 @@ class SolisInverter(BaseInverterController):
 
     def _set_times(self, direction, **times) -> bool:
         value_changed = False
+        # Solis inverters can't cope with time slots spanning midnight so if the end is a different day
+        # crop it to 23:59
+
+        if times["end"].day != times["start"].day:
+            times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
         for limit in LIMITS:
             time = times.get(limit, None)
             if time is not None:
@@ -727,6 +732,12 @@ class SolisSolaxModbusInverter(SolisInverter):
     def _set_times(self, direction, **times) -> bool:
         # Required if the times are set as separate_hours and units
         value_changed = False
+        
+        # Solis inverters can't cope with time slots spanning midnight so if the end is a different day
+        # crop it to 23:59
+        if times["end"].day != times["start"].day:
+            times["end"] = times["end"].floor("1D") - pd.Timedelta("1min")
+
         for limit in LIMITS:
             time = times.get(limit, None)
             if time is not None:
