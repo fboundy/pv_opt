@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v4.0.4
+# PV Opt: Home Assistant Solar/Battery Optimiser v4.0.7
 
 
 Solar / Battery Charging Optimisation for Home Assistant. This appDaemon application attempts to optimise charging and discharging of a home solar/battery system to minimise cost electricity cost on a daily basis using freely available solar forecast data from SolCast. This is particularly beneficial for Octopus Agile but is also benefeficial for other time-of-use tariffs such as Octopus Flux or simple Economy 7.
@@ -554,6 +554,7 @@ The dashboards also depend on the following Frontend components from HACS:
 For Agile tariff users, Pv_opt also contains functionality to generate a charge plan for your EV. This is fully integrated with the Pv_opt core functionality of optimising house battery use, such that EV charge plans will not discharge your house battery. 
 
 An example Dashbaord for control and output for this is provided at XXXXXX. 
+If you are an existing user, it is also recommended you download config.yaml from here and repopulate with your system configuration. 
 
 To enable the functionality, do the following, either in the dashboard directly or in config.yaml:
 
@@ -569,13 +570,15 @@ The candidate car charge plan calculated is based on the following settings:
  - Car Ready by time (select.pvopt_car_charging_ready_by)
  - Maximum slot price . If the slot price is above this limit then the car will not charge during this slot  (number.pvopt_max_ev_price_p). 
 
-The candidate plan is automatically made active upon car plugin, but is not changed again. This is to ensure that if the charge to add value is calculated by an external automation based on the cars SOC, the charging plan stays the same once charging begins and the cars SOC increments.
+The candidate plan is automatically made the active plan on car plugin. It is not changed again. This is to ensure that if the charge to add value is calculated by an external automation based on the cars SOC, the charging plan stays the same once charging begins and the cars SOC increments.
 
-If required, the candidate plan can also be made active via mamual Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become avaialble, or parameters above are adjusted after car plugin, where it is necessary to update the active plan after car plugin. 
+If required, the candidate plan can also be transferred to the active plan via mamual Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become avaialble or parameters above are adjusted after car plugin that then needs the active plan upating after car plugin. 
 
 In the example dashboard, both the candidate charging plan and the active charging plan are displayed as a list of 1/2 hour charging slots and a series of charging windows; which one you select is a matter of personal preference. 
 
-The active car charging plan is then output live on binary_sensor.pvopt_car_charging_slot for use in HA automations to switch the EV charger on and off. An example automation for a Zappi charger is available here: https://github.com/fboundy/pv_opt/blob/steveb-patch/files/zappi_automation.yaml
+The active car charging plan result is then output at the right time  on binary_sensor.pvopt_car_charging_slot for use in HA automations to switch the EV charger on and off. 
+An example automation for a Zappi charger is available here: https://github.com/fboundy/pv_opt/blob/steveb-patch/files/zappi_automation.yaml
+
 
 
 
