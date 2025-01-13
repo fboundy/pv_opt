@@ -579,12 +579,20 @@ The candidate plan is automatically made the active plan on car plugin, but is n
 
 If required, the candidate plan can also be transferred to the active plan via mamual Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become available or parameters above are adjusted after car plugin, which then means the active plan needs an update. 
 
-In the example dashboard, both the candidate charging plan and the active charging plan are displayed as a list of 1/2 hour charging slots and a series of charging windows; which one you select is a matter of personal preference. 
+In the example dashboard, the candidate charging plan is displayed as a list of 1/2 hour charging slots and a series of charging windows. The 1/2 hour slot display contains more detailed information. A 1/2 slot version of the active plan is future work. 
+
+The main PV_opt dashboard will display the house battery charge plan with any necessary car charging information interlaced. If your car is scheduled to charge but the house battery isnt then a hold slot with power 1W and "<=Car" is scheduled to prevent house battery discharge when the car is charging:
+
+![image](https://github.com/user-attachments/assets/caec438f-aeb5-452d-b8a4-5e20369280da)
+
+
+
 
 The active car charging plan result is then output at the right time  on binary_sensor.pvopt_car_charging_slot for use in HA automations to switch the EV charger on and off. 
+
 An example automation for a Zappi charger is available here: https://github.com/fboundy/pv_opt/blob/steveb-patch/files/zappi_automation.yaml
 
-
+Notes: at the current release, the Agile EV charger only schedules charging for a complete half hour slot. The ability to schedule partial slots to allow a more accurate car SOC to be obtained is future work. 
 
 
 <h2> Known Issues</h2>
