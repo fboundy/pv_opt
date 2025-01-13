@@ -13,7 +13,9 @@ import pandas as pd
 import pvpy as pv
 from numpy import nan
 
-VERSION = "4.0.8-Beta-1"
+
+VERSION = "4.0.8-Beta-2"
+
 UNITS = {
     "current": "A",
     "power": "W",
@@ -4278,31 +4280,51 @@ class PVOpt(hass.Hass):
         return df
 
     def write_and_poll_time(self, entity_id, time: str | pd.Timestamp, verbose=False):
+
+        self.log("write and poll time entered.")
+        #var_type = type(time)
+        #self.log(f"'time' = {time}")
+        #self.log(f"type of 'time' = {var_type}")
         changed = False
         written = False
         if isinstance(time, pd.Timestamp):
-            time = time.strftime("%H:%M")
+            time = time.strftime('%X') # HH:MM:SS is needed as get_state_retry returns SS. 
+            #self.log("write and poll time - time detected. Trimming time to hours and minutes")
         state = self.get_state_retry(entity_id=entity_id)
+        
+        #self.log(f"Write_and_poll_time: time = {time}, old_time = {state}")
+
         if state != time:
             changed = True
+            #self.log(f"Write_and_poll_time: Changed = true")
+
+
             try:
                 self.call_service("time/set_value", entity_id=entity_id, time=time)
 
                 written = False
                 retries = 0
                 while not written and retries < WRITE_POLL_RETRIES:
+
+                    # SVB debugging 
+                    #self.log("Write_and_poll_time: Entered while loop")
+
                     retries += 1
                     time.sleep(WRITE_POLL_SLEEP)
                     new_state = self.get_state_retry(entity_id=entity_id)
                     written = new_state == time
+ 
+                    # SVB debugging
+                    #self.log(f"Write_and_poll_time:  while loop, new_time = {new_state}")
 
             except:
                 written = False
 
-            if verbose:
-                str_log = f"Entity: {entity_id:30s} Time: {time}  Old State: {state} "
-                str_log += f"New state: {new_state}"
-                self.log(str_log)
+            # commented out, as causes an error (new state not defined) if routine above fails, negating the use of "try/except"
+            #if verbose:
+            #    str_log = f"Entity: {entity_id:30s} Time: {time}  Old State: {state} "
+            #    str_log += f"New state: {new_state}"
+            #    self.log(str_log)
 
         return (changed, written)
 
@@ -4345,50 +4367,6 @@ class PVOpt(hass.Hass):
 
         return (changed, written)
 
-    def write_and_poll_time(self, entity_id, value):
-        changed = False
-        written = False
-
-        # Set consistent date for all comparisons
-        value = value.replace(year=2024, month=1, day=1)
-
-        old_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
-        new_time = None
-
-        # self.log(f"Write_and_poll_time: time = {value}, old_time = {old_time}")
-
-        # Convert time to string of HH:MM:SS for call_service routine
-        value_str = value.strftime("%X")
-
-        if old_time != value:
-            changed = True
-            # self.log(f"Write_and_poll_time: Changed = true")
-
-            try:
-                # self.call_service("number/set_value", entity_id=entity_id, value=value)
-                self.call_service("time/set_value", entity_id=entity_id, time=value_str)
-
-                written = False
-                retries = 0
-                while not written and retries < WRITE_POLL_RETRIES:
-                    # self.log("Write_and_poll_time: Entered while loop")
-                    retries += 1
-                    time.sleep(WRITE_POLL_TIME_SLEEP)
-
-                    new_time = pd.to_datetime("2024/01/01 " + self.get_state_retry(entity_id=entity_id))
-
-                    # self.log(f"Write_and_poll_time:  while loop, new_time = {new_time}")
-
-                    written = new_time == value
-
-            except:
-                written = False
-                # self.log("Write_and_poll_time: Exception logged")
-
-            str_log = f"Entity: {entity_id} Time: {value}  Value_str: {value_str}  Old Time: {old_time} New time: {(new_time)} "
-            self.log(str_log)
-
-        return (changed, written)
 
     def set_select(self, item, state):
         if state is not None:
