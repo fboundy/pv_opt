@@ -554,10 +554,11 @@ The dashboards also depend on the following Frontend components from HACS:
 For Agile tariff users, Pv_opt also contains functionality to generate a charge plan for your EV. This is fully integrated with the Pv_opt core functionality of optimising house battery use, such that EV charge plans will not discharge your house battery. 
 
 An example Dashbaord for control and output for this is provided at https://github.com/fboundy/pv_opt/blob/steveb-patch/dashboards/ev_agile_control.yaml. 
-If you are an existing user, it is also recommended you download config.yaml from https://github.com/fboundy/pv_opt/blob/steveb-patch/apps/pv_opt/config/config.yaml and repopulate with your system configuration. 
+
 
 ![image](https://github.com/user-attachments/assets/cee304ec-b9e3-4c50-9c75-7ebe8b8d1c43)
 
+If you are an existing user, it is also recommended you download config.yaml from https://github.com/fboundy/pv_opt/blob/steveb-patch/apps/pv_opt/config/config.yaml and repopulate with your system configuration. 
 
 To enable the functionality, do the following, either in the dashboard directly or in config.yaml:
 
