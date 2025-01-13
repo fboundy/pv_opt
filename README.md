@@ -553,8 +553,11 @@ The dashboards also depend on the following Frontend components from HACS:
 
 For Agile tariff users, Pv_opt also contains functionality to generate a charge plan for your EV. This is fully integrated with the Pv_opt core functionality of optimising house battery use, such that EV charge plans will not discharge your house battery. 
 
-An example Dashbaord for control and output for this is provided at XXXXXX. 
-If you are an existing user, it is also recommended you download config.yaml from here and repopulate with your system configuration. 
+An example Dashbaord for control and output for this is provided at https://github.com/fboundy/pv_opt/blob/steveb-patch/dashboards/ev_agile_control.yaml. 
+If you are an existing user, it is also recommended you download config.yaml from https://github.com/fboundy/pv_opt/blob/steveb-patch/apps/pv_opt/config/config.yaml and repopulate with your system configuration. 
+
+![image](https://github.com/user-attachments/assets/cee304ec-b9e3-4c50-9c75-7ebe8b8d1c43)
+
 
 To enable the functionality, do the following, either in the dashboard directly or in config.yaml:
 
@@ -562,17 +565,18 @@ To enable the functionality, do the following, either in the dashboard directly 
 2) Set Charger to Zappi (select.pvopt_ev_charger, or ev_charger in config.yaml)
 3) Set the car battery capacity (number.pvopt_ev_battery_capacity_kwh, or ev_battery_capacity_kwh in config.yaml))
 4) Adjust the EV chargerpower (if required)   (number.pvopt_ev_charger_power_watts, or ev_charger_power_watts in config.yaml))
+5) Set the Maximum Slot Price to zero. 
 
 Pv_opt will then generate a candidate car charging plan on each optimiser run.
 
 The candidate car charge plan calculated is based on the following settings:
  - Charge to add , i.e if your EV is at 40% and you want to get charge it to 90% then set to 50%  (number.pvopt_ev_charge_target_percent)
  - Car Ready by time (select.pvopt_car_charging_ready_by)
- - Maximum slot price . If the slot price is above this limit then the car will not charge during this slot  (number.pvopt_max_ev_price_p). 
+ - Maximum slot price . If the slot price is above this limit then the car will not charge during this slot  (number.pvopt_max_ev_price_p). Setting to zero disables this. 
 
-The candidate plan is automatically made the active plan on car plugin. It is not changed again. This is to ensure that if the charge to add value is calculated by an external automation based on the cars SOC, the charging plan stays the same once charging begins and the cars SOC increments.
+The candidate plan is automatically made the active plan on car plugin, but is not changed again. This is to ensure that if the charge to add value is calculated by an external automation based on the cars SOC, the charging plan stays the same once charging begins and the cars SOC increments.
 
-If required, the candidate plan can also be transferred to the active plan via mamual Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become avaialble or parameters above are adjusted after car plugin that then needs the active plan upating after car plugin. 
+If required, the candidate plan can also be transferred to the active plan via mamual Dashboard command. This is useful if the car is plugged in before 4pm once Agile rates become available or parameters above are adjusted after car plugin, which then means the active plan needs an update. 
 
 In the example dashboard, both the candidate charging plan and the active charging plan are displayed as a list of 1/2 hour charging slots and a series of charging windows; which one you select is a matter of personal preference. 
 
