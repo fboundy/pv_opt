@@ -64,14 +64,14 @@ jobs:
             RELEASE_NOTES+="No significant changes."
           else
             echo "Found commits:"
-            echo -e "${COMMITS}"
-            RELEASE_NOTES+=$(echo -e "${COMMITS}")
+            echo "${COMMITS}"
+            RELEASE_NOTES+="${COMMITS}"
           fi
 
           # Output the release notes
-          echo -e "Release notes generated:\n${RELEASE_NOTES}"
+          echo "Release notes generated:"\n"${RELEASE_NOTES}"
           echo "release_notes<<EOF" >> $GITHUB_ENV
-          echo -e "${RELEASE_NOTES}" >> $GITHUB_ENV
+          echo "${RELEASE_NOTES}" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       # Step 5: Create GitHub Release
