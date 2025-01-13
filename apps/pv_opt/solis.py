@@ -410,10 +410,10 @@ class BaseInverterController(ABC):
         if isinstance(value, int) or isinstance(value, float):
             return self._host.write_and_poll_value(entity_id=entity_id, value=value, **kwargs)
         else:
-            self.log("write_to_hass - time detected")
-            var_type = type(value)
-            self.log(f"value = {value}")
-            self.log(f"type of value = {var_type}")
+            #self.log("write_to_hass - time detected")
+            #var_type = type(value)
+            #self.log(f"value = {value}")
+            #self.log(f"type of value = {var_type}")
             try:
                 return self._host.write_and_poll_time(entity_id=entity_id, time=value, verbose=True)
             except:
