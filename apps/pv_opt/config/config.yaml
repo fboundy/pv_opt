@@ -172,7 +172,7 @@ pv_opt:
   # ========================================
   #
   # If you have a Zappi Charger, uncomment next line to allow Pv_opt to detect car plugin status
-  # for use with the Octopus Intelligent Tariff and to allow EV consumption data to be read (if needed).
+  # for use with the Octopus Intelligent / Agile tariff and to allow EV consumption data to be read (if needed).
   #
   # ev_charger: Zappi   # Default = None
   #
@@ -185,10 +185,34 @@ pv_opt:
   #
   # By default, Zappi is set to seen as part of the house load to prevent house battery discharge during car charging and allow discounting of EV consumption
   # from house charging calculations.
-  #
   # If your Zappi is not seen as part of the house load, uncomment next line to set to False.
   #
   # ev_part_of_house_load = False     # Default = True
+  #
+  #
+  # EV charge plan input values for Agile and IOG. On IOG, these parameters are passed to the Octopus API and will be
+  # mirrored in the Octopus App after Pv_opt start. 
+  #
+  # car_charging_ready_by: 06:30 # Default 06:30
+  # ev_charge_target_percent: 30  # Default 30%
+  #
+  #
+  # If on Agile, Pv_opt can generate a car charging plan using the cheapest slots to charge to a target SOC. 
+  # To enable this, uncomment the next line. (IOG users should leave this line commented out). 
+  #
+  # control_car_charging: On   # Default = Off
+  #
+  # 
+  # EV/Charger Parameters for EV charging on Agile. Uncomment to overide the defaults if needed for your car/EV charger. 
+  # These parameters are not needed for IOG, as they are already defined by Octopus. 
+  #
+  # ev_battery_capacity_kwh: 60 # Default 60kWh
+  # ev_charger_efficiency_percent : 92  # Default 92%
+  # ev_charger_power_watts: 7000 # Default 7000W (7kW)
+  #
+  # Max slot price for Agile charging. Note, setting a low value may mean the car does not achieve its target SOC. 
+  # To disable, uncomment and set to 0. 
+  # max_ev_price_p: 30 # Default = 30p
   #
   # ===============================================================================================================
   # Brand / Integration Specific Config: SOLIS_SOLAX_MODBUS: https://github.com/wills106/homeassistant-solax-modbus
