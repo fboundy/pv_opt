@@ -4270,25 +4270,21 @@ class PVOpt(hass.Hass):
     def write_and_poll_time(self, entity_id, time: str | pd.Timestamp, verbose=False):
 
         self.log("write and poll time entered.")
-        var_type = type(time)
-        self.log(f"'time' = {time}")
-        self.log(f"type of 'time' = {var_type}")
+        #var_type = type(time)
+        #self.log(f"'time' = {time}")
+        #self.log(f"type of 'time' = {var_type}")
         changed = False
         written = False
         if isinstance(time, pd.Timestamp):
             time = time.strftime('%X') # HH:MM:SS is needed as get_state_retry returns SS. 
-            self.log("write and poll time - time detected. Trimming time to hours and minutes")
+            #self.log("write and poll time - time detected. Trimming time to hours and minutes")
         state = self.get_state_retry(entity_id=entity_id)
         
-        # SVB debugging
-        self.log(f"Write_and_poll_time: time = {time}, old_time = {state}")
-
+        #self.log(f"Write_and_poll_time: time = {time}, old_time = {state}")
 
         if state != time:
             changed = True
-            
-            # SVB debugging
-            self.log(f"Write_and_poll_time: Changed = true")
+            #self.log(f"Write_and_poll_time: Changed = true")
 
 
             try:
@@ -4299,7 +4295,7 @@ class PVOpt(hass.Hass):
                 while not written and retries < WRITE_POLL_RETRIES:
 
                     # SVB debugging 
-                    self.log("Write_and_poll_time: Entered while loop")
+                    #self.log("Write_and_poll_time: Entered while loop")
 
                     retries += 1
                     time.sleep(WRITE_POLL_SLEEP)
@@ -4307,11 +4303,12 @@ class PVOpt(hass.Hass):
                     written = new_state == time
  
                     # SVB debugging
-                    self.log(f"Write_and_poll_time:  while loop, new_time = {new_state}")
+                    #self.log(f"Write_and_poll_time:  while loop, new_time = {new_state}")
 
             except:
                 written = False
 
+            # commented out, as causes an error (new state not defined) if routine above fails, negating the use of "try/except"
             #if verbose:
             #    str_log = f"Entity: {entity_id:30s} Time: {time}  Old State: {state} "
             #    str_log += f"New state: {new_state}"

@@ -583,7 +583,7 @@ class SolisInverter(BaseInverterController):
         current = min(current, battery_current_limit)
 
         changed = self._set_times(direction, **times)
-        # changed = changed or self._set_current(direction, current)
+        changed = changed or self._set_current(direction, current)
 
         if changed and self._requires_button_press:
             self.log("Something changed - need to press the appropriate Button")
