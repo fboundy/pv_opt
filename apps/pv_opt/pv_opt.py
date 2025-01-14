@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.8-Beta-4"
+VERSION = "4.0.8-Beta-5"
 
 UNITS = {
     "current": "A",
@@ -551,6 +551,7 @@ class PVOpt(hass.Hass):
         self.io = False
         self.agile = False
         self.ev = False
+        self.zappi_plug_entity = ""
         self.debug = DEBUG
         self.debug_cat = DEBUG_CATEGORIES
         self.redact_regex = REDACT_REGEX
