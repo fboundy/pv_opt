@@ -4287,7 +4287,7 @@ class PVOpt(hass.Hass):
 
     def write_and_poll_time(self, entity_id, time: str | pd.Timestamp, verbose=False):
 
-        self.log("write and poll time entered.")
+        #self.log("write and poll time entered.")
         #var_type = type(time)
         #self.log(f"'time' = {time}")
         #self.log(f"type of 'time' = {var_type}")
