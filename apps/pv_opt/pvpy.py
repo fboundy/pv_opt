@@ -894,6 +894,7 @@ class PVsystemModel:
         return self.flows
 
     def _search_window(self, df: pd.DataFrame, available: pd.Series, max_slot):
+        # Need to check why this .iloc[:-1] is here....
         x = df.loc[: max_slot - pd.Timedelta("30min")].copy().iloc[:-1]
         if len(x) > 0:
             x = x[available.loc[: max_slot - pd.Timedelta("30min")]]
@@ -959,6 +960,7 @@ class PVsystemModel:
 
                             window = search_window[search_window["import"] == min_price].index
                             start_window = window[0]
+                            end_window = window[-1]
 
                             cost_at_min_price = round_trip_energy_required * min_price
 
@@ -1018,7 +1020,7 @@ class PVsystemModel:
 
                                 slot_count.append(len(factors))
 
-                                str_log += f"New SOC: {self.flows.loc[start_window]['soc']:5.1f}%->{self.flows.loc[start_window]['soc_end']:5.1f}% "
+                                str_log += f"New SOC: {self.flows.loc[start_window]['soc']:5.1f}%->{self.flows.loc[end_window]['soc_end']:5.1f}% "
                                 best_cost = self.net_costs[-1]
                                 str_log += f"Net: {best_cost:6.1f}"
 
