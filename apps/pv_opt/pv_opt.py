@@ -40,7 +40,7 @@ DEBUG = False
 # F = Power Flows Logging
 # V = Power Flows debugging (verbose)
 # I = inverter control/commands Logging
-# E = EV debugging
+# E = EV Logging
 
 # Default is all, include desired string in Config.yaml to enable filtering
 
@@ -3110,15 +3110,23 @@ class PVOpt(hass.Hass):
         # If there is either a charge/discharge plan or a car charging plan, create windows.
         if ((self.opt["forced"] != 0).sum() > 0) or ((self.opt["carslot"] != 0).sum() > 0):
             x = self.opt[self.opt["forced"] > 0].copy()
+
+            if self.debug and "X" in self.debug_cat:
+                self.log("")
+                self.log("Printing X just after copy....")
+                self.log(f"\n{x.to_string()}")
+
             x["start"] = x.index.tz_convert(self.tz)
-            x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+
+            # End time is 30 minutes after the start time, unless partway through a slot
+            #x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+            x["end"] = x.index.tz_convert(self.tz) + pd.to_timedelta((x["dt_hours"] * 60), unit = "m").round("min")
             x["soc"] = x["soc"].round(0).astype(int)
             x["soc_end"] = x["soc_end"].round(0).astype(int)
 
             if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing X for charge slots.....")
-                # self.log(x.to_string())
                 self.log(f"\n{x.to_string()}")
 
             # Create the charge window by taking the first and the last entry for each period.
@@ -3249,8 +3257,6 @@ class PVOpt(hass.Hass):
                     self.log("Printing Combined Window after Hold SOC check.....")
                     self.log(f"\n{self.windows.to_string()}")
 
-            ### Need to add Agile tariff into this, but only if car charging is enabled (EV Charger = Zappi?)
-            #   DONE needs verifying
 
             # if self.intelligent or (self.agile and self.ev) :  # gate removed******
             if self.debug and "W" in self.debug_cat:
@@ -4206,6 +4212,10 @@ class PVOpt(hass.Hass):
                     state=round(df["delta"].abs().mean(), 2) == 0,
                 )
                 if round(df["delta"].abs().mean(), 2) > 0:
+
+                    ### SVB work to do
+                    # If on IOG and error is on import, extra slots trigger this - generate a different message and do not set status......
+
                     str_log += " <<< ERROR"
                     self.status("ERROR: Tariff inconsistency")
                     err = True
