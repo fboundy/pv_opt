@@ -4153,8 +4153,12 @@ class PVOpt(hass.Hass):
     def _check_tariffs_vs_bottlecap(self):
 
         self.ulog("Checking tariff prices vs Octopus Energy Integration:")
+
+
         for direction in self.contract.tariffs:
             err = False
+            print_detail = False
+
             if self.bottlecap_entities[direction] is None:
                 str_log = "No OE Integration entity found."
 
@@ -4194,9 +4198,8 @@ class PVOpt(hass.Hass):
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
 
-                # SVB logging
-                # self.log("Printing contract comparison df")
-                # self.log(df.to_string())
+                # self.log("Detailed check tariffs details = ")
+                # self.log(f"\n{df.to_string()}")
 
                 # Drop any Savings Sessions
 
@@ -4211,16 +4214,25 @@ class PVOpt(hass.Hass):
                     entity_id=f"sensor.{self.prefix}_tariff_{direction}_OK",
                     state=round(df["delta"].abs().mean(), 2) == 0,
                 )
+
                 if round(df["delta"].abs().mean(), 2) > 0:
 
-                    ### SVB work to do
-                    # If on IOG and error is on import, extra slots trigger this - generate a different message and do not set status......
+                    if direction == "import" and self.intelligent:
+                        str_log += " <<< Potential error detected. Check compare pricing array below."
+                        str_log += " <<< "
+                        print_detail = True                                
 
-                    str_log += " <<< ERROR"
-                    self.status("ERROR: Tariff inconsistency")
-                    err = True
+                    else:
+                        str_log += " <<< ERROR"
+                        self.status("ERROR: Tariff inconsistency")
+                        err = True
 
             self.log(f"  {direction.title()}: {str_log}")
+
+        if (self.debug and "T" in self.debug_cat) or print_detail:
+            self.log("")
+            self.log("Compare pricing array is = ")
+            self.log(f"\n{df.to_string()}")        
 
     def ulog(self, strlog, underline="-", words=False):
         self.log("")
