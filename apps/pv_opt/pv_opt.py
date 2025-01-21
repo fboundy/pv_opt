@@ -4217,9 +4217,10 @@ class PVOpt(hass.Hass):
 
                 if round(df["delta"].abs().mean(), 2) > 0:
 
-                    if direction == "import" and self.intelligent:
+                    if direction == "import":
                         str_log += " <<< Potential error detected. Check compare pricing array below."
                         str_log += " <<< "
+                        self.status("ERROR: Tariff inconsistency")
                         print_detail = True                                
 
                     else:
