@@ -2531,12 +2531,11 @@ class PVOpt(hass.Hass):
 
         # end times are start times from one row down (deals with partial first slots)
         y["end"] = y["start"]
-        y["end"] = y["end"].shift(-1) 
+        y["end"] = y["end"].shift(-1)
 
-        # Set last end time to be 30 mins greater than last start time. 
-    
-        (y.at[y.index[-1],"end"]) = (y.at[y.index[-1],"start"]) + pd.Timedelta (30, "minutes")
+        # Set last end time to be 30 mins greater than last start time.
 
+        (y.at[y.index[-1], "end"]) = (y.at[y.index[-1], "start"]) + pd.Timedelta(30, "minutes")
 
         # self.log("")
         # self.log("Y is........")
@@ -4310,23 +4309,22 @@ class PVOpt(hass.Hass):
 
     def write_and_poll_time(self, entity_id, time: str | pd.Timestamp, verbose=False):
 
-        #self.log("write and poll time entered.")
-        #var_type = type(time)
-        #self.log(f"'time' = {time}")
-        #self.log(f"type of 'time' = {var_type}")
+        # self.log("write and poll time entered.")
+        # var_type = type(time)
+        # self.log(f"'time' = {time}")
+        # self.log(f"type of 'time' = {var_type}")
         changed = False
         written = False
         if isinstance(time, pd.Timestamp):
-            time = time.strftime('%X') # HH:MM:SS is needed as get_state_retry returns SS. 
-            #self.log("write and poll time - time detected. Trimming time to hours and minutes")
+            time = time.strftime("%X")  # HH:MM:SS is needed as get_state_retry returns SS.
+            # self.log("write and poll time - time detected. Trimming time to hours and minutes")
         state = self.get_state_retry(entity_id=entity_id)
-        
-        #self.log(f"Write_and_poll_time: time = {time}, old_time = {state}")
+
+        # self.log(f"Write_and_poll_time: time = {time}, old_time = {state}")
 
         if state != time:
             changed = True
-            #self.log(f"Write_and_poll_time: Changed = true")
-
+            # self.log(f"Write_and_poll_time: Changed = true")
 
             try:
                 self.call_service("time/set_value", entity_id=entity_id, time=time)
@@ -4335,22 +4333,22 @@ class PVOpt(hass.Hass):
                 retries = 0
                 while not written and retries < WRITE_POLL_RETRIES:
 
-                    # SVB debugging 
-                    #self.log("Write_and_poll_time: Entered while loop")
+                    # SVB debugging
+                    # self.log("Write_and_poll_time: Entered while loop")
 
                     retries += 1
                     time.sleep(WRITE_POLL_SLEEP)
                     new_state = self.get_state_retry(entity_id=entity_id)
                     written = new_state == time
- 
+
                     # SVB debugging
-                    #self.log(f"Write_and_poll_time:  while loop, new_time = {new_state}")
+                    # self.log(f"Write_and_poll_time:  while loop, new_time = {new_state}")
 
             except:
                 written = False
 
             # commented out, as causes an error (new state not defined) if routine above fails, negating the use of "try/except"
-            #if verbose:
+            # if verbose:
             #    str_log = f"Entity: {entity_id:30s} Time: {time}  Old State: {state} "
             #    str_log += f"New state: {new_state}"
             #    self.log(str_log)
@@ -4395,7 +4393,6 @@ class PVOpt(hass.Hass):
             self.log(str_log)
 
         return (changed, written)
-
 
     def set_select(self, item, state):
         if state is not None:
