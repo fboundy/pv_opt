@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.8-Beta-5"
+VERSION = "4.0.9-Beta-1"
 
 UNITS = {
     "current": "A",
@@ -4153,11 +4153,11 @@ class PVOpt(hass.Hass):
     def _check_tariffs_vs_bottlecap(self):
 
         self.ulog("Checking tariff prices vs Octopus Energy Integration:")
-
+        print_detail = False
 
         for direction in self.contract.tariffs:
             err = False
-            print_detail = False
+
 
             if self.bottlecap_entities[direction] is None:
                 str_log = "No OE Integration entity found."
