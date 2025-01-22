@@ -381,7 +381,7 @@ class Tariff:
                 if event_start <= end or event_end > start and event_value > 0:
                     event_start = max(event_start, start)
                     event_end = min(event_end - pd.Timedelta(30, "minutes"), end)
-                    df["unit"].loc[event_start:event_end] += event_value
+                    df.loc[event_start:event_end, "unit"] += event_value
 
         return df
 
@@ -895,7 +895,7 @@ class PVsystemModel:
 
     def _search_window(self, df: pd.DataFrame, available: pd.Series, max_slot):
         # Need to check why this .iloc[:-1] is here....
-        x = df.loc[: max_slot - pd.Timedelta("30min")].copy().iloc[:-1]
+        x = df.loc[: max_slot - pd.Timedelta("30min")].copy()
         if len(x) > 0:
             x = x[available.loc[: max_slot - pd.Timedelta("30min")]]
             x["countback"] = (x["soc_end"] >= 97).sum() - (x["soc_end"] >= 97).cumsum()
