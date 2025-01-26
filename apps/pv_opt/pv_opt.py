@@ -3093,6 +3093,7 @@ class PVOpt(hass.Hass):
 
         self.opt["period"] = (
             (self.opt["forced"].diff() > (tolerance / 2))
+            | (self.opt["forced"].diff() < (tolerance / 2))
             | ((self.opt["carslot"].diff() > 0) & (self.opt["forced"] == 0))
         ).cumsum()
 
