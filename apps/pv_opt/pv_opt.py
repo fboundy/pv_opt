@@ -2201,6 +2201,7 @@ class PVOpt(hass.Hass):
             "inverter_efficiency_percent",
             "inverter_power_watts",
             "inverter_loss_watts",
+            "charger_power_watts",
             "charger_efficiency_percent",
             "battery_capacity_wh",
             "maximum_dod_percent",
