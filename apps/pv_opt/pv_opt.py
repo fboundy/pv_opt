@@ -3092,8 +3092,7 @@ class PVOpt(hass.Hass):
         # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous car slot detected (when charge power = 0).
 
         self.opt["period"] = (
-            (self.opt["forced"].diff() > (tolerance / 2))
-            | (self.opt["forced"].diff() < (tolerance / 2))
+            (self.opt["forced"].diff().abs() > (tolerance / 2))
             | ((self.opt["carslot"].diff() > 0) & (self.opt["forced"] == 0))
         ).cumsum()
 
