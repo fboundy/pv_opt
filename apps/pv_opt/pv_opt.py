@@ -2201,6 +2201,7 @@ class PVOpt(hass.Hass):
             "inverter_efficiency_percent",
             "inverter_power_watts",
             "inverter_loss_watts",
+            "charger_power_watts",
             "charger_efficiency_percent",
             "battery_capacity_wh",
             "maximum_dod_percent",
@@ -2317,7 +2318,8 @@ class PVOpt(hass.Hass):
 
             self.io_prices = self.get_io_tariffs(self.octopus_import_entity[0])
 
-        elif self.contract_last_loaded.day != pd.Timestamp.now(tz="UTC").day:
+        elif ((pd.Timestamp.now(tz="UTC") - self.contract_last_loaded).total_seconds() / 3600) > 6:
+            # Reload every 6 hours
             self._load_contract()
 
         if self._check_tariffs():
