@@ -113,7 +113,7 @@ Follow the Github instructions here: (https://github.com/davidrapan/ha-solarman)
 
 For Solis Inverters, replace existing Solis_Hybrid.yaml with this one:
 
-https://github.com/fboundy/pv_opt/blob/patch/files/solis_hybrid.yaml
+https://github.com/fboundy/pv_opt/blob/main/files/solis_hybrid.yaml
 
 Note:  installs using https://github.com/StephanJoubert/home_assistant_solarman have writes to the inverter disabled. For full inverter control, reinstall using the Solarman repo 
 above.
@@ -416,7 +416,7 @@ These parameters will define how PV Opt estimates daily consumption:
 |:--|:--:| :-- | :--:|:--|
 | EV Charger | None / Zappi / Other | `select.pvopt_ev_charger` | None | Set EV Charger Type. At the current release, only 'Zappi' is supported, 'Other' is unused and is for a future release. Note: Zappi support requires the MyEnergi integration to be installed. |
 | EV Part of House Load | On / Off | `switch.pvopt_ev_part_of_house_load` | On | Prevents house battery discharge when EV is charging. If your EV Charger is wired so it is seen as part of the house load, then it will discharge to the EV when the EV is charging. Setting this to On prevents this, as well as ensuring that any EV consumption is removed from Consumption History. If your Zappi is wired on its own Henley block and thus outside of what the inverter CT clamp will measure, then set this to Off. Note: PV Opt does not support allowing the house battery to be used to charge the car. |
-| Car Charge Plan | kWh | `switch.control_car_charging` | Off | Toggle Car Plan generation On/Off. For users on Agile, setitng to On will generate a candidate car charging plan on each optimiser run based on the settings below. The candidate plan is made active upon car plugin, or via Dashbaord command (see "Transfer Car Charge Plan" below). The active car charging plan is output live on binary_sensor.pvopt_car_charging_slot for use in HA automations to switch the EV charger on and off. An example HA automation to control a Zappi charger is included at https://github.com/fboundy/pv_opt/blob/patch/files/zappi_automation.yaml. Intelligent Octopus Go users should set this to Off. If Off, the rest of the EV parameters below have no effect. |
+| Car Charge Plan | kWh | `switch.control_car_charging` | Off | Toggle Car Plan generation On/Off. For users on Agile, setitng to On will generate a candidate car charging plan on each optimiser run based on the settings below. The candidate plan is made active upon car plugin, or via Dashbaord command (see "Transfer Car Charge Plan" below). The active car charging plan is output live on binary_sensor.pvopt_car_charging_slot for use in HA automations to switch the EV charger on and off. An example HA automation to control a Zappi charger is included at https://github.com/fboundy/pv_opt/blob/main/files/zappi_automation.yaml. Intelligent Octopus Go users should set this to Off. If Off, the rest of the EV parameters below have no effect. |
 | Transfer Car Charge Plan | On/Off | `switch.transfer_car_charge_plan` | 30 | Make Candidate Car Charging Plan the active plan. Useful if adjusting any of the below paramaters after the car has been plugged in. This will automatically be set back to Off after the plan is transferred. This ensures any external HA automations used to auto-calculate "Car Charge to Add" based on car SOC don't corrupt the car charging plan once the car starts charging. |
 | EV Charger Power | W | `number.pvopt_ev_charger_power_watts` | 7000 | Set EV charger power. |
 | EV Batttery Capacity | kWh | `number.pvopt_ev_battery_capacity_kwh` | 60 | Set EV Battery Capacity.   |
@@ -553,12 +553,12 @@ The dashboards also depend on the following Frontend components from HACS:
 
 For Agile tariff users, Pv_opt also contains functionality to generate a charge plan for your EV. This is fully integrated with the Pv_opt core functionality of optimising house battery use, such that EV charge plans will not discharge your house battery. 
 
-An example Dashbaord for control and output for this is provided at https://github.com/fboundy/pv_opt/blob/patch/dashboards/ev_agile_control.yaml. 
+An example Dashbaord for control and output for this is provided at https://github.com/fboundy/pv_opt/blob/main/dashboards/ev_agile_control.yaml. 
 
 
 ![image](https://github.com/user-attachments/assets/cee304ec-b9e3-4c50-9c75-7ebe8b8d1c43)
 
-If you are an existing user, it is also recommended you download config.yaml from https://github.com/fboundy/pv_opt/blob/patch/apps/pv_opt/config/config.yaml and repopulate with your system configuration. 
+If you are an existing user, it is also recommended you download config.yaml from https://github.com/fboundy/pv_opt/blob/main/apps/pv_opt/config/config.yaml and repopulate with your system configuration. 
 
 To enable the functionality, do the following, either in the dashboard directly or in config.yaml:
 
@@ -590,7 +590,7 @@ The main PV_opt dashboard will display the house battery charge plan with any ne
 
 The active car charging plan result is then output at the right time  on binary_sensor.pvopt_car_charging_slot for use in HA automations to switch the EV charger on and off. 
 
-An example automation for a Zappi charger is available here: https://github.com/fboundy/pv_opt/blob/patch/files/zappi_automation.yaml
+An example automation for a Zappi charger is available here: https://github.com/fboundy/pv_opt/blob/main/files/zappi_automation.yaml
 
 Notes: at the current release, the Agile EV charger only schedules charging for a complete half hour slot. The ability to schedule partial slots to allow a more accurate car SOC to be obtained is future work. 
 
