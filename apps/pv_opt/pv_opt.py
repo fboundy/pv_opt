@@ -768,8 +768,8 @@ class PVOpt(hass.Hass):
         y = {}
 
         # Load tariffs from bottlecapdave .event sensors
+        self.log("   Downloading IOG pricing information from Octopus Energy Integration")
         self.log("")
-        self.log("    Downloading IOG pricing information from Octopus Energy Integration")
 
         x = pd.DataFrame(self.get_state_retry(entity_id1, attribute=("rates")))
         # self.log("")
@@ -844,7 +844,7 @@ class PVOpt(hass.Hass):
                         f"  {z['start'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['end'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['charge_in_kwh']:12.3f}  {z['source']:12s}"
                     )
 
-        # Get Planned dispatches from Intelligent Dispathing sensor
+        # Get Planned dispatches from Intelligent Dispatching sensor
         df = pd.DataFrame(self.get_state_retry(self.io_dispatching_sensor, attribute=("planned_dispatches")))
 
         # If Charging plan exists, convert dispatch start and end times to datetime format and append to df.
@@ -883,26 +883,26 @@ class PVOpt(hass.Hass):
                 self.tariff_reloaded == 0
             ):
                 self.car_plugin_detected = 1
-                self.log("EV plug-in event detected, IOG tariff reload scheduled for next optimiser run")
+                self.log("EV plug-in event detected, Contract reload scheduled for next optimiser run")
 
             elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
                 self.tariff_reloaded == 1
             ):
-                self.log("EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded")
+                self.log("EV is connected but Contract reload previously caried out.")
                 self.car_plugin_detected = 0
 
             elif (plug_status == "Charging") and (self.tariff_reloaded == 0):
                 self.log(
-                    "EV plug-in event detected and car has commenced charging. IOG tariff reload scheduled for next optimiser run"
+                    "EV plug-in event detected and car has commenced charging. Contract to be reloaded on next optimiser run"
                 )
                 self.car_plugin_detected = 1
 
             elif (plug_status == "Charging") and (self.tariff_reloaded == 1):
-                self.log("EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded")
+                self.log("EV is charging but Contract reload previously carried out.")
                 self.car_plugin_detected = 0
 
             else:
-                self.log("EV not plugged in. IOG tariff reload not necessary")
+                self.log("EV not plugged in. Contract reload not necessary")
                 self.car_plugin_detected = 0
 
             # If EV plugged in, check charge to add hasnt changed
@@ -910,10 +910,10 @@ class PVOpt(hass.Hass):
                 self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)
                 if (self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected"):
                     self.car_plugin_detected = 1
-                    self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
+                    self.log("Charge to add changed, Contract reload scheduled for next optimiser run")
             else:
                 self.log(
-                    "Octopus Energy Integration not detected (or disabled): Charge to add is not available, IOG tariff not reloaded"
+                    "Octopus Energy Integration not detected (or disabled): Charge to add is not available, no reload carried out"
                 )
 
     def _check_car_plugin_agile(self):
@@ -2293,20 +2293,20 @@ class PVOpt(hass.Hass):
             # self.log("Printing time.....")
             # self.log(pd.Timestamp.now(tz=self.tz).hour)
             if (pd.Timestamp.now(tz=self.tz).hour == 16) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
-                self.log("   About to reload Octopus Intelligent Pricing - 16:40")
+                self.log("   About to reload Contract - 16:40")
                 self._load_contract()
 
             if (pd.Timestamp.now(tz=self.tz).hour == 0) and (pd.Timestamp.now(tz=self.tz).minute <= 20):
-                self.log("   About to reload Octopus Intelligent Pricing - 00:20")
+                self.log("   About to reload Contract- 00:20")
                 self._load_contract()
 
             if (pd.Timestamp.now(tz=self.tz).hour == 5) and (pd.Timestamp.now(tz=self.tz).minute >= 10):
-                self.log("   About to reload Octopus Intelligent Pricing - 05:10")
+                self.log("   About to reload Contract - 05:10")
                 self._load_contract()
 
             if self.car_plugin_detected == 1:
                 self.log(
-                    "Car plugin detected or charge to add value changed. About to reload Octopus Intelligent Pricing"
+                    "Car plugin detected or charge to add value changed. About to reload Contract"
                 )
                 self._load_contract()
                 self.tariff_reloaded = 1

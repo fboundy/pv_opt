@@ -556,6 +556,9 @@ class SolisInverter(BaseInverterController):
             times["start"] = kwargs.get("start", None)
             times["end"] = kwargs.get("end", None)
             current = kwargs.get("current", abs(round(kwargs.get("power", 0) / self.voltage, 1)))
+            # SVB debugging
+            self.log(f"Current in solis.py = {current}")
+
             target_soc = kwargs.get("target_soc", None)
 
         else:
