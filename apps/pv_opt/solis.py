@@ -557,6 +557,7 @@ class SolisInverter(BaseInverterController):
             times["end"] = kwargs.get("end", None)
             current = kwargs.get("current", abs(round(kwargs.get("power", 0) / self.voltage, 1)))
             # SVB debugging
+            self.log(f"Voltage in solis.py = {self.voltage}") 
             self.log(f"Current in solis.py = {current}")
 
             target_soc = kwargs.get("target_soc", None)
@@ -669,8 +670,14 @@ class SolisInverter(BaseInverterController):
 
     def _set_current(self, direction, current: float = 0) -> bool:
         entity_id = self._host.config.get(f"id_timed_{direction}_current", None)
+   
+        power_tolerance = self._host.config.get(f"forced_power_group_tolerance", 0.1)
+        current_tolerance = power_tolerance / self.voltage
+
+        self.log(f"Current tolerance is {current_tolerance}A")
+
         if entity_id is not None:
-            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=0.1, verbose=True)
+            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=current_tolerance, verbose=True)
 
         if changed:
             if written:
@@ -722,8 +729,13 @@ class SolisSolarmanV2Inverter(SolisInverter):
 
         current = round(current, 1)
 
+        power_tolerance = self._host.config.get(f"forced_power_group_tolerance", 0.1)
+        current_tolerance = power_tolerance / self.voltage
+
+        self.log(f"Current tolerance is {current_tolerance}A")
+
         if entity_id is not None:
-            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=0.1, verbose=True)
+            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=current_tolerance, verbose=True)
 
         if changed:
             if written:
