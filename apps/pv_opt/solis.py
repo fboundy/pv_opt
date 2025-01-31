@@ -671,7 +671,8 @@ class SolisInverter(BaseInverterController):
     def _set_current(self, direction, current: float = 0) -> bool:
         entity_id = self._host.config.get(f"id_timed_{direction}_current", None)
    
-        power_tolerance = self._host.config.get(f"forced_power_group_tolerance", 0.1)
+        power_tolerance = self.get_config(f"forced_power_group_tolerance", 0.1)
+        power_tolerance = float(power_tolerance)
         current_tolerance = power_tolerance / self.voltage
 
         self.log(f"Current tolerance is {current_tolerance}A")
@@ -729,7 +730,7 @@ class SolisSolarmanV2Inverter(SolisInverter):
 
         current = round(current, 1)
 
-        power_tolerance = self._host.config.get(f"forced_power_group_tolerance", 0.1)
+        power_tolerance = self.get_config(f"forced_power_group_tolerance", 0.1)
         current_tolerance = power_tolerance / self.voltage
 
         self.log(f"Current tolerance is {current_tolerance}A")
