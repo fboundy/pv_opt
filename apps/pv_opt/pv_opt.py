@@ -884,7 +884,7 @@ class PVOpt(hass.Hass):
                 self.tariff_reloaded == 0
             ):
                 self.car_plugin_detected = 1
-                self.log("EV plug-in event detected, Contract reload scheduled for next optimiser run")
+                self.log("EV plug-in event detected (or end of car plan reached), Contract reload scheduled for next optimiser run")
 
             elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
                 self.tariff_reloaded == 1
