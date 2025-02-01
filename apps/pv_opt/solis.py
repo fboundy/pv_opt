@@ -587,18 +587,24 @@ class SolisInverter(BaseInverterController):
 
         current = min(current, battery_current_limit)
 
-        changed = self._set_times(direction, **times)
-        changed = changed or self._set_current(direction, current)
+        changed_times = self._set_times(direction, **times)
+        changed_current = self._set_current(direction, current)
+
+        changed = changed_times or changed_current
 
         if changed and self._requires_button_press:
             self.log("Something changed - need to press the appropriate Button")
             if self._hmi_fb00:
                 entity_id = self.brand_config.get(f"id_timed_{direction}_button", None)
+                if entity_id is not None:
+                    self._press_button(entity_id=entity_id)
+
             else:
                 entity_id = self.brand_config.get(f"id_timed_charge_discharge_button", None)
+                # only press button if times have updated
+                if entity_id is not None and changed_times:
+                    self._press_button(entity_id=entity_id)
 
-            if entity_id is not None:
-                self._press_button(entity_id=entity_id)
 
         if self._hmi_fb00:
             """
