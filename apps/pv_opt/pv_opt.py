@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.9-Beta-4"
+VERSION = "4.0.9-Beta-5"
 
 UNITS = {
     "current": "A",
@@ -609,7 +609,8 @@ class PVOpt(hass.Hass):
         if (self.debug and "S" in self.debug_cat) or self.args.get("list_entities", True):
             self._list_entities()
 
-        self.timer_handle = None
+        self.timer_handle_optimiser = None
+        self.timer_handle_compare = None
         self.handles = {}
         self.mqtt_handles = {}
 
@@ -1322,7 +1323,7 @@ class PVOpt(hass.Hass):
 
     def _setup_compare_schedule(self):
         start = (pd.Timestamp.now(tz="UTC").ceil("60min") - pd.Timedelta("2min")).to_pydatetime()
-        self.timer_handle = self.run_every(
+        self.timer_handle_compare = self.run_every(
             self._compare_tariff_cb,
             start=start,
             interval=3600,
@@ -1386,7 +1387,7 @@ class PVOpt(hass.Hass):
 
     def _setup_schedule(self):
         start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}min").to_pydatetime()
-        self.timer_handle = self.run_every(
+        self.timer_handle_optimiser = self.run_every(
             self.optimise_time,
             start=start_opt,
             interval=self.get_config("optimise_frequency_minutes") * 60,
@@ -2195,6 +2196,13 @@ class PVOpt(hass.Hass):
 
         # if "forced" in item:
         #    self._setup_schedule()
+
+ 
+        # cancel existing callback and setup a new one if optimiser_freqeuency_minutes is changed
+
+        if "optimise_frequency_minutes" in item:
+            self.cancel_timer(self.timer_handle_optimiser)
+            self._setup_schedule()
 
         ### SVB: Add additional EV items to this list: Car capacity, charger efficiency, charger power, and add an Ev model to pv_system_model routine
         if item in [
