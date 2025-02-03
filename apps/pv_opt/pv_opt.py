@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.8"
+VERSION = "4.0.9-Beta-5"
 
 UNITS = {
     "current": "A",
@@ -40,7 +40,7 @@ DEBUG = False
 # F = Power Flows Logging
 # V = Power Flows debugging (verbose)
 # I = inverter control/commands Logging
-# E = EV debugging
+# E = EV Logging
 
 # Default is all, include desired string in Config.yaml to enable filtering
 
@@ -609,7 +609,8 @@ class PVOpt(hass.Hass):
         if (self.debug and "S" in self.debug_cat) or self.args.get("list_entities", True):
             self._list_entities()
 
-        self.timer_handle = None
+        self.timer_handle_optimiser = None
+        self.timer_handle_compare = None
         self.handles = {}
         self.mqtt_handles = {}
 
@@ -768,8 +769,8 @@ class PVOpt(hass.Hass):
         y = {}
 
         # Load tariffs from bottlecapdave .event sensors
+        self.log("   Downloading IOG pricing information from Octopus Energy Integration")
         self.log("")
-        self.log("    Downloading IOG pricing information from Octopus Energy Integration")
 
         x = pd.DataFrame(self.get_state_retry(entity_id1, attribute=("rates")))
         # self.log("")
@@ -844,7 +845,7 @@ class PVOpt(hass.Hass):
                         f"  {z['start'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['end'].strftime(DATE_TIME_FORMAT_LONG):20s}  {z['charge_in_kwh']:12.3f}  {z['source']:12s}"
                     )
 
-        # Get Planned dispatches from Intelligent Dispathing sensor
+        # Get Planned dispatches from Intelligent Dispatching sensor
         df = pd.DataFrame(self.get_state_retry(self.io_dispatching_sensor, attribute=("planned_dispatches")))
 
         # If Charging plan exists, convert dispatch start and end times to datetime format and append to df.
@@ -883,26 +884,26 @@ class PVOpt(hass.Hass):
                 self.tariff_reloaded == 0
             ):
                 self.car_plugin_detected = 1
-                self.log("EV plug-in event detected, IOG tariff reload scheduled for next optimiser run")
+                self.log("EV plug-in event detected (or end of car plan reached), Contract reload scheduled for next optimiser run")
 
             elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
                 self.tariff_reloaded == 1
             ):
-                self.log("EV is connected but IOG tariff reload previously caried out. IOG tariff not reloaded")
+                self.log("EV is connected but Contract reload previously caried out.")
                 self.car_plugin_detected = 0
 
             elif (plug_status == "Charging") and (self.tariff_reloaded == 0):
                 self.log(
-                    "EV plug-in event detected and car has commenced charging. IOG tariff reload scheduled for next optimiser run"
+                    "EV plug-in event detected and car has commenced charging. Contract to be reloaded on next optimiser run"
                 )
                 self.car_plugin_detected = 1
 
             elif (plug_status == "Charging") and (self.tariff_reloaded == 1):
-                self.log("EV is charging but IOG tariff reload previously carried out. IOG tariff not reloaded")
+                self.log("EV is charging but Contract reload previously carried out.")
                 self.car_plugin_detected = 0
 
             else:
-                self.log("EV not plugged in. IOG tariff reload not necessary")
+                self.log("EV not plugged in. Contract reload not necessary")
                 self.car_plugin_detected = 0
 
             # If EV plugged in, check charge to add hasnt changed
@@ -910,10 +911,10 @@ class PVOpt(hass.Hass):
                 self.io_charge_to_add = self.get_state(self.io_charge_to_add_sensor)
                 if (self.old_io_charge_to_add != self.io_charge_to_add) and (plug_status == "EV Connected"):
                     self.car_plugin_detected = 1
-                    self.log("Charge to add changed, IOG tariff reload scheduled for next optimiser run")
+                    self.log("Charge to add changed, Contract reload scheduled for next optimiser run")
             else:
                 self.log(
-                    "Octopus Energy Integration not detected (or disabled): Charge to add is not available, IOG tariff not reloaded"
+                    "Octopus Energy Integration not detected (or disabled): Charge to add is not available, no reload carried out"
                 )
 
     def _check_car_plugin_agile(self):
@@ -1322,7 +1323,7 @@ class PVOpt(hass.Hass):
 
     def _setup_compare_schedule(self):
         start = (pd.Timestamp.now(tz="UTC").ceil("60min") - pd.Timedelta("2min")).to_pydatetime()
-        self.timer_handle = self.run_every(
+        self.timer_handle_compare = self.run_every(
             self._compare_tariff_cb,
             start=start,
             interval=3600,
@@ -1386,7 +1387,7 @@ class PVOpt(hass.Hass):
 
     def _setup_schedule(self):
         start_opt = pd.Timestamp.now().ceil(f"{self.get_config('optimise_frequency_minutes')}min").to_pydatetime()
-        self.timer_handle = self.run_every(
+        self.timer_handle_optimiser = self.run_every(
             self.optimise_time,
             start=start_opt,
             interval=self.get_config("optimise_frequency_minutes") * 60,
@@ -2196,11 +2197,19 @@ class PVOpt(hass.Hass):
         # if "forced" in item:
         #    self._setup_schedule()
 
+ 
+        # cancel existing callback and setup a new one if optimiser_freqeuency_minutes is changed
+
+        if "optimise_frequency_minutes" in item:
+            self.cancel_timer(self.timer_handle_optimiser)
+            self._setup_schedule()
+
         ### SVB: Add additional EV items to this list: Car capacity, charger efficiency, charger power, and add an Ev model to pv_system_model routine
         if item in [
             "inverter_efficiency_percent",
             "inverter_power_watts",
             "inverter_loss_watts",
+            "charger_power_watts",
             "charger_efficiency_percent",
             "battery_capacity_wh",
             "maximum_dod_percent",
@@ -2292,20 +2301,20 @@ class PVOpt(hass.Hass):
             # self.log("Printing time.....")
             # self.log(pd.Timestamp.now(tz=self.tz).hour)
             if (pd.Timestamp.now(tz=self.tz).hour == 16) and (pd.Timestamp.now(tz=self.tz).minute >= 40):
-                self.log("   About to reload Octopus Intelligent Pricing - 16:40")
+                self.log("   About to reload Contract - 16:40")
                 self._load_contract()
 
             if (pd.Timestamp.now(tz=self.tz).hour == 0) and (pd.Timestamp.now(tz=self.tz).minute <= 20):
-                self.log("   About to reload Octopus Intelligent Pricing - 00:20")
+                self.log("   About to reload Contract- 00:20")
                 self._load_contract()
 
             if (pd.Timestamp.now(tz=self.tz).hour == 5) and (pd.Timestamp.now(tz=self.tz).minute >= 10):
-                self.log("   About to reload Octopus Intelligent Pricing - 05:10")
+                self.log("   About to reload Contract - 05:10")
                 self._load_contract()
 
             if self.car_plugin_detected == 1:
                 self.log(
-                    "Car plugin detected or charge to add value changed. About to reload Octopus Intelligent Pricing"
+                    "Car plugin detected or charge to add value changed. About to reload Contract"
                 )
                 self._load_contract()
                 self.tariff_reloaded = 1
@@ -2317,7 +2326,8 @@ class PVOpt(hass.Hass):
 
             self.io_prices = self.get_io_tariffs(self.octopus_import_entity[0])
 
-        elif self.contract_last_loaded.day != pd.Timestamp.now(tz="UTC").day:
+        elif ((pd.Timestamp.now(tz="UTC") - self.contract_last_loaded).total_seconds() / 3600) > 6:
+            # Reload every 6 hours
             self._load_contract()
 
         if self._check_tariffs():
@@ -2897,6 +2907,7 @@ class PVOpt(hass.Hass):
                             self.log(f"Setting end time to {end.strftime(DATE_TIME_FORMAT_SHORT)}")
                             self.log(f"Setting power to {self.charge_power}")
                             self.log(f"Setting SOC to {self.charge_target_soc}")
+                            # self.log(f"Current is {self.charge_current}")
 
                             self.inverter.control_charge(
                                 enable=True,
@@ -3092,7 +3103,7 @@ class PVOpt(hass.Hass):
         # Increment "period" if charge power varies by more than half the power tolerance OR non-contiguous car slot detected (when charge power = 0).
 
         self.opt["period"] = (
-            (self.opt["forced"].diff() > (tolerance / 2))
+            (self.opt["forced"].diff().abs() > (tolerance / 2))
             | ((self.opt["carslot"].diff() > 0) & (self.opt["forced"] == 0))
         ).cumsum()
 
@@ -3109,15 +3120,23 @@ class PVOpt(hass.Hass):
         # If there is either a charge/discharge plan or a car charging plan, create windows.
         if ((self.opt["forced"] != 0).sum() > 0) or ((self.opt["carslot"] != 0).sum() > 0):
             x = self.opt[self.opt["forced"] > 0].copy()
+
+            if self.debug and "X" in self.debug_cat:
+                self.log("")
+                self.log("Printing X just after copy....")
+                self.log(f"\n{x.to_string()}")
+
             x["start"] = x.index.tz_convert(self.tz)
-            x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+
+            # End time is 30 minutes after the start time, unless partway through a slot
+            #x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+            x["end"] = x.index.tz_convert(self.tz) + pd.to_timedelta((x["dt_hours"] * 60), unit = "m").round("min")
             x["soc"] = x["soc"].round(0).astype(int)
             x["soc_end"] = x["soc_end"].round(0).astype(int)
 
             if self.debug and "W" in self.debug_cat:
                 self.log("")
                 self.log("Printing X for charge slots.....")
-                # self.log(x.to_string())
                 self.log(f"\n{x.to_string()}")
 
             # Create the charge window by taking the first and the last entry for each period.
@@ -3248,8 +3267,6 @@ class PVOpt(hass.Hass):
                     self.log("Printing Combined Window after Hold SOC check.....")
                     self.log(f"\n{self.windows.to_string()}")
 
-            ### Need to add Agile tariff into this, but only if car charging is enabled (EV Charger = Zappi?)
-            #   DONE needs verifying
 
             # if self.intelligent or (self.agile and self.ev) :  # gate removed******
             if self.debug and "W" in self.debug_cat:
@@ -4146,8 +4163,12 @@ class PVOpt(hass.Hass):
     def _check_tariffs_vs_bottlecap(self):
 
         self.ulog("Checking tariff prices vs Octopus Energy Integration:")
+        print_detail = False
+
         for direction in self.contract.tariffs:
             err = False
+
+
             if self.bottlecap_entities[direction] is None:
                 str_log = "No OE Integration entity found."
 
@@ -4187,9 +4208,8 @@ class PVOpt(hass.Hass):
                     axis=1,
                 ).set_axis(["bottlecap", "pv_opt"], axis=1)
 
-                # SVB logging
-                # self.log("Printing contract comparison df")
-                # self.log(df.to_string())
+                # self.log("Detailed check tariffs details = ")
+                # self.log(f"\n{df.to_string()}")
 
                 # Drop any Savings Sessions
 
@@ -4204,12 +4224,26 @@ class PVOpt(hass.Hass):
                     entity_id=f"sensor.{self.prefix}_tariff_{direction}_OK",
                     state=round(df["delta"].abs().mean(), 2) == 0,
                 )
+
                 if round(df["delta"].abs().mean(), 2) > 0:
-                    str_log += " <<< ERROR"
-                    self.status("ERROR: Tariff inconsistency")
-                    err = True
+
+                    if direction == "import":
+                        str_log += " <<< Potential error detected. Check compare pricing array below."
+                        str_log += " <<< "
+                        self.status("ERROR: Tariff inconsistency")
+                        print_detail = True                                
+
+                    else:
+                        str_log += " <<< ERROR"
+                        self.status("ERROR: Tariff inconsistency")
+                        err = True
 
             self.log(f"  {direction.title()}: {str_log}")
+
+        if (self.debug and "T" in self.debug_cat) or print_detail:
+            self.log("")
+            self.log("Compare pricing array is = ")
+            self.log(f"\n{df.to_string()}")        
 
     def ulog(self, strlog, underline="-", words=False):
         self.log("")

@@ -73,7 +73,7 @@ pv_opt:
   # All parameters can be a number or point to an entity UNLESS they start with 'id_'. All of
   # these are required but will be defaulted if not specified
 
-  # battery_capacity_wh: 10000
+  battery_capacity_wh: 20000
   # inverter_efficiency_percent: 97 # Default: 97
   # charger_efficiency_percent: 91 # Default: 91
   # maximum_dod_percent: 15
