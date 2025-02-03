@@ -2907,7 +2907,7 @@ class PVOpt(hass.Hass):
                             self.log(f"Setting end time to {end.strftime(DATE_TIME_FORMAT_SHORT)}")
                             self.log(f"Setting power to {self.charge_power}")
                             self.log(f"Setting SOC to {self.charge_target_soc}")
-                            self.log(f"Current is {self.charge_current}")
+                            # self.log(f"Current is {self.charge_current}")
 
                             self.inverter.control_charge(
                                 enable=True,
