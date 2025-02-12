@@ -769,7 +769,8 @@ class PVOpt(hass.Hass):
         y = {}
 
         # Load tariffs from bottlecapdave .event sensors
-        self.log("   Downloading IOG pricing information from Octopus Energy Integration")
+        self.log("")
+        self.log("    Downloading IOG pricing information from Octopus Energy Integration")
         self.log("")
 
         x = pd.DataFrame(self.get_state_retry(entity_id1, attribute=("rates")))
@@ -926,7 +927,10 @@ class PVOpt(hass.Hass):
 
         if (len(self.zappi_plug_entity) > 0) and self.ev:
             plug_status = self.get_state(self.zappi_plug_entity)
-            # self.log(plug_status)
+            self.log(plug_status)
+            self.log(self.car_plugin_detected)
+            self.log(self.car_plugin_detected_delayed)
+
             if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
                 self.car_plugin_detected_delayed == 0
             ):
@@ -934,7 +938,7 @@ class PVOpt(hass.Hass):
                 self.log("EV plug-in event detected. Contract reload scheduled for next optimiser run")
 
             elif ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
-                self.car_plugin_detected_delayed == 0
+                self.car_plugin_detected_delayed == 1
             ):
                 self.log("EV is connected but Contract reload previously caried out.")
                 self.car_plugin_detected = 0
