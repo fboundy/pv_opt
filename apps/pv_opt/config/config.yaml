@@ -48,6 +48,7 @@ pv_opt:
   # B = Optimisation Start summary
   # C = Charge algorithm Logging
   # D = Discharge algorithm Logging
+  # A = Print out all plans summary (1/2 hour slots)
   # W = Charge/Discharge Windows Logging
   # O = Optimsation Summary (1/2 hour slots)
   # F = Power Flows Logging

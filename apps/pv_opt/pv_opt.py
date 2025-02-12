@@ -33,10 +33,13 @@ DEBUG = False
 # T = Tariff loading Logging
 # P = Power consumption history Logging
 # Q = Power consumption debugging (verbose)
+# B = Optimisation Start summary
 # C = Charge algorithm Logging
 # D = Discharge algorithm Logging
-# W = Charge/Discharge Windows Logging
+# A = Print out all plans summarty (1/2 hour slots)
+# W = Charge/Discharge Windows Loggin
 # X = Charge/Discharge Windows Logging (verbose)
+# O = Optimsation Summary (1/2 hour slots)
 # F = Power Flows Logging
 # V = Power Flows debugging (verbose)
 # I = inverter control/commands Logging
@@ -1647,7 +1650,8 @@ class PVOpt(hass.Hass):
             # self.log("")
 
             if self.contract.tariffs["export"] is None:
-                self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
+                #self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
+                self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)                
             self.rlog("")
             self._load_saving_events()
 
@@ -2536,14 +2540,37 @@ class PVOpt(hass.Hass):
         self.status("Optimising charge plan")
 
         self.pv_system.contract = self.contract
-        for case in cases:
-            self.flows[case] = self.pv_system.optimised_force(
-                log=(case == self.selected_case),
-                use_export=cases[case]["export"],
-                discharge=cases[case]["discharge"],
-            )
 
-            self.optimised_cost[case] = self.contract.net_cost(self.flows[case], sum=False)
+        # log all plans if debug_cat is A
+        if self.debug and "A" in self.debug_cat:
+            for case in cases:
+                self.log("")
+                self.ulog(f"Printing details of plan for {case} ")
+            
+                self.flows[case] = self.pv_system.optimised_force(
+                    log=True,
+                    use_export=cases[case]["export"],
+                    discharge=cases[case]["discharge"],
+                )
+
+                self.optimised_cost[case] = self.contract.net_cost(self.flows[case], sum=False)
+
+                self.log("")
+                self.log(f"\n{self.flows[case].to_string()}")
+                self.log("")
+                
+
+
+        else:
+            for case in cases:
+                self.flows[case] = self.pv_system.optimised_force(
+                    log=(case == self.selected_case),
+                    use_export=cases[case]["export"],
+                    discharge=cases[case]["discharge"],
+                )
+
+                self.optimised_cost[case] = self.contract.net_cost(self.flows[case], sum=False)
+
 
         # test = self.pv_system.optimised_force_de(
         #     self.contract,
@@ -2576,11 +2603,6 @@ class PVOpt(hass.Hass):
         self.opt = self.flows[self.selected_case]
 
         self.base = self.flows["Base"]
-
-        # SVB debug logging
-        # self.log("")
-        # self.log("Returned from .flows. self.opt is........")
-        # self.log(f"\n{self.opt.to_string()}")
 
         # create a df with an index value the same as self.opt (just copy it from self.opt)
         # Copy two columns to force y to be a dataframe
@@ -3110,45 +3132,6 @@ class PVOpt(hass.Hass):
                 self.log("")
 
     def _create_windows(self):
-
-        # If we are already in the first slot (e.g. 10 mins in or 20 mins in) then the value of "forced" is factored so I think .flows calculations continue to work for 20 and then 10 mins remaining.
-        # However, a factored "forced" value means that it result in a seperate charge window for the remaining time, and for IOG/IO/E7 that will result in needless
-        # writes to the inverter every 10 minutes and an increasing charge power towards the end of the night to compensate.
-        # As the .flows calls are all done with now, the "forced" power can be set back to what the inverter needs it to be, which is the original value prior to factoring
-
-        # Get the time of the first slot
-        # self.opt["start"] = self.opt.index.tz_convert(self.tz)
-        # self.charge_start_datetime = self.opt["start"].iloc[0]
-
-        # slot_left_factor = 0
-
-        # Are we already partway through that slot?
-        # if pd.Timestamp.now(self.tz) > self.charge_start_datetime:
-        #    slot_left_factor = 1800 / (
-        #        (self.charge_start_datetime + pd.Timedelta(30, "minutes") - pd.Timestamp.now(self.tz)).total_seconds()
-        #    )
-
-        # If we are in a slot, then "forced" has already been factored by the slot time remaining to ensure the power flow calclations are correct
-        # We need to remove that factor so the inverter charge power remains unchanged in the slot.
-        # If forced = 0 (i.e no charging) the result remains zero so no need to gate with forced > 0.
-
-        # SVB this needs a "not to exceed" limit to:
-        # 1) Handle large multiplication factors for programme restarts at time values very close to the half hour boundaries. Just limit to 6. DONE
-        # 2) To handle slots that even when factored, are still limited by the inverter power - these ones we don't want to multiply.
-
-        # In 2), is it just a limit of charger power we need to apply? Or do we require something more complex?
-
-        # if not slot_left_factor == 0:
-        #    if slot_left_factor > 6:
-        #        slot_left_factor = 6
-        #    self.opt["forced"].iloc[0] = self.opt["forced"].iloc[0] * slot_left_factor
-
-        # SVB Previous code created a seperate period if the power stored in "forced" differed between rows (1/2 hour slots) by anything bigger than 0.
-        # On IOG, as all high cost swaps are shared equally between the 12 1/2 hour slots, we only need a small rounding error for the value of "forced" to end up different
-        # and thus generate a new charge window. This rounding error equally applies to the restoration of the forced value prior to factoring. This "">0" test
-        # almost guarantees an IOG 6 hour charge window to end up as one hold slot after another, rather than what should be a 6 hour charge slot at a fixed charge rate.
-
-        # Now changed this so its based on the value of forced_power_group_tolerance (currently set to 100W), say half of it (50W).
 
         tolerance = self.get_config("forced_power_group_tolerance")
 
