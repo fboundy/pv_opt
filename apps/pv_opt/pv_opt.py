@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.9-Beta-6"
+VERSION = "4.0.9-Beta-7"
 
 UNITS = {
     "current": "A",
@@ -818,14 +818,17 @@ class PVOpt(hass.Hass):
             self.log("      No data found in next day rate")
 
         # Concatenate todays and tomorrows tariffs into one DataSeries
-        if not x.empty:
+        if not x.empty and not y.empty:
             z = x.combine_first(y)
             if self.debug and "T" in self.debug_cat:
                 self.log("")
                 self.log("IOG prices are")
                 self.log(f"\n{z.to_string()}")
-        else:
+        elif not y.empty:
             z = y
+
+        elif not x.empty:
+            z = x
 
         return z
 
