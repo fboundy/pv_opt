@@ -368,16 +368,15 @@ DEFAULT_CONFIG = {
         },
     },
     "ev_charger": {
-        "default": "None",
+        "default": "Not fitted",
         "domain": "select",
         "attributes": {
             "options": [
-                "None",
+                "Not fitted",
                 "Zappi",
                 "Other",
             ]
         },
-        "domain": "select",
     },
     "ev_charger_efficiency_percent": {
         "default": 92,
@@ -955,7 +954,7 @@ class PVOpt(hass.Hass):
                 )
                 self.car_plugin_detected = 1
 
-            elif (plug_status == "Charging") and (self.car_plugin_detected_delayed == 0):
+            elif (plug_status == "Charging") and (self.car_plugin_detected_delayed == 1):
                 self.log("EV is charging but Contract reload previously carried out.")
                 self.car_plugin_detected = 0
 
