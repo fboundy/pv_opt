@@ -36,10 +36,10 @@ DEBUG = False
 # B = Optimisation Start summary
 # C = Charge algorithm Logging
 # D = Discharge algorithm Logging
-# A = Print out all plans summarty (1/2 hour slots)
-# W = Charge/Discharge Windows Loggin
+# W = Charge/Discharge Windows Logging
 # X = Charge/Discharge Windows Logging (verbose)
-# O = Optimsation Summary (1/2 hour slots)
+# O = Optimsation Summary (1/2 hour slots) of chosen plan
+# A = All plans Optimisation Summary (1/2 hour slots)
 # F = Power Flows Logging
 # V = Power Flows debugging (verbose)
 # I = inverter control/commands Logging
@@ -47,7 +47,7 @@ DEBUG = False
 
 # Default is all, include desired string in Config.yaml to enable filtering
 
-DEBUG_CATEGORIES = "STPQCDWOXFVIE"
+DEBUG_CATEGORIES = "STPQCDAWOXFVIE"
 
 DATE_TIME_FORMAT_LONG = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M %Z"
