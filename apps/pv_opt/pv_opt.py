@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.9-Beta-7"
+VERSION = "4.0.9-Beta-8"
 
 UNITS = {
     "current": "A",
@@ -670,6 +670,9 @@ class PVOpt(hass.Hass):
 
         self._cost_actual()
 
+
+
+
         # Optimise on an EVENT trigger:
         self.listen_event(
             self.optimise_event,
@@ -683,6 +686,17 @@ class PVOpt(hass.Hass):
         self.log("Running initial Optimisation:")
         self.optimise()
         self._setup_schedule()
+
+        ### SVB new function
+        #Optimise if car starts charging on IOG (intelligent dispatcing sensor changes from off to on)
+        if self.intelligent:
+            entity_id = self.zappi_plug_entity
+            self.handles[entity_id] = self.listen_state(callback=self.optimise_IOG, entity_id=entity_id, new = "Charging")
+            #self.log(f"Optimiser will run on change of {entity_id} from off to on")
+            #self.handles[entity_id] = self.listen_state(callback=self.optimise(), entity_id=entity_id, new = "On")
+            self.log(f"Optimiser will run on change of {entity_id} to 'Charging'")
+            self.log("")
+    
 
         if self.debug and "S" in self.debug_cat:
             self.log(f"PV Opt Initialisation complete. Listen_state Handles:")
@@ -932,9 +946,9 @@ class PVOpt(hass.Hass):
 
         if (len(self.zappi_plug_entity) > 0) and self.ev:
             plug_status = self.get_state(self.zappi_plug_entity)
-            self.log(plug_status)
-            self.log(self.car_plugin_detected)
-            self.log(self.car_plugin_detected_delayed)
+            #self.log(plug_status)
+            #self.log(self.car_plugin_detected)
+            #self.log(self.car_plugin_detected_delayed)
 
             if ((plug_status == "EV Connected") or (plug_status == "EV Ready to Charge")) and (
                 self.car_plugin_detected_delayed == 0
@@ -2246,17 +2260,6 @@ class PVOpt(hass.Hass):
 
         self.config_state[item] = new
 
-        # SVB 25/11/2024
-        # Commented out call to setup_schedule - it shouldn't be needed to do something special if the Optimised Discharge (forced_discharge) entity is toggled. Having
-        # it appears to generate an addtional optimiser callback every 10 minutes that then persists forever, so removed.
-        # Believed to be a hangover from when the charging and discharging algorithms had thier own seperate callbacks, long since removed.
-
-        # if "forced" in item:
-        #    self._setup_schedule()
-
- 
-        # cancel existing callback and setup a new one if optimiser_freqeuency_minutes is changed
-
         if "optimise_frequency_minutes" in item:
             self.cancel_timer(self.timer_handle_optimiser)
             self._setup_schedule()
@@ -2309,6 +2312,12 @@ class PVOpt(hass.Hass):
     def optimise_event(self, event_name, data, kwargs):
         self.log(f"Optimiser triggered by {event_name}")
         self.optimise()
+
+    @ad.app_lock
+    def optimise_IOG(self, entity_id, attribute, old, new, kwargs):
+        self.log(f"State change detected for {entity_id} from {old} to {new}:")
+        self.optimise()
+
 
     @ad.app_lock
     def optimise_time(self, cb_args):
@@ -2490,8 +2499,20 @@ class PVOpt(hass.Hass):
         # self.log(f"Initial SOC: {self.pv_system.initial_soc}")
         # self.log(f"Current SOC: {self.pv_system.soc_now}")
 
+        start = self.pv_system.static_flows.index[0]
+        end = self.pv_system.static_flows.index[-1]
+
+        self.prices = self.contract.prices(start=start, end=end)
+        self.prices = self.prices.set_axis(
+            [t for t in self.contract.tariffs.keys() if self.contract.tariffs[t] is not None],
+            axis=1,
+        )
+
+        self.pv_system.prices = self.prices
+
         self.pv_system.calculate_flows()
         self.flows = {"Base": self.pv_system.flows}
+        self.log("")
         self.log("Calculating Base flows:")
 
         if len(self.flows["Base"]) == 0:
@@ -2499,6 +2520,21 @@ class PVOpt(hass.Hass):
             self.log("  Unable to calculate baseline perfoormance", level="ERROR")
             self.status("ERROR: Baseline performance")
             return
+
+        if self.debug and "A" in self.debug_cat:
+
+
+            self.log("")
+            self.ulog("Printing static_flows ")
+            self.log("")
+            self.log(f"\n{self.pv_system.static_flows.to_string()}")
+            self.log("")
+
+            self.log("")
+            self.ulog("Printing details of plan for Base ")
+            self.log("")
+            self.log(f"\n{self.flows['Base'].to_string()}")
+            self.log("")
 
         self.optimised_cost = {"Base": self.contract.net_cost(self.flows["Base"], sum=False)}
 
