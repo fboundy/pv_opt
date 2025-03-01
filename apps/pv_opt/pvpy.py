@@ -335,7 +335,7 @@ class Tariff:
             # to overwrite the Df with IOG data from the BottlecapDave integration, loaded in pv_opt.py and passed in here via self.host.io_prices.
             # (SVB Note: io_prices should be passed in via Class, but I cannot figure out the structure of Tariff and Contract Classes to do this)
 
-            if len(self.host.io_prices) > 0:
+            if len(self.host.io_prices) > 0 and "INTELLI" in self.name:
                 # Add IO slot prices as a column to dataframe.
                 df = pd.concat([df, self.host.io_prices], axis=1).set_axis(["unit", "io_unit"], axis=1)
 
@@ -346,6 +346,7 @@ class Tariff:
                 ]  # Overwrite unit (prices from website) with io_unit (prices from OE integration) if in an IOslot.
                 df = df.drop(["io_unit"], axis=1)  # remove IO prices column
 
+                # SVB logging
                 # self.log("To_df, Printing result")
                 # self.log(df.to_string())
 
