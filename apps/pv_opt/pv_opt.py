@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.9-Beta-9"
+VERSION = "4.0.9-Beta-10"
 
 UNITS = {
     "current": "A",
@@ -2510,6 +2510,10 @@ class PVOpt(hass.Hass):
 
         self.pv_system.prices = self.prices
 
+        # SVB debugging
+        self.log("Self.prices is")
+        self.log(self.prices.to_string())
+
         self.pv_system.calculate_flows()
         self.flows = {"Base": self.pv_system.flows}
         self.log("")
@@ -2524,11 +2528,11 @@ class PVOpt(hass.Hass):
         if self.debug and "A" in self.debug_cat:
 
 
-            self.log("")
-            self.ulog("Printing static_flows ")
-            self.log("")
-            self.log(f"\n{self.pv_system.static_flows.to_string()}")
-            self.log("")
+            # self.log("")
+            # self.ulog("Printing static_flows ")
+            # self.log("")
+            # self.log(f"\n{self.pv_system.static_flows.to_string()}")
+            # self.log("")
 
             self.log("")
             self.ulog("Printing details of plan for Base ")
@@ -2584,7 +2588,7 @@ class PVOpt(hass.Hass):
             for case in cases:
                 self.log("")
                 self.ulog(f"Printing details of plan for {case} ")
-            
+
                 self.flows[case] = self.pv_system.optimised_force(
                     log=True,
                     use_export=cases[case]["export"],
@@ -2996,6 +3000,10 @@ class PVOpt(hass.Hass):
                             self.inverter.hold_soc(enable=True, target_soc=self.hold[0]["soc"])
                         else:
                             self.log(f"  Inverter already holding SOC of {self.hold[0]['soc']:0.0f}%")
+                            start = None
+                            end = self.charge_end_datetime
+                            self.inverter.hold_soc(enable=True, target_soc=self.hold[0]["soc"])
+
 
                     else:  # if already in Car slot, this bit should run
                         self.log(f"Current charge/discharge window ends in {time_to_slot_end:0.1f} minutes.")
@@ -3229,7 +3237,8 @@ class PVOpt(hass.Hass):
 
             x = self.opt[self.opt["forced"] < 0].copy()
             x["start"] = x.index.tz_convert(self.tz)
-            x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+            # x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+            x["end"] = x.index.tz_convert(self.tz) + pd.to_timedelta((x["dt_hours"] * 60), unit = "m").round("min")
 
             if self.debug and "W" in self.debug_cat:
                 self.log("")
@@ -3255,7 +3264,8 @@ class PVOpt(hass.Hass):
             # Create a Hold slot for all car slots
             x = self.opt[self.opt["carslot"] == 1].copy()
             x["start"] = x.index.tz_convert(self.tz)
-            x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+            # x["end"] = x.index.tz_convert(self.tz) + pd.Timedelta(30, "minutes")
+            x["end"] = x.index.tz_convert(self.tz) + pd.to_timedelta((x["dt_hours"] * 60), unit = "m").round("min")
 
             # Delete any entries where charging is already scheduled (Forced > 1)
             x = x.drop(x[x["forced"] > 1].index)
