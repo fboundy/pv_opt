@@ -1666,8 +1666,9 @@ class PVOpt(hass.Hass):
             # self.log("")
 
             if self.contract.tariffs["export"] is None:
-                #self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
-                self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)                
+                self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=0, octopus=False, host=self)
+                # SVB debugging line to force export tariff
+                # self.contract.tariffs["export"] = pv.Tariff("None", export=True, unit=15, octopus=False, host=self)                
             self.rlog("")
             self._load_saving_events()
 
@@ -2511,8 +2512,8 @@ class PVOpt(hass.Hass):
         self.pv_system.prices = self.prices
 
         # SVB debugging
-        self.log("Self.prices is")
-        self.log(self.prices.to_string())
+        # self.log("Self.prices is")
+        # self.log(self.prices.to_string())
 
         self.pv_system.calculate_flows()
         self.flows = {"Base": self.pv_system.flows}
@@ -2526,7 +2527,6 @@ class PVOpt(hass.Hass):
             return
 
         if self.debug and "A" in self.debug_cat:
-
 
             # self.log("")
             # self.ulog("Printing static_flows ")
