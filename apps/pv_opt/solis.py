@@ -556,6 +556,11 @@ class SolisInverter(BaseInverterController):
             times["start"] = kwargs.get("start", None)
             times["end"] = kwargs.get("end", None)
             current = kwargs.get("current", abs(round(kwargs.get("power", 0) / self.voltage, 1)))
+           
+            # SVB debugging
+            # self.log(f"Voltage in solis.py = {self.voltage}") 
+            # self.log(f"Current in solis.py = {current}")
+
             target_soc = kwargs.get("target_soc", None)
 
         else:
@@ -582,18 +587,25 @@ class SolisInverter(BaseInverterController):
 
         current = min(current, battery_current_limit)
 
-        changed = self._set_times(direction, **times)
-        changed = changed or self._set_current(direction, current)
+        changed_times = self._set_times(direction, **times)
+        changed_current = self._set_current(direction, current)
+
+        changed = changed_times or changed_current
 
         if changed and self._requires_button_press:
-            self.log("Something changed - need to press the appropriate Button")
             if self._hmi_fb00:
+                self.log("Something changed - need to press the appropriate Button")
                 entity_id = self.brand_config.get(f"id_timed_{direction}_button", None)
+                if entity_id is not None:
+                    self._press_button(entity_id=entity_id)
+
             else:
                 entity_id = self.brand_config.get(f"id_timed_charge_discharge_button", None)
+                # only press button if times have updated
+                if entity_id is not None and changed_times:
+                    self._press_button(entity_id=entity_id)
+                    self.log("Times have changed - press Update Charge/Discharge Times Button")
 
-            if entity_id is not None:
-                self._press_button(entity_id=entity_id)
 
         if self._hmi_fb00:
             """
@@ -666,8 +678,15 @@ class SolisInverter(BaseInverterController):
 
     def _set_current(self, direction, current: float = 0) -> bool:
         entity_id = self._host.config.get(f"id_timed_{direction}_current", None)
+   
+        power_tolerance = float(self.get_config(f"forced_power_group_tolerance", 0.1))
+        current_tolerance = round(power_tolerance / self.voltage, 2)
+        
+        # SVB debugging
+        # self.log(f"Current tolerance is {current_tolerance}A")
+
         if entity_id is not None:
-            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=0.1, verbose=True)
+            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=current_tolerance, verbose=True)
 
         if changed:
             if written:
@@ -719,8 +738,13 @@ class SolisSolarmanV2Inverter(SolisInverter):
 
         current = round(current, 1)
 
+        power_tolerance = self.get_config(f"forced_power_group_tolerance", 0.1)
+        current_tolerance = power_tolerance / self.voltage
+
+        self.log(f"Current tolerance is {current_tolerance}A")
+
         if entity_id is not None:
-            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=0.1, verbose=True)
+            changed, written = self.write_to_hass(entity_id=entity_id, value=current, tolerance=current_tolerance, verbose=True)
 
         if changed:
             if written:
