@@ -817,7 +817,7 @@ class PVOpt(hass.Hass):
 
         if not y.empty:
             y = y.set_index("start")["value_inc_vat"]
-            y.index = pd.to_datetime(y.index)
+            y.index = pd.to_datetime(y.index, utc=True)
             y.index = y.index.tz_convert("UTC")
             y *= 100
             self.rlog(f"      Reading next day IOG prices from  {entity_id1}")
