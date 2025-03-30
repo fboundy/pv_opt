@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.9"
+VERSION = "4.0.10-Beta-2"
 
 UNITS = {
     "current": "A",
@@ -794,8 +794,7 @@ class PVOpt(hass.Hass):
 
         if not x.empty:
             x = x.set_index("start")["value_inc_vat"]
-            x.index = pd.to_datetime(x.index)
-            x.index = x.index.tz_convert("UTC")
+            x.index = pd.to_datetime(x.index, utc=True)
             x *= 100
             # SVB logging
             self.rlog(f"      Reading current day IOG prices from  {entity_id1}")
@@ -818,7 +817,6 @@ class PVOpt(hass.Hass):
         if not y.empty:
             y = y.set_index("start")["value_inc_vat"]
             y.index = pd.to_datetime(y.index, utc=True)
-            y.index = y.index.tz_convert("UTC")
             y *= 100
             self.rlog(f"      Reading next day IOG prices from  {entity_id1}")
 
