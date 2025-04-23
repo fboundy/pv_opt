@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.10-Beta-3"
+VERSION = "4.0.10"
 
 UNITS = {
     "current": "A",
@@ -2676,11 +2676,11 @@ class PVOpt(hass.Hass):
                 self.ev_total_charge = self.car_slots["charge_in_kwh"].sum()
                 self.ev_total_cost = self.car_slots["import"].sum()
 
-                #self.log(f"self.ev_total_charge = {self.ev_total_charge}")
-                #self.log(f"self.ev_capacity = {self.ev_capacity}")
- 
-                #SVB Next line is irrelevent to IOG, commented out as a trial
-                #self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
+                # self.log(f"self.ev_total_charge = {self.ev_total_charge}")
+                # self.log(f"self.ev_capacity = {self.ev_capacity}")
+
+                # SVB Next line is irrelevent to IOG, commented out as a trial
+                # self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
 
         # If on Agile tariff, (re)calculate car slots now.
 
@@ -3516,15 +3516,14 @@ class PVOpt(hass.Hass):
         ]
 
         # SVB debugging
-        #self.log(f"\n{cost_today.to_string()}")
-        #self.log("")
-        #self.log(f"\n{cost.to_string()}")
-        #self.log(f"Dtype of cost_today is {cost_today.dtypes}")
-        #self.log(f"Dtype of cost is {cost.dtypes}")
-
+        # self.log(f"\n{cost_today.to_string()}")
+        # self.log("")
+        # self.log(f"\n{cost.to_string()}")
+        # self.log(f"Dtype of cost_today is {cost_today.dtypes}")
+        # self.log(f"Dtype of cost is {cost.dtypes}")
 
         # cast cost_today as float64 in case it is empty, to prevent Futurewarning "The behavior of array concatenation with empty entries is deprecated"
-        cost = pd.DataFrame(pd.concat([cost_today.astype('float64'), cost])).set_axis(["cost"], axis=1).fillna(0)
+        cost = pd.DataFrame(pd.concat([cost_today.astype("float64"), cost])).set_axis(["cost"], axis=1).fillna(0)
         cost["cumulative_cost"] = cost["cost"].cumsum()
 
         for d in [df, cost]:
