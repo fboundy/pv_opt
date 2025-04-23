@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.9"
+VERSION = "4.0.10-Beta-3"
 
 UNITS = {
     "current": "A",
@@ -794,8 +794,7 @@ class PVOpt(hass.Hass):
 
         if not x.empty:
             x = x.set_index("start")["value_inc_vat"]
-            x.index = pd.to_datetime(x.index)
-            x.index = x.index.tz_convert("UTC")
+            x.index = pd.to_datetime(x.index, utc=True)
             x *= 100
             # SVB logging
             self.rlog(f"      Reading current day IOG prices from  {entity_id1}")
@@ -817,8 +816,7 @@ class PVOpt(hass.Hass):
 
         if not y.empty:
             y = y.set_index("start")["value_inc_vat"]
-            y.index = pd.to_datetime(y.index)
-            y.index = y.index.tz_convert("UTC")
+            y.index = pd.to_datetime(y.index, utc=True)
             y *= 100
             self.rlog(f"      Reading next day IOG prices from  {entity_id1}")
 
@@ -2677,7 +2675,12 @@ class PVOpt(hass.Hass):
             if not self.car_slots.empty:
                 self.ev_total_charge = self.car_slots["charge_in_kwh"].sum()
                 self.ev_total_cost = self.car_slots["import"].sum()
-                self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
+
+                #self.log(f"self.ev_total_charge = {self.ev_total_charge}")
+                #self.log(f"self.ev_capacity = {self.ev_capacity}")
+ 
+                #SVB Next line is irrelevent to IOG, commented out as a trial
+                #self.ev_percent_to_add = (self.ev_total_charge / self.ev_capacity) * 100
 
         # If on Agile tariff, (re)calculate car slots now.
 
@@ -3512,7 +3515,16 @@ class PVOpt(hass.Hass):
             "consumption",
         ]
 
-        cost = pd.DataFrame(pd.concat([cost_today, cost])).set_axis(["cost"], axis=1).fillna(0)
+        # SVB debugging
+        #self.log(f"\n{cost_today.to_string()}")
+        #self.log("")
+        #self.log(f"\n{cost.to_string()}")
+        #self.log(f"Dtype of cost_today is {cost_today.dtypes}")
+        #self.log(f"Dtype of cost is {cost.dtypes}")
+
+
+        # cast cost_today as float64 in case it is empty, to prevent Futurewarning "The behavior of array concatenation with empty entries is deprecated"
+        cost = pd.DataFrame(pd.concat([cost_today.astype('float64'), cost])).set_axis(["cost"], axis=1).fillna(0)
         cost["cumulative_cost"] = cost["cost"].cumsum()
 
         for d in [df, cost]:
