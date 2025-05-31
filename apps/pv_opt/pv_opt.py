@@ -14,7 +14,7 @@ import pvpy as pv
 from numpy import nan
 
 
-VERSION = "4.0.10"
+VERSION = "5.0.0"
 
 UNITS = {
     "current": "A",
@@ -54,15 +54,15 @@ DATE_TIME_FORMAT_SHORT = "%d-%b %H:%M %Z"
 TIME_FORMAT = "%H:%M"
 
 REDACT_REGEX = [
-    "[0-9]{2}m[0-9]{7}_[0-9]{13}",  # Serial_MPAN
-    "[0-9]{2}e[0-9]{7}_[0-9]{13}",  # Serial_MPAN
-    "[a-zA-Z0-9]{10}_[0-9]{13}",  # MeterSerial_MPAN
-    "[0-9]{2}m[0-9]{7}",  # Serial
-    "[0-9]{2}e[0-9]{7}",  # Serial
-    "^$|\d{13}$",  # MPAN
-    "a_[0-f]{8}",  # Account Number
-    "A-[0-f]{8}",  # Account Number
-    "sk_live_[a-zA-Z0-9]{24}",  # API
+    r"[0-9]{2}m[0-9]{7}_[0-9]{13}",  # Serial_MPAN
+    r"[0-9]{2}e[0-9]{7}_[0-9]{13}",  # Serial_MPAN
+    r"[a-zA-Z0-9]{10}_[0-9]{13}",  # MeterSerial_MPAN
+    r"[0-9]{2}m[0-9]{7}",  # Serial
+    r"[0-9]{2}e[0-9]{7}",  # Serial
+    r"^$|\d{13}$",  # MPAN
+    r"a_[0-f]{8}",  # Account Number
+    r"A-[0-f]{8}",  # Account Number
+    r"sk_live_[a-zA-Z0-9]{24}",  # API
 ]
 
 EVENT_TRIGGER = "PV_OPT"
