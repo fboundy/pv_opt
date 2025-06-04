@@ -375,8 +375,8 @@ class Tariff:
         if (self.host is not None) and ("unit" in df.columns):
             events = self.host.saving_events
             for id in events:
-                event_start = pd.Timestamp(events[id]["start"]).floor("30min")
-                event_end = pd.Timestamp(events[id]["end"]).ceil("30min")
+                event_start = pd.Timestamp(events[id]["start"], tz="UTC").floor("30min")
+                event_end = pd.Timestamp(events[id]["end"], tz="UTC").ceil("30min")
                 event_value = int(events[id]["octopoints_per_kwh"]) / 8
 
                 self.log("Savings Events debugging")
