@@ -374,18 +374,22 @@ class Tariff:
         # Update for Octopus Savings Events if they exists
         if (self.host is not None) and ("unit" in df.columns):
             events = self.host.saving_events
+
             for id in events:
+                self.log(id)
                 event_start = pd.Timestamp(events[id]["start"], tz="UTC").floor("30min")
                 event_end = pd.Timestamp(events[id]["end"], tz="UTC").ceil("30min")
                 event_value = int(events[id]["octopoints_per_kwh"]) / 8
 
                 self.log("Savings Events debugging")
                 self.log("")
+                self.log("Events is.....")
+                self.log(events)
                 self.log(f"start = {start}")
                 self.log(f"end = {end}")
                 self.log(f"event_start = {event_start}")
                 self.log(f"event_end = {event_end}")
-
+                
                 if event_start <= end or event_end > start and event_value > 0:
                     event_start = max(event_start, start)
                     event_end = min(event_end - pd.Timedelta(30, "minutes"), end)
