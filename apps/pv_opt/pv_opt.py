@@ -21,7 +21,7 @@ import pandas as pd
 import pvpy as pv
 from numpy import nan
 
-VERSION = "5.1.8-Beta-2"
+VERSION = "5.1.8-Beta-3"
 
 UNITS = {
     "current": "A",
@@ -2557,6 +2557,9 @@ class PVOpt(hass.Hass):
             time_value = pd.to_datetime(state, errors="coerce", format="%H:%M")
             if pd.notna(time_value):
                 value = state
+
+        if value is None and isinstance(state, str):
+            value = state
 
         return value
 
