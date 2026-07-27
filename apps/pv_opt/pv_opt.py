@@ -21,7 +21,7 @@ import pandas as pd
 import pvpy as pv
 from numpy import nan
 
-VERSION = "5.1.8-Beta-1"
+VERSION = "5.1.8-Beta-2"
 
 UNITS = {
     "current": "A",
@@ -2555,11 +2555,8 @@ class PVOpt(hass.Hass):
 
         if value is None:
             time_value = pd.to_datetime(state, errors="coerce", format="%H:%M")
-            if time_value != pd.NaT:
+            if pd.notna(time_value):
                 value = state
-
-        if value is None:
-            value = state
 
         return value
 
@@ -2704,7 +2701,24 @@ class PVOpt(hass.Hass):
 
         soc_now = self.get_config("id_battery_soc")
 
-        self.pv_system.initial_soc = soc_now
+        try:
+            self.pv_system.initial_soc = float(soc_now)
+        except (TypeError, ValueError):
+            soc_history = self.hass2df(self.config["id_battery_soc"], days=1)
+            if soc_history is not None and len(soc_history) > 0:
+                self.pv_system.initial_soc = float(soc_history.iloc[-1])
+                self.log(
+                    f"Unable to get a valid current SOC from HASS (got: {soc_now!r}). "
+                    f"Using last known value from history: {self.pv_system.initial_soc:.1f}%",
+                    level="WARNING",
+                )
+            else:
+                self.log(
+                    f"Unable to get a valid current SOC from HASS (got: {soc_now!r}) and no history available. "
+                    "Skipping this optimiser run.",
+                    level="WARNING",
+                )
+                return
         # soc_last_day = self.hass2df(self.config["id_battery_soc"], days=1, log=self.debug)
         # if self.debug and "S" in self.debug_cat:
         #     self.log(f">>> soc_now: {soc_now}")
