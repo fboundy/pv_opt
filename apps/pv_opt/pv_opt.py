@@ -3224,7 +3224,7 @@ class PVOpt(hass.Hass):
 
                     elif self.charge_power < 0:
                         self.log("Charge Power <0")
-                        did_something = self.inverter.control_charge(enable=False)
+                        did_something = self.inverter.control_charge(enable=False, update_work_mode=False)
 
                         did_something = self.inverter.control_discharge(
                             enable=True,
@@ -3333,6 +3333,7 @@ class PVOpt(hass.Hass):
                             if status["charge"]["active"]:
                                 did_something = self.inverter.control_charge(
                                     enable=False,
+                                    update_work_mode=False,
                                 )
 
                             did_something = self.inverter.control_discharge(
