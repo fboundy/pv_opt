@@ -114,21 +114,11 @@ class Tariff:
 
         self.host.io_prices = {}
 
-        if octopus:
-            self.get_octopus_from_website(**kwargs)
-            # self.log("")
-            # self.log("Returned from get_octopus_from_website")
-        else:
+        # Try to find Octopus Intelligent/IOG rates from the Octopus Energy Integration
+        # *before* touching the website - the public product catalog has been unreliable
+        # for these tariffs (see BottlecapDave #1708), while the Integration's own
+        # rates entities give correct, personalised, dispatch-aware pricing directly.
 
-            if self.manual:
-                self.unit = unit
-                self.fixed = fixed
-            else:
-                self.fixed = [{"value_inc_vat": fixed, "valid_from": valid_from}]
-                self.unit = [{"value_inc_vat": unit, "valid_from": valid_from}]
-                if eco7:
-                    self.day = [{"value_inc_vat": day, "valid_from": valid_from}]
-                    self.night = [{"value_inc_vat": night, "valid_from": valid_from}]
 
         if ("INTELLI" in name or "IOG" in name) and not self.export:
             if self.host.get_config("octopus_auto"):
@@ -154,6 +144,24 @@ class Tariff:
                         "Failed to find Octopus Intellgient tariffs from Octopus Energy Integration, extra IO slots will not be loaded",
                         level="WARNING",
                     )
+
+        if octopus:
+            self.get_octopus_from_website(**kwargs)
+            # self.log("")
+            # self.log("Returned from get_octopus_from_website")
+        else:
+
+            if self.manual:
+                self.unit = unit
+                self.fixed = fixed
+            else:
+                self.fixed = [{"value_inc_vat": fixed, "valid_from": valid_from}]
+                self.unit = [{"value_inc_vat": unit, "valid_from": valid_from}]
+                if eco7:
+                    self.day = [{"value_inc_vat": day, "valid_from": valid_from}]
+                    self.night = [{"value_inc_vat": night, "valid_from": valid_from}]
+
+
 
     def _oct_time(self, d):
         # print(d)
@@ -202,6 +210,17 @@ class Tariff:
             ]
             self.unit = self.day
 
+        elif not self.export and len(self.host.io_prices) > 0:
+            # Intelligent Octopus Go / IOG: use the Octopus Energy Integration's own
+            # rates directly rather than the public product catalog, which has been
+            # unreliable for this tariff type.
+            self.log(
+                "    Using rates from Octopus Energy Integration directly for Intelligent tariff "
+                "(skipping public product-catalog lookup)"
+            )
+            self.unit = [
+                {"valid_from": ts.isoformat(), "value_inc_vat": v} for ts, v in self.host.io_prices.items()
+            ]
         else:
             url = f"{OCTOPUS_PRODUCT_URL}{product}/electricity-tariffs/{code}/standard-unit-rates/"
             self.unit = requests.get(url, params=params).json()["results"]
@@ -209,6 +228,8 @@ class Tariff:
                 raise ValueError(
                     f"Octopus API returned no standard-unit-rates for tariff '{code}' (product '{product}'). URL: {url}"
                 )
+
+            
             # SVB logging
             # self.log("")
             # self.log("Printing self.unit")
