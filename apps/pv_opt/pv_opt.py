@@ -2306,15 +2306,26 @@ class PVOpt(hass.Hass):
             return
 
         switch_entity = f"switch.{self.prefix.lower()}_axle_allow_pvopt_writes"
-        if self.entity_exists(switch_entity) and self.get_ha_value(entity_id=switch_entity) == "off":
-            self.log(
-                f"  - Migrating {switch_entity}: fixing axle_allow_pvopt_writes polarity bug. "
-                "Setting to 'on' to preserve your pre-fix behaviour (writes were never "
-                "suppressed during Axle events regardless of this switch). Set it to 'off' "
-                "now if you actually want write suppression during the Axle event window.",
-                level="WARNING",
-            )
-            self.set_state(state="on", entity_id=switch_entity)
+
+        if self.entity_exists(switch_entity):
+            state = self.get_state_retry(entity_id=switch_entity)
+            if state is None:
+                self.log(
+                    f"  - Could not reliably read {switch_entity} during the axle_allow_pvopt_writes "
+                    "polarity migration check. Skipping for now; will retry on next restart.",
+                    level="WARNING",
+                )
+                return  # don't create the marker - retry next restart rather than skip silently
+
+            if state.strip().lower() == "off":
+                self.log(
+                    f"  - Migrating {switch_entity}: fixing axle_allow_pvopt_writes polarity bug. "
+                    "Setting to 'on' to preserve your pre-fix behaviour (writes were never "
+                    "suppressed during Axle events regardless of this switch). Set it to 'off' "
+                    "now if you actually want write suppression during the Axle event window.",
+                    level="WARNING",
+                )
+                self.set_state(state="on", entity_id=switch_entity)
 
         conf_topic = f"homeassistant/sensor/{marker_id}/config"
         state_topic = f"homeassistant/sensor/{marker_id}/state"

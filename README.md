@@ -357,9 +357,10 @@ That's it. AppDaemon is up and running. There is futher documentation for the [A
 0. Make sure HACS "Enable AppDaemon apps discovery & tracking" is enabled - under integrations in HA https://hacs.xyz/docs/categories/appdaemon_apps/
 1. Go to HACS
 2. Select `Automation`
-3. Click on the 3 dots top right and `Add Custom Repository`
-4. Add this repository https://github.com/stevebuk1/pv_opt and select `AppDaemon` as the `Category`
-5. Download the app
+3. Click on the 3 dots top right and then select `Custom Repositories`
+4. Add this string as the repository: https://github.com/stevebuk1/pv_opt and select `AppDaemon` as the `Category`
+5. Type "pv_opt" into the search box to locate Pv_opt. 
+6. Download the app by clicking the download button. 
 
 Once downloaded AppDaemon should see the app and attempt to load it using the default configuration. Go back to the AppDaemon logs and this time open pv_opt.log. You should see:
 
