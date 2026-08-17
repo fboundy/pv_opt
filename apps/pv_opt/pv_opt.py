@@ -434,7 +434,7 @@ DEFAULT_CONFIG = {
     # },
     "id_solcast_today": {"default": "sensor.solcast_pv_forecast_forecast_today"},
     "id_solcast_tomorrow": {"default": "sensor.solcast_pv_forecast_forecast_tomorrow"},
-    "axle_allow_pvopt_writes": {"default": False, "domain": "switch"},
+    "axle_allow_pvopt_writes": {"default": True, "domain": "switch"},
     "id_axle_start_time": {"default": "sensor.axle_vpp_axle_start_time"},
     "id_axle_end_time": {"default": "sensor.axle_vpp_axle_end_time"},
     "axle_export_rate_p": {
@@ -676,6 +676,7 @@ class PVOpt(hass.Hass):
         # if there are existing entities for the configs in HA then read those values
         # if not, set up entities using MQTT discovery and write the initial state to them
         self._load_args()
+        self._migrate_axle_write_polarity()  #set axle_allow_pvopt_writes to True - one time command
 
         # self._estimate_capacity()
         self._load_pv_system_model()
@@ -1886,7 +1887,7 @@ class PVOpt(hass.Hass):
         and write suppression is not needed."""
         if self.axle_event is None:
             return False
-        if not self.get_config("axle_allow_pvopt_writes"):
+        if self.get_config("axle_allow_pvopt_writes"):
             return False
         now = pd.Timestamp.now(tz="UTC")
         freq = pd.Timedelta(minutes=self.get_config("optimise_frequency_minutes"))
@@ -2283,6 +2284,49 @@ class PVOpt(hass.Hass):
         self.rlog("")
 
         self._expose_configs(over_write)
+
+    def _migrate_axle_write_polarity(self):
+        """
+        One-time migration for the axle_allow_pvopt_writes polarity fix.
+
+        Prior to this fix, _axle_writes_suspended() had its logic inverted, so
+        every existing installation was effectively running with writes NEVER
+        suppressed during Axle events, regardless of this switch's state. To
+        avoid a silent behaviour change for existing users on upgrade, if the
+        switch entity already exists and is currently 'off', flip it to 'on'
+        (preserving the "never suppressed" behaviour they were actually
+        experiencing). Marks itself done via a small retained marker entity so
+        it only ever runs once, and never overrides a deliberate choice made
+        after this fix has already applied.
+        """
+        marker_id = f"{self.prefix.lower()}_axle_write_polarity_migrated"
+        marker_entity = f"sensor.{marker_id}"
+
+        if self.entity_exists(marker_entity):
+            return
+
+        switch_entity = f"switch.{self.prefix.lower()}_axle_allow_pvopt_writes"
+        if self.entity_exists(switch_entity) and self.get_ha_value(entity_id=switch_entity) == "off":
+            self.log(
+                f"  - Migrating {switch_entity}: fixing axle_allow_pvopt_writes polarity bug. "
+                "Setting to 'on' to preserve your pre-fix behaviour (writes were never "
+                "suppressed during Axle events regardless of this switch). Set it to 'off' "
+                "now if you actually want write suppression during the Axle event window.",
+                level="WARNING",
+            )
+            self.set_state(state="on", entity_id=switch_entity)
+
+        conf_topic = f"homeassistant/sensor/{marker_id}/config"
+        state_topic = f"homeassistant/sensor/{marker_id}/state"
+        conf = {
+            "state_topic": state_topic,
+            "name": self._name_from_item("axle_write_polarity_migrated"),
+            "object_id": marker_id,
+            "unique_id": marker_id,
+        }
+        self.mqtt.mqtt_publish(conf_topic, dumps(conf), retain=True)
+        self.mqtt.mqtt_publish(state_topic, "applied", retain=True)
+
 
     def _name_from_item(self, item):
         name = item.replace("_", " ")
