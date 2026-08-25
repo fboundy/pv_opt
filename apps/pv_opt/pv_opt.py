@@ -1846,6 +1846,7 @@ class PVOpt(hass.Hass):
                 self.redact_regex.append(octopus_account)
                 self.redact_regex.append(octopus_account.lower().replace("-", "_"))
 
+# After
             free_events = self.get_state_retry(free_electricity_events_entity, attribute="all")["attributes"]["events"]
 
             # The logging in this if statement should be hidden behind a debugging switch
@@ -1853,19 +1854,23 @@ class PVOpt(hass.Hass):
 
                 self.log("  The following Free Electricty Events have been identified:")
                 for event in free_events:
+                    event_key = event["code"] if event.get("code") is not None else f"id_{event.get('id', '?')}"
+                    if event.get("code") is None:
+                        self.log(f"  Event id={event.get('id', '?')} has no event code from the integration - will use '{event_key}' as key")
                     self.log(
-                        f"{event['code']:8s}: {pd.Timestamp(event  ['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(event['end']).strftime(DATE_TIME_FORMAT_SHORT)}"
+                        f"{str(event_key):8s}: {pd.Timestamp(event['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(event['end']).strftime(DATE_TIME_FORMAT_SHORT)}"
                     )
 
                 self.log("  The following upcoming Free Electricty Events have been identified:")
                 for event in free_events:
-                    if event["code"] not in self.free_electricity_events and pd.Timestamp(
+                    event_key = event["code"] if event.get("code") is not None else f"id_{event.get('id', '?')}"
+                    if event_key not in self.free_electricity_events and pd.Timestamp(
                         event["end"], tz="UTC"
                     ) > pd.Timestamp.now(tz="UTC"):
                         self.log(
-                            f"{event['code']:8s}: {pd.Timestamp(event  ['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(event['end']).strftime(DATE_TIME_FORMAT_SHORT)}"
+                            f"{str(event_key):8s}: {pd.Timestamp(event['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(event['end']).strftime(DATE_TIME_FORMAT_SHORT)}"
                         )
-                        self.free_electricity_events[event["code"]] = event
+                        self.free_electricity_events[event_key] = event
 
         self.log("")
 
@@ -1873,7 +1878,7 @@ class PVOpt(hass.Hass):
             self.log("  The following upcoming Octopus Free Electricity Events are being applied:")
             for id in self.free_electricity_events:
                 self.log(
-                    f"{id:8s}: {pd.Timestamp(self.free_electricity_events[id]['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(self.free_electricity_events[id]['end']).strftime(DATE_TIME_FORMAT_SHORT)}"
+                    f"{str(id):8s}: {pd.Timestamp(self.free_electricity_events[id]['start']).strftime(DATE_TIME_FORMAT_SHORT)} - {pd.Timestamp(self.free_electricity_events[id]['end']).strftime(DATE_TIME_FORMAT_SHORT)}"
                 )
         else:
             self.log("No upcoming Octopus Free Electricity Events detected")
