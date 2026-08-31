@@ -90,7 +90,7 @@ class Tariff:
         if host is None:
             self.log = print
             self.rlog = print
-            self.tz = "GB"
+            self.tz = "Europe/London"
         else:
             self.log = host.log
             self.rlog = host.rlog
@@ -694,7 +694,7 @@ class Contract:
         else:
             self.log = print
             self.rlog = print
-            self.tz = "GB"
+            self.tz = "Europe/London"
 
         if imp is None and octopus_account is None:
             raise ValueError("Either a named import tariff or Octopus Account details much be provided")
@@ -859,7 +859,7 @@ class PVsystemModel:
             self.tz = host.tz
         else:
             self.log = print
-            self.tz = "GB"
+            self.tz = "Europe/London"
         self.prices = None
         self.static_flows = None
         self.solar_id = "solar"

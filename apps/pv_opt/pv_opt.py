@@ -21,7 +21,7 @@ import pandas as pd
 import pvpy as pv
 from numpy import nan
 
-VERSION = "5.1.8-Beta-5"
+VERSION = "5.1.8-Beta-6"
 
 UNITS = {
     "current": "A",
@@ -1327,7 +1327,7 @@ class PVOpt(hass.Hass):
             return None
 
     def _load_tz(self):
-        self.tz = self.args.pop("manual_tz", "GB")
+        self.tz = self.args.pop("manual_tz", "Europe/London")
         self.log(f"Local timezone set to {self.tz}")
 
     def _load_inverter(self):
@@ -1763,13 +1763,22 @@ class PVOpt(hass.Hass):
     def _load_saving_events(self):
 
         event_states = self.get_state_retry("event") or {}   #Protects against None being returned
-        if (
-            len([name for name in event_states.keys() if ("octoplus_saving_session_events" in name)])
-            > 0
-        ):
-            saving_events_entity = [
-                name for name in event_states.keys() if ("octoplus_saving_session_events" in name)
-            ][0]
+
+        # Octopus/BottlecapDave renamed these entities (old ones deprecated Jan 2027).
+        # Prefer the new "power_down" name; fall back to the old "saving_session" one.
+        new_entities = [name for name in event_states.keys() if ("octoplus_power_down_events" in name)]
+        old_entities = [name for name in event_states.keys() if ("octoplus_saving_session_events" in name)]
+
+        saving_events_entity = None
+        join_service = None
+        if len(new_entities) > 0:
+            saving_events_entity = new_entities[0]
+            join_service = "octopus_energy/join_octoplus_power_down_session_event"
+        elif len(old_entities) > 0:
+            saving_events_entity = old_entities[0]
+            join_service = "octopus_energy/join_octoplus_saving_session_event"
+
+        if saving_events_entity is not None:
             self.log("")
             self.log(f"Found Octopus Savings Events entity: {saving_events_entity}")
             octopus_account = self.get_state_retry(entity_id=saving_events_entity, attribute="account_id")
@@ -1797,7 +1806,7 @@ class PVOpt(hass.Hass):
                         )
                         if not axle_enrolled:
                             self.call_service(
-                                "octopus_energy/join_octoplus_saving_session_event",
+                                join_service,
                                 entity_id=saving_events_entity,
                                 event_code=event["code"],
                             )
@@ -1823,23 +1832,27 @@ class PVOpt(hass.Hass):
 
     def _load_free_electricity_events(self):
         DATE_TIME_FORMAT_SHORT_YEAR = "%d-%b-%Y %H:%M %Z"
-        if (
-            len(
-                [
-                    name
-                    for name in (self.get_state_retry("event") or {}).keys()
-                    if ("octoplus_free_electricity_session_events" in name)
-                ]
-            )
-            > 0
-        ):
-            free_electricity_events_entity = [
-                name
-                for name in (self.get_state_retry("event") or {}).keys()
-                if ("octoplus_free_electricity_session_events" in name)
-            ][0]
+
+        event_states = self.get_state_retry("event") or {}
+
+        # Octopus/BottlecapDave renamed these entities (old ones deprecated Jan 2027).
+        # Prefer the new name; fall back to the old one if it's not present yet.
+        new_entities = [name for name in event_states.keys() if ("octoplus_power_up_events" in name)]
+        old_entities = [
+            name for name in event_states.keys() if ("octoplus_free_electricity_session_events" in name)
+        ]
+
+        free_electricity_events_entity = None
+        if len(new_entities) > 0:
+            free_electricity_events_entity = new_entities[0]
+        elif len(old_entities) > 0:
+            free_electricity_events_entity = old_entities[0]
+
+        if free_electricity_events_entity is not None:
             self.log("")
             self.rlog(f"Found Octopus Free Electricity Session Events entity: {free_electricity_events_entity}")
+
+
             octopus_account = self.get_state_retry(entity_id=free_electricity_events_entity, attribute="account_id")
 
             self.config["octopus_account"] = octopus_account
