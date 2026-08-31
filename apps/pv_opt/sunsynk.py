@@ -430,12 +430,11 @@ class SolarSunsynkInverter(SunsynkBaseInverter):
     discharge command are sent in a single service call.
     """
 
-    def control_charge(self, enable, **kwargs):
+    def control_charge(self, enable, update_work_mode=True, **kwargs):
         time_now = pd.Timestamp.now(tz=self.tz)
 
         if enable:
             params = {
-                self._brand_config["json_work_mode"]: 2,
                 self._brand_config["json_timed_charge_target_soc"]: kwargs.get("target_soc", 100),
                 self._brand_config["json_timed_charge_start"]: kwargs.get("start", time_now.strftime(TIMEFORMAT)),
                 self._brand_config["json_timed_charge_end"]: kwargs.get(
@@ -450,7 +449,6 @@ class SolarSunsynkInverter(SunsynkBaseInverter):
             }
         else:
             params = {
-                self._brand_config["json_work_mode"]: 2,
                 self._brand_config["json_timed_charge_target_soc"]: 100,
                 self._brand_config["json_timed_charge_start"]: "00:00",
                 self._brand_config["json_timed_charge_end"]: "00:00",
@@ -459,14 +457,21 @@ class SolarSunsynkInverter(SunsynkBaseInverter):
                 self._brand_config["json_gen_charge_enable"]: True,
             }
 
+        # sysWorkMode is a single, shared inverter register. When this call is
+        # immediately followed by the complementary control_discharge/control_charge
+        # call in the same cycle, the caller can pass update_work_mode=False so only
+        # the final call writes it — avoiding two back-to-back writes of different
+        # values within the same execution.
+        if update_work_mode:
+            params[self._brand_config["json_work_mode"]] = 2
+
         self._set_inverter(**params)
 
-    def control_discharge(self, enable, **kwargs):
+    def control_discharge(self, enable, update_work_mode=True, **kwargs):
         time_now = pd.Timestamp.now(tz=self.tz)
 
         if enable:
             params = {
-                self._brand_config["json_work_mode"]: 0,
                 self._brand_config["json_timed_discharge_target_soc"]: kwargs.get(
                     "target_soc", self._host.get_config("maximum_dod_percent")
                 ),
@@ -478,9 +483,9 @@ class SolarSunsynkInverter(SunsynkBaseInverter):
                 self._brand_config["json_timed_discharge_enable"]: True,
                 self._brand_config["json_gen_discharge_enable"]: False,
             }
+            work_mode = 0
         else:
             params = {
-                self._brand_config["json_work_mode"]: 2,
                 self._brand_config["json_timed_discharge_target_soc"]: 100,
                 self._brand_config["json_timed_discharge_start"]: "00:00",
                 self._brand_config["json_timed_discharge_end"]: "00:00",
@@ -488,6 +493,10 @@ class SolarSunsynkInverter(SunsynkBaseInverter):
                 self._brand_config["json_timed_discharge_enable"]: False,
                 self._brand_config["json_gen_discharge_enable"]: True,
             }
+            work_mode = 2
+
+        if update_work_mode:
+            params[self._brand_config["json_work_mode"]] = work_mode
 
         self._set_inverter(**params)
 

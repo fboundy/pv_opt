@@ -1,4 +1,4 @@
-# PV Opt: Home Assistant Solar/Battery Optimiser v5.1.7
+# PV Opt: Home Assistant Solar/Battery Optimiser v5.1.8
 
 <h2>*** Announcement *** </h2>
 
@@ -357,9 +357,10 @@ That's it. AppDaemon is up and running. There is futher documentation for the [A
 0. Make sure HACS "Enable AppDaemon apps discovery & tracking" is enabled - under integrations in HA https://hacs.xyz/docs/categories/appdaemon_apps/
 1. Go to HACS
 2. Select `Automation`
-3. Click on the 3 dots top right and `Add Custom Repository`
-4. Add this repository https://github.com/stevebuk1/pv_opt and select `AppDaemon` as the `Category`
-5. Download the app
+3. Click on the 3 dots top right and then select `Custom Repositories`
+4. Add this string as the repository: https://github.com/stevebuk1/pv_opt and select `AppDaemon` as the `Category`
+5. Type "pv_opt" into the search box to locate Pv_opt. 
+6. Download the app by clicking the download button. 
 
 Once downloaded AppDaemon should see the app and attempt to load it using the default configuration. Go back to the AppDaemon logs and this time open pv_opt.log. You should see:
 
@@ -533,7 +534,7 @@ Import and/or export tarifs can be set manually as follows. These can be combine
 
 | Parameter                  |   Units    | Entity                       | Default | Description                                                                                              |
 | :------------------------- | :--------: | :--------------------------- | :-----: | :------------------------------------------------------------------------------------------------------- |
-| Pv_opt control during Axle events   |  `True/False`  | `switch.pv_opt_axle_allow_pvopt_writes`      | True | Allow Pv_opt to write to inverter during Axle Energy events. If you signed up with Axle with "control" disabled then you'll want to leave this set to True. If you've signed up with Axle with control disabled, Axle should control your inverter during an event but has been known to start late or not at all. Until Axle fix this it is recommended that Pv_opt should also control your inverter, which given the current export price will almost certainly schedule an export event and as such there will be no conflicts.                                                      |
+| Pv_opt control during Axle events   |  `True/False`  | `switch.pv_opt_axle_allow_pvopt_writes`      | True | Allow Pv_opt to write to inverter during Axle Energy events. If you signed up with Axle with "control" disabled then you'll want to leave this set to True. If you've signed up with Axle with control disabled, Axle should control your inverter during an event but has been known to start late or not at all. Until Axle fix this it is recommended that Pv_opt should also control your inverter, which given the current export price will almost certainly schedule an export event and as such there will be no conflicts. Note: a fix released at v5.1.8-Beta-5 corrects an inversion error and will set this to True as a one time event. Storage of applying the fix will be via creation of a new entity 'sensor.pvopt_axle_write_polarity_migrated'                                                       |
 | Axle Energy export price   |  pence  | `number.pvopt_axle_export_rate_p`   |  100p   | Price for Axle Energy Export events. Defaults to 100p which is the current price Axle offer for all events. Change it here if it changes.                                                           |
 
 
