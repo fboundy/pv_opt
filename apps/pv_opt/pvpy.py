@@ -1237,7 +1237,19 @@ class PVsystemModel:
 
                             tolerance = self.host.get_config("forced_power_group_tolerance")
                             window_hours = search_window["dt_hours"].loc[window].sum()
-                            if slot_power_required < (tolerance / 2) and window_hours > 3.5:
+
+                            # Energy already committed to this window by earlier swaps, plus what this swap
+                            # would add, spread evenly across the whole window - not just this swap's own
+                            # marginal slice.
+
+                            existing_energy_wh = (
+                                search_window["forced"].loc[window] * search_window["dt_hours"].loc[window]
+                            ).sum()
+                            projected_avg_power = (
+                                existing_energy_wh + round_trip_energy_required * 1000
+                            ) / window_hours
+
+                            if projected_avg_power < (tolerance / 2) and window_hours > 3.5:
                                 window = window[-2:]
                                 slot_power_required = (
                                     round_trip_energy_required * 1000 / search_window["dt_hours"].loc[window].sum()
@@ -1252,8 +1264,8 @@ class PVsystemModel:
                                 for slot in window:
                                     slot_charger_power_available = max(
                                         self.inverter.charger_power
-                                        - search_window["forced"].loc[slot]
-                                        - search_window["solar"].loc[slot],
+                                        - search_window["forced"].loc[slot],
+                                    #     - search_window["solar"].loc[slot],  # certain this isnt required. Forced is what the battery charges at, independent of solar
                                         0,
                                     )
                                     slot_available_capacity = max(

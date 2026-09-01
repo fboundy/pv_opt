@@ -293,6 +293,7 @@ class SolarSynkV3Inverter(SunsynkBaseInverter):
                 self._brand_config["json_charge_current"]: min(
                     round(kwargs.get("power", 0) / self._host.get_config("battery_voltage")),
                     self._host.get_config("battery_current_limit_amps"),
+                    round(self._host.get_config("charger_power_watts") / self._host.get_config("battery_voltage")),
                 ),
             }
             self._set_inverter(**params)
@@ -308,7 +309,10 @@ class SolarSynkV3Inverter(SunsynkBaseInverter):
                 self._brand_config["json_timed_charge_target_soc"]: 100,
                 self._brand_config["json_timed_charge_start"]: "00:00",
                 self._brand_config["json_timed_charge_end"]: "00:00",
-                self._brand_config["json_charge_current"]: self._host.get_config("battery_current_limit_amps"),
+                self._brand_config["json_charge_current"]: min(
+                    self._host.get_config("battery_current_limit_amps"),
+                    round(self._host.get_config("charger_power_watts") / self._host.get_config("battery_voltage")),
+                ),
             }
             self._set_inverter(**params)
 
@@ -443,6 +447,7 @@ class SolarSunsynkInverter(SunsynkBaseInverter):
                 self._brand_config["json_charge_current"]: min(
                     round(kwargs.get("power", 0) / self._host.get_config("battery_voltage")),
                     self._host.get_config("battery_current_limit_amps"),
+                    round(self._host.get_config("charger_power_watts") / self._host.get_config("battery_voltage")),
                 ),
                 self._brand_config["json_timed_charge_enable"]: True,
                 self._brand_config["json_gen_charge_enable"]: False,
@@ -452,7 +457,10 @@ class SolarSunsynkInverter(SunsynkBaseInverter):
                 self._brand_config["json_timed_charge_target_soc"]: 100,
                 self._brand_config["json_timed_charge_start"]: "00:00",
                 self._brand_config["json_timed_charge_end"]: "00:00",
-                self._brand_config["json_charge_current"]: self._host.get_config("battery_current_limit_amps"),
+                self._brand_config["json_charge_current"]: min(
+                    self._host.get_config("battery_current_limit_amps"),
+                    round(self._host.get_config("charger_power_watts") / self._host.get_config("battery_voltage")),
+                ),
                 self._brand_config["json_timed_charge_enable"]: False,
                 self._brand_config["json_gen_charge_enable"]: True,
             }

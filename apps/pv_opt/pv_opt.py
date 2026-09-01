@@ -21,7 +21,7 @@ import pandas as pd
 import pvpy as pv
 from numpy import nan
 
-VERSION = "5.1.8"
+VERSION = "5.1.9-Beta-1"
 
 UNITS = {
     "current": "A",
