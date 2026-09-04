@@ -893,11 +893,28 @@ class PVOpt(hass.Hass):
         df = pd.DataFrame(self.get_state_retry(self.io_dispatching_sensor, attribute=("planned_dispatches")))
 
         # If Charging plan exists, convert dispatch start and end times to datetime format and append to df.
+        # If Charging plan exists, convert dispatch start and end times to datetime format and append to df.
         if not df.empty:
             df["start_dt"] = pd.to_datetime(df["start"], utc=True)
             df["end_dt"] = pd.to_datetime(df["end"], utc=True)
             df["start_local"] = df["start_dt"].dt.tz_convert(self.tz)
             df["end_local"] = df["end_dt"].dt.tz_convert(self.tz)
+
+            # Guard against a stale "planned_dispatches" attribute from the Octopus Energy
+            # integration (observed: the intelligent-dispatch sensor can stop updating while
+            # other Octopus entities keep working, silently returning a schedule that is days
+            # or weeks old). Drop any rows whose end has already passed by more than a day -
+            # a genuinely current/future schedule should never have entries this stale.
+            stale_cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=1)
+            stale_mask = df["end_dt"] < stale_cutoff
+
+            if stale_mask.any():
+                self.log(
+                    f"    WARNING: {stale_mask.sum()} IOG dispatch row(s) appear stale "
+                    f"(ended before {stale_cutoff.strftime('%d-%b %H:%M %Z')}) - discarding. "
+                    "Check the Octopus Energy integration's intelligent-dispatch sensor if this persists."
+                )
+                df = df[~stale_mask].reset_index(drop=True)
 
         self.log("")
         self.log("    Octopus Intelligent Go Smart Charging Schedule is.... ")
