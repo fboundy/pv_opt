@@ -448,7 +448,7 @@ class Tariff:
                     self.log(f"event_start = {event_start}")
                     self.log(f"event_end = {event_end}")
 
-                if event_start <= end or event_end > start and event_value > 0:
+                if event_start <= end and event_end > start and event_value > 0:
                     event_start = max(event_start, start)
                     event_end = min(event_end - pd.Timedelta(30, "minutes"), end)
 
@@ -486,7 +486,7 @@ class Tariff:
                     self.log(f"event_start = {event_start}")
                     self.log(f"event_end = {event_end}")
 
-                if event_start <= end or event_end > start and event_value > 0:
+                if event_start <= end and event_end > start:
                     event_start = max(event_start, start)
                     event_end = min(event_end - pd.Timedelta(30, "minutes"), end)
 
